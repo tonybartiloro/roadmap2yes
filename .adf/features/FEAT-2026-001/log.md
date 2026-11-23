@@ -303,3 +303,91 @@ Verdetto sul piano: **solido e coerente con il design**, copre quasi tutte le sc
 - **Q1 (DES-17)** — AC39 dice "Il servizio si sta svegliando, riprovate tra un minuto" ma un progetto Supabase free in pausa non riparte da solo. Riformulare AC39 in: "pagina 'L'app è in pausa' che spiega che serve il ripristino manuale dal pannello (con 'Riprova'), distinta dalla pagina 'Non riesco a raggiungere il servizio' per errori di rete o 5xx"? (sì; testi in design §7.3.)
 - **Q2** — Nome dell'app nei testi e nelle email (e nome del mittente): "roadmap2yes", provvisorio e centralizzato in una costante? (sì.)
 - **Q3** — Nella pagina "in pausa" nominiamo chi la ripristina? (no: formula generica "chi gestisce l'app"; il dettaglio tecnico sta in un blocco comprimibile.)
+
+## F2 round 1 — architect responses — 2026-11-23
+plan.md has been rewritten with the round-1 changes (change log updated); the ADR draft is updated. Totals: 41 objections:
+- 34 accepted (1 of them partly: QA-6);
+- 7 sent to the developer as questions, with a technical design ready;
+- 0 rejected.
+
+Business questions are merged into plan.md → "Open questions" Q1–Q16.
+
+### Product-owner
+- PO-1 → accepted. `reopen_decision` puts discarded options back to candidate; pgTAP case added.
+- PO-2 → question for the developer (Q7). Proposed: when a period is chosen, ask for the exact day. `choose_option(…, exact_date)` is ready.
+- PO-3 → accepted. "Adesso" includes open highlightFirst tasks with no date, plus "Scegli il rito".
+- PO-4 → question (Q8, merged with DES-26). Default design: one email per user per day; no 7-day email for dates set or changed inside the window; catch-up only for missed cron runs.
+- PO-5 → question (Q9). Proposed: keep the per-task toggle (already designed) and add it to AC50.
+- PO-6 → accepted. Emails computed on a provisional reference carry a note saying so.
+- PO-7 → accepted. Warning when Assegnato > totale.
+- PO-8 → accepted. (a) and (c) are the PO and designer's own fixes; (b) → Q14; (d) partner B is optional in `complete_onboarding`, and assignee B is shown via `displayName`.
+- PO-9 → accepted. New task T0 (PO milestone spec); T4 depends on it.
+
+### QA
+- QA-1 (blocking) → accepted. New §3.1 write matrix:
+  - column grants;
+  - `guard_row` makes `wedding_id`, `created_*` and `id` immutable;
+  - trigger sets `due_overridden` outside `sync_timeline` (transaction-local `set_config`);
+  - triggers for status and deleted_by;
+  - option status and events only via RPC/trigger;
+  - memberships and user state only via RPC;
+  - composite FKs `(id, wedding_id)`;
+  - allowlist of executable functions.
+  - QA's generated matrix is the test oracle (T17a).
+- QA-2 (blocking) → accepted. §1.1:
+  - every time-dependent pure function takes `today`/`now` as a parameter;
+  - `runDailyJob({clock, sender, db, caps})`;
+  - `r2y-test-now` cookie honoured only if `E2E_CLOCK=1` and `VERCEL` is unset (NODE_ENV is not usable, since `next start` sets production), with a unit test;
+  - serial `time` Playwright project;
+  - DB time tested by shifting timestamps.
+- QA-3 → accepted. `config.toml` is local/CI only, with high limits; remote Auth is set in the dashboard via a runbook checklist (no `config push`); `loginAs` helper; one `@slow` real-cooldown test; a 429 burst integration test.
+- QA-4 → accepted. Server-side limiter `signin_gate` applies the same limit to every email, with identical messages; a provider 429 maps to the same text. The residual leak (project-wide GoTrue limit) is documented as R17. `next=` accepts only relative paths. Acceptance test added.
+- QA-5 → accepted. Stale `claimed` rows (>15 min) are re-taken with the same `batch_key`; tests for overlapping runs, failure at 3 points and bursts; ISO-week vectors; cap math stated (app cap counts app emails only; Auth email rate set to 10/h in the dashboard). Mon–Wed digest catch-up → Q11.
+- QA-6 → accepted in part. QA-owned concurrency tests use parallel PostgREST clients (they get separate pooled connections). Raw `pg` clients are rejected: that would be a new dependency, and the constraint itself is already proven in pgTAP. `create_wedding` double-submit is covered (`for update` on the allowlist row); direct memberships INSERT is denied.
+- QA-7 → accepted:
+  - (a, b) matrix generated from the catalog, run through pgTAP and through PostgREST with real JWTs;
+  - (c) grants audit, only `public` exposed, public wrapper `record_heartbeat` callable only with the secret key;
+  - (d) `audit_capture` excludes `token_hash`;
+  - (e) adversarial invite cases;
+  - (f) family role with no permissions reads nothing;
+  - (g) composite FKs.
+- QA-8 → accepted. T17 split into T17a–d. QA owns `supabase/tests/qa_*`, `tests/acceptance/**`, `e2e/**` and `e2e/support/{auth,fixtures,clock,stub-supabase}.ts`; `mailbox.ts` stays with T6, with QA's contract.
+- QA-9 → accepted:
+  - separate CI jobs: checks / db / e2e-mobile / secrets on each PR; e2e-full on main, nightly or a label;
+  - Playwright browser and Docker image caches; WebKit runs a smoke subset only;
+  - `retries: 1` with flaky reporting;
+  - `-x` service names verified in T1;
+  - unique data per test, `db reset` once per run.
+- QA-10 → accepted. `degraded` Playwright project: a second `next start` pointed at a closed port, plus a stub returning 540; offline-draft test reworked; unit tests of `classifyDbError` against real error shapes.
+- QA-11 → question (Q10, the money parsing rules as proposed). Parsing from the string to integer cents, the cap and the `inputmode` test are accepted.
+- QA-12 → accepted. Mailbox contract in T6: polling, unique recipient per test, raw headers, text and html parts, absence assertions only after a positive control; CI checks `site_url`/template host against Playwright `baseURL`.
+- QA-13 → accepted. The contrast gate reads the generated `themes.css`; the calculator is unit-tested against WCAG vectors; extended token pairs and semantic states; non-blocking report on all 12 themes; nightly axe; target-size and reflow checks; manual F3 checklist.
+- QA-14 → accepted. Header tests, unauthenticated server-action calls, unsubscribe cases, failing lint fixtures, cross-session cache bleed and Back-after-logout tests, deterministic JS/font budgets with LCP as report only, `keepalive-check.ts` with unit tests. The sign-out button → Q12.
+- QA-15 → question (Q13). Proposed: the developer's own Supabase-org-member address as the only staging smoke account.
+- QA-16 → accepted. Neutral fake names; the `@example.test` email guard runs repo-wide.
+- QA-17 → accepted. Unit tests also run with alternative TZ values; Playwright `timezoneId` varied; DST and leap-day vectors; midnight cases.
+
+### Designer
+- DES-16 (blocking) → accepted:
+  - the root layout reads the theme in try/catch, falling back to the `r2y-theme` cookie and then Giardino;
+  - the proxy uses `getClaims()` and, on network errors or 540, rewrites to `/servizio?motivo=paused|unreachable` instead of redirecting to login;
+  - `/servizio` renders without touching the DB; `global-error.tsx` is self-contained;
+  - `classifyDbError` has two outcomes (paused / unreachable);
+  - tested in the `degraded` e2e project.
+- DES-17 → question (Q14, AC39 rewording; merged with PO-8b).
+- DES-18 → accepted. `set_reference_scenario(null)` = back to automatic; reference actions on scenario cards in T12; ScenarioPicker and banner in T11; `reference_set`/`reference_auto` events; undo toast.
+- DES-19 → accepted. Changes of `applied_reference_date` appear in Novità, attributed to whoever caused them; the Percorso header always shows the reference.
+- DES-20 → accepted. `welcome_dismissed_at` plus WelcomeCard (T14).
+- DES-21 → accepted. Theme selectors without `:root`.
+- DES-22 → accepted. Only approved themes are declared; headings 1 weight, body 400+600; `check-font-budget.ts`; gallery font loading as specified; `next/font/local` as plan B.
+- DES-23 → accepted. T3 owns DateScenarioList, ReferenceBadge, MonthYearField, PublicShell and ServiceDownPage; T11 owns ScenarioPicker, ScenarioPreviewBanner, AssigneeField and ReminderToggle.
+- DES-24 → accepted. Extended contrast pairs; rule "accent only on background/card"; lint bans `text-accent`.
+- DES-25 → accepted. Mandatory HTML escaping plus CR/LF stripping in subjects and headers (tested); explicit template signatures; static Giardino palette for Auth emails.
+- DES-26 → question (Q8, merged with PO-4). Batching is the plan's default implementation.
+- DES-27 → accepted. `groupTasks` follows design §3.4.
+- DES-28 → accepted. `?anteprima=<id>`, auto-close, change count.
+- DES-29 → accepted. Field-label maps per entity; nested focus trap.
+- DES-30 → accepted. `displayName` fallback, `content/style-tips.ts` (T10), theme cookie, `theme-color` meta, two email preference toggles.
+
+### Questions for the developer (plan.md Q1–Q16)
+Q1 two-step release · Q2 accepted partner's email read-only · Q3 unknown rite · Q4 deleting a budget category that has items · Q5 partner B reminders only after acceptance · Q6 approved themes · Q7 choosing a period as the date · Q8 one reminder email per user per day · Q9 per-task reminder toggle · Q10 money parsing · Q11 digest catch-up Mon–Wed · Q12 sign-out "Esci" · Q13 staging smoke account · Q14 AC39 rewording · Q15 app name "roadmap2yes" · Q16 paused page names no one.

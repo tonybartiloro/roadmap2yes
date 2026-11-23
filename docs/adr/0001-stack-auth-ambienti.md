@@ -25,12 +25,13 @@
 
 ## Decision
 1. **Stack**: Next.js (App Router, TypeScript strict) su Vercel Hobby, funzioni nella regione `fra1`. Tailwind CSS + shadcn/ui. Supabase (Postgres + Auth) nella regione `eu-central-1`. Nessun altro backend.
-2. **Autorizzazione**: la Row Level Security di Postgres è l'**unico confine di autorizzazione**.
+2. **Autorizzazione**: la Row Level Security di Postgres, insieme ai privilegi di colonna, è l'**unico confine di autorizzazione**.
    - Ogni dato di dominio ha `wedding_id`.
    - Ogni policy usa una sola funzione `private.has_permission(wedding_id, area, action)`, basata su `memberships(role)` × `private.role_permissions`. I ruoli futuri si abilitano aggiungendo righe di mappatura, non riscrivendo policy.
    - Le query dell'utente viaggiano sempre con il suo JWT (`@supabase/ssr`).
+   - Una **matrice delle scritture** imposta nel DB stabilisce cosa il client può scrivere direttamente: privilegi di colonna, trigger che rendono immutabili `wedding_id` e `created_by`, foreign key composte `(id, wedding_id)`, allowlist delle funzioni eseguibili. Il resto passa da RPC o trigger. L'API espone solo lo schema `public`.
    - La chiave segreta di Supabase è confinata in un modulo `server-only` e usata solo per tre scopi:
-     1. creare l'utente Auth di un'email autorizzata;
+     1. accesso: limitatore applicativo identico per tutte le email e creazione dell'utente Auth di un'email autorizzata;
      2. il job giornaliero;
      3. la disattivazione delle email da link firmato.
    - I dati utente non vengono mai messi in cache condivisa.
@@ -52,6 +53,8 @@
    - Production: progetto Supabase prod.
    - Le migrazioni sono versionate in `supabase/migrations`, **solo additive e compatibili con il codice precedente**, applicate da GitHub Actions: sullo staging nelle PR, in produzione al merge, con approvazione nell'environment `production`.
    - Il deploy di produzione resta automatico al merge su main.
+   - `supabase/config.toml` vale solo per il locale e la CI (limiti di test). La configurazione Auth di staging e produzione si fa dal pannello Supabase seguendo una checklist versionata nel runbook; non si usa `supabase config push`.
+   - Se il servizio Supabase è in pausa o non raggiungibile, proxy e layout non reindirizzano al login: mostrano una pagina dedicata che non legge il database.
 6. **Keep-alive e job**:
    - Vercel Cron giornaliero (mattino, Europe/Rome) su una route protetta da `CRON_SECRET`. Registra un heartbeat con una vera query e invia promemoria idempotenti (unicità nel DB);
    - un workflow GitHub settimanale richiama staging e produzione e fallisce, notificando lo sviluppatore, se l'heartbeat di produzione è più vecchio di 36 h.
@@ -92,6 +95,7 @@
   - isolamento tra due matrimoni su ogni tabella;
   - immutabilità delle tabelle storiche;
   - vincolo dei due partner.
+- **Matrice delle scritture**: un test di accettazione generato dal catalogo, eseguito via pgTAP e via PostgREST con JWT reali, fa fallire la CI se una tabella o funzione nuova non ha la sua voce, o se una scrittura vietata riesce.
 - **Test d'integrazione**:
   - la chiave pubblicabile senza sessione non legge nulla;
   - un'email non autorizzata non crea utenti;
