@@ -418,3 +418,8 @@ Coordinator interpretation (to be confirmed at the combined Gate A-change + Gate
 - Release: no two-step needed for Jessica — she can join in C1 with the access code; Resend + reminders are switched on when the domain exists.
 - Q7: a date option can optionally be bound to a location option; when bound, the date shows the location everywhere it appears (full date×location comparison stays in R2).
 - Q13: staging smoke account and all bootstrap values configurable via env.
+
+## Requirement change applied — 2026-11-23
+- PO: brief.md → 62 active AC (AC1–AC64, AC8 and AC47 removed); new AC54–AC64; D29–D48; open C1–C4.
+- Architect: plan.md + ADR → email+access-code auth, env bootstrap inside the login server action (create-only, also `npm run bootstrap`), partner accounts via authorised admin calls, account_events, EmailOffBanner, date→location link; 24 tasks + T0; risks R20–R25; no new dependencies. Open Q-A (min length 10), Q-B (Turnstile, not in R1), Q-C (force change only after temporary reset).
+- Coordinator: C1 (PO min 8) vs Q-A (architect 10, Supabase-enforced) merged into one question for the developer. Security-focused review round in F3 covers the auth change.
