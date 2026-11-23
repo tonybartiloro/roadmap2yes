@@ -3,13 +3,13 @@ id: FEAT-2026-001
 title: "Fondamenta, onboarding guidato, timeline e budget"
 type: feature
 size: L
-phase: F1
+phase: F2
 branch: feature/FEAT-2026-001-fondamenta-onboarding-budget
 ticket: ""
 created: 2026-11-23
 updated: 2026-11-23
 gates:
-  a_requirements: pending    # pending | approved <date> by <name> | skipped
+  a_requirements: "approved 2026-11-23 by tonybartiloro"
   b_plan: pending
   c_production: pending      # pending | approved <date> by <name> | not-needed
 environments:

@@ -227,3 +227,7 @@ Brief updated (AC1–AC53; new AC46–AC53). Decisions D8–D23 record all 14 an
 - Date of birth removed entirely (D26): AC47 and BR17 marked "Rimosso", numbering kept; AC12/13/45/46 and scope reworded.
 - Open questions: none (domain name deferred, non-blocking). Active AC: 52 (AC1–AC53, AC47 removed).
 - Reference scenario rule refined (developer, 2026-11-23): always exactly one reference scenario, "provvisorio" by default (earliest open) and manually changeable, "definitivo" once the date decision is taken, back to "provvisorio" on reopen; preview never changes it and offers "Imposta come riferimento" (AC24, AC32, BR3, D28; numbering unchanged).
+
+## Gate A — 2026-11-23
+- Developer approved the requirements (brief.md, 52 active AC) in chat: "Sì, approvo".
+- Phase → F2. Note for F2: design.md still mentions date of birth (removed by D26) — designer to clean up while finalising.
