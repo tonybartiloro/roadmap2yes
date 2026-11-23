@@ -214,3 +214,9 @@ Totals: 27 objections, 27 accepted (1 in part), 0 rejected.
 - Q12 online-only: approved (local form drafts = text kept if the page is closed mid-form; developer is fine with it).
 - Q13 tone: CHANGED — informal "tu" (second person singular to the logged-in person), very informal.
 - Q14 visual direction: A "Giardino" preferred, but the developer wants at least 10 theme proposals; the couple should be able to pick the theme during onboarding among the themes the developer approves at Gate B.
+
+## F1 round 2 — product-owner update — 2026-11-23
+Brief updated (AC1–AC53; new AC46–AC53). Decisions D8–D23 record all 14 answers.
+- Changed: onboarding now collects both partners (email, name, surname, optional DOB) and sends the invite from it (AC5, AC12–AC14); generic partner A/B model with couple-chosen label (AC46); DOB minimal use (AC47, BR17); rite editable with recalculation (AC48); couple-chosen theme from >=10 candidates approved at Gate B (AC49, BR18); email reminders and weekly digest in scope, assignee both/A/B (AC31, AC50–AC53, BR16, BR19); date reference = fixed/chosen date, else earliest open scenario (AC24, BR3); Resend + own domain, no Vercel/Supabase email (AC9); tone "tu" (BR15; designer to rewrite copy samples); storage Supabase only, R1 none (scope, NFR, D8); one Vercel project + 2nd Supabase for Preview (AC43, D13).
+- Access mechanism for the first account left to the architect (allowlist vs manual), constraint: no stranger can sign up (AC3, BR12).
+- Remaining questions: Q1 reminder cadence, Q2 provisional reference date, Q3 domain timing/name, Q4 light/dark per theme, Q5 DOB necessity.
