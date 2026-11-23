@@ -197,3 +197,20 @@ Brief rewritten (AC renumbered 1–45, Q1–Q14 merged). Business choices stay o
 - DES-14 → accepted: BR15, Q13.
 - DES-15 → accepted: AC16 (suggestions box), AC42 (export), NFR (theme, PWA manifest, fonts, noindex login), Q14.
 Totals: 27 objections, 27 accepted (1 in part), 0 rejected.
+
+## F1 developer answers (round 1 questions) — 2026-11-23
+- Storage: developer asks to use ONLY Supabase (do not fragment the stack). Coordinator position: Supabase Storage is enough for R1–R5; R6 (wedding-day media) starts on Supabase Storage too, behind a small storage interface, with client-side compression/thumbnails and caps; the free limits (1 GB storage, 50 MB/file, ~5 GB egress/month) are re-evaluated with real numbers when R6 is planned. No Backblaze/R2 now.
+- Q1 decision primitive in R1: approved.
+- Q2 access: approved as closed/invite-only, BUT the developer wants an onboarding flow that collects BOTH partners' data: email, first name, last name, date of birth for the groom and the bride (editable later); the second partner receives the invite from that data.
+- Q3 email: developer asks whether Vercel/Supabase/Resend can send email, wants as few services as possible; no domain yet, plans to buy "roadmap2yes" domain. Coordinator proposal: buy the domain, use Resend (free tier) as the single email provider — both as Supabase Auth custom SMTP and for app emails. Vercel has no email sending; Supabase built-in email is only for org members and heavily rate-limited.
+- Q4 staging: OK; developer asks to use Vercel environments instead of duplicating projects. Coordinator: one Vercel project with Preview/Production environments (no duplication on Vercel); the Preview environment variables point to a second free Supabase project (the DB must be separate, Vercel environments do not isolate data).
+- Q5 rite: chosen in onboarding (civil / Catholic with civil effects / symbolic), editable later.
+- Q6 overdue milestones: approved.
+- Q7 single couple budget: approved.
+- Q8 reminders: CHANGED — email reminders wanted: to both partners for shared deadlines, only to the groom or only to the bride for tasks assigned to them (tasks need an assignee: both / partner A / partner B).
+- Q9 style label + note: approved.
+- Q10 date scenarios: approved, plus: a scenario can be a fixed date (usually set by the chosen location) or a period, and there can be several scenarios at once (e.g. Sep 2027, May–Jun 2028, Sep 2028).
+- Q11 partner reactions: approved.
+- Q12 online-only: approved (local form drafts = text kept if the page is closed mid-form; developer is fine with it).
+- Q13 tone: CHANGED — informal "tu" (second person singular to the logged-in person), very informal.
+- Q14 visual direction: A "Giardino" preferred, but the developer wants at least 10 theme proposals; the couple should be able to pick the theme during onboarding among the themes the developer approves at Gate B.
