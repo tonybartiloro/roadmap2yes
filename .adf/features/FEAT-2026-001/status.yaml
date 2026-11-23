@@ -1,0 +1,23 @@
+# p49 ADF feature status — updated through the ADF CLI (adf feature set / adf gate).
+id: FEAT-2026-001
+title: "Fondamenta, onboarding guidato, timeline e budget"
+type: feature
+size: L
+phase: F0                # F0 | F1 | F2 | F3 | F4 | F5 | done | cancelled
+branch: feature/FEAT-2026-001-fondamenta-onboarding-budget
+ticket: ""
+created: 2026-11-23
+updated: 2026-11-23
+gates:
+  a_requirements: pending    # pending | approved <date> by <name> | skipped
+  b_plan: pending
+  c_production: pending      # pending | approved <date> by <name> | not-needed
+environments:
+  staging: pending           # pending | deployed <date> | not-applicable
+  production: pending
+links:
+  pr: ""
+  brief: ""
+  plan: ""
+  docs_functional: ""
+  docs_technical: ""
