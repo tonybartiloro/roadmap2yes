@@ -402,3 +402,19 @@ Q1 two-step release · Q2 accepted partner's email read-only · Q3 unknown rite 
 ## F2 round 1 — summary (coordinator) — 2026-11-23
 - PO-1..9 (0 blocking), QA-1..17 (2 blocking), DES-16..30 (1 blocking): 34 accepted by the architect, 7 turned into developer questions, 0 rejected (QA-6 concurrency via raw pg client rejected as sub-point: PostgREST parallel calls + pgTAP suffice).
 - Blockers QA-1, QA-2, DES-16 closed by their challengers. Plan: 22 tasks, groups G0–G5, max 3 developers in parallel.
+
+## Gate B round — developer answers and REQUIREMENT CHANGE — 2026-11-23
+Developer's words (Italian, verbatim summary): Jessica can be invited by email OR via the email entered at project bootstrap. Through env vars it must be possible to specify the FIRST user's email, their access code and their role (sposa or sposo); that user can invite the other partner by entering the partner's email and an access code that they will hand over, and which can be changed later. If Resend is not configured, no deadline recap emails are sent and an alert is shown in the app.
+Answers: Q2 and Q5 → see the above. Q7 → OK, and a date can be bound to a location; if it is, the app must show it. Q13 → always configurable via env. All other proposals accepted as proposed: Q1 (as adapted below), Q3, Q4, Q6 = approve all 12 themes (default Giardino), Q8, Q9 (keep per-task reminder toggle), Q10, Q11, Q12, Q14, Q15, Q16.
+
+Coordinator interpretation (to be confirmed at the combined Gate A-change + Gate B):
+- Auth becomes email + ACCESS CODE (Supabase Auth email/password; code hashed by Supabase, never stored by us). Magic link / 6-digit email OTP removed from R1. Login works with no email provider at all.
+- Bootstrap via env (server-only, Vercel env / local .env, never committed): R2Y_BOOTSTRAP_EMAIL, R2Y_BOOTSTRAP_ACCESS_CODE, R2Y_BOOTSTRAP_ROLE (sposo|sposa). Idempotent create-only: creates the first user if absent, never overwrites a code changed in-app. Replaces the SQL founder allowlist.
+- Partner invite, two ways: (a) always available: A enters B's email + an initial access code and hands it over personally; B logs in with it and can change it; (b) only when Resend is configured: an invite email with a one-time link where B sets their own code. Max 2 partners stays.
+- Access code rules (proposal): min 8 characters; login rate-limited with temporary lockout and neutral error messages; each partner changes their own code (current code required); a forgotten code is reset by the other partner setting a new temporary code (and, with Resend, by an email reset link).
+- Emails (proposal): A can edit B's email until B's first login; afterwards each partner edits only their own login email.
+- Reminders to B only after B's first login (Q5).
+- No Resend configured → no emails at all (no reminders, digest, invite or reset emails); a persistent in-app alert says emails are off and reminders are visible only in the app; email-only options are hidden/explained.
+- Release: no two-step needed for Jessica — she can join in C1 with the access code; Resend + reminders are switched on when the domain exists.
+- Q7: a date option can optionally be bound to a location option; when bound, the date shows the location everywhere it appears (full date×location comparison stays in R2).
+- Q13: staging smoke account and all bootstrap values configurable via env.
