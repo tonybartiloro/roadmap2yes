@@ -391,3 +391,14 @@ Business questions are merged into plan.md → "Open questions" Q1–Q16.
 
 ### Questions for the developer (plan.md Q1–Q16)
 Q1 two-step release · Q2 accepted partner's email read-only · Q3 unknown rite · Q4 deleting a budget category that has items · Q5 partner B reminders only after acceptance · Q6 approved themes · Q7 choosing a period as the date · Q8 one reminder email per user per day · Q9 per-task reminder toggle · Q10 money parsing · Q11 digest catch-up Mon–Wed · Q12 sign-out "Esci" · Q13 staging smoke account · Q14 AC39 rewording · Q15 app name "roadmap2yes" · Q16 paused page names no one.
+
+## F2 closure — designer — 2026-11-23
+- DES-16 closed: layout DB->cookie->giardino, proxy rewrite to /servizio?motivo=paused|unreachable (no login redirect), /servizio and global-error DB-free, two-outcome classifyDbError, degraded e2e (T17d) all in plan.
+
+## F2 closure — QA — 2026-11-23
+- QA-1: closed. plan §3.1 gives a per-table write matrix with column grants, guard/due_overridden/status triggers, RPC-only paths, an EXECUTE allowlist and composite FKs; it is a testable oracle for the generated matrix (T17a).
+- QA-2: closed. plan §1.1 and A7/R18 give `today`/`now` parameters, `runDailyJob({clock,sender,db,caps})`, the `r2y-test-now` cookie behind `E2E_CLOCK=1` and no `VERCEL`, a unit test, a serial `time` project, and the T17a-d split with QA ownership.
+
+## F2 round 1 — summary (coordinator) — 2026-11-23
+- PO-1..9 (0 blocking), QA-1..17 (2 blocking), DES-16..30 (1 blocking): 34 accepted by the architect, 7 turned into developer questions, 0 rejected (QA-6 concurrency via raw pg client rejected as sub-point: PostgREST parallel calls + pgTAP suffice).
+- Blockers QA-1, QA-2, DES-16 closed by their challengers. Plan: 22 tasks, groups G0–G5, max 3 developers in parallel.
