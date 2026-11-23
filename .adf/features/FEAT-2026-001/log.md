@@ -220,3 +220,9 @@ Brief updated (AC1–AC53; new AC46–AC53). Decisions D8–D23 record all 14 an
 - Changed: onboarding now collects both partners (email, name, surname, optional DOB) and sends the invite from it (AC5, AC12–AC14); generic partner A/B model with couple-chosen label (AC46); DOB minimal use (AC47, BR17); rite editable with recalculation (AC48); couple-chosen theme from >=10 candidates approved at Gate B (AC49, BR18); email reminders and weekly digest in scope, assignee both/A/B (AC31, AC50–AC53, BR16, BR19); date reference = fixed/chosen date, else earliest open scenario (AC24, BR3); Resend + own domain, no Vercel/Supabase email (AC9); tone "tu" (BR15; designer to rewrite copy samples); storage Supabase only, R1 none (scope, NFR, D8); one Vercel project + 2nd Supabase for Preview (AC43, D13).
 - Access mechanism for the first account left to the architect (allowlist vs manual), constraint: no stranger can sign up (AC3, BR12).
 - Remaining questions: Q1 reminder cadence, Q2 provisional reference date, Q3 domain timing/name, Q4 light/dark per theme, Q5 DOB necessity.
+
+## F1 — final changes before Gate A — 2026-11-23
+- Approved: reminder cadence (D24, "(proposta)" markers removed from AC50/AC51), provisional reference date (D28), light+dark for every theme (D25).
+- Domain not chosen: everything developed and tested locally (Docker, local Supabase, mail catcher); AC9 now states the dependency; release to Jessica waits for the domain (D27).
+- Date of birth removed entirely (D26): AC47 and BR17 marked "Rimosso", numbering kept; AC12/13/45/46 and scope reworded.
+- Open questions: none (domain name deferred, non-blocking). Active AC: 52 (AC1–AC53, AC47 removed).
