@@ -11,9 +11,9 @@ updated: 2026-11-24
 gates:
   a_requirements: "approved 2026-11-23 by tonybartiloro"
   b_plan: "approved 2026-11-24 by tonybartiloro"
-  c_production: pending      # pending | approved <date> by <name> | not-needed
+  c_production: "approved 2026-11-24 by tonybartiloro"
 environments:
-  staging: pending           # pending | deployed <date> | not-applicable
+  staging: "deployed 2026-11-24 (Vercel preview + Supabase roadmap2yes-stage)"
   production: pending
 links:
   pr: "https://github.com/tonybartiloro/roadmap2yes/pull/1"

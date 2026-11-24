@@ -724,3 +724,18 @@ Totale: 24 task (19 developer, 4 qa, 1 technical-writer) più T0 del product-own
 
 ## Outcome
 <!-- Filled at the end of F5: what shipped, where, when, deviations from the plan, follow-ups. -->
+- **Cosa:** R1 completa con tutti i 24 task e T0, revisionata con le revisioni di sicurezza su T2, T7a, T7b e T16, la QA end-to-end e il controllo visivo. La consegna è la PR #1, https://github.com/tonybartiloro/roadmap2yes/pull/1.
+- **Dove:** Vercel, progetto `roadmap2yes` (`dub1`). Supabase `roadmap2yes` per la produzione e `roadmap2yes-stage` per lo staging, entrambi in `eu-west-1`. Email spente: Resend si attiva dopo l'acquisto del dominio.
+- **Quando:** staging e anteprima il 2026-11-24. La produzione segue al merge, dopo il Gate C approvato il 2026-11-24.
+- **Deviazioni dal piano:**
+  - Regioni `eu-west-1` e `dub1` invece di `eu-central-1` e `fra1`.
+  - Migrazioni sullo staging solo con avvio manuale da `main`. Le prime sono state applicate tramite MCP, con la cronologia allineata.
+  - Nessun reviewer richiesto sull'environment `production`, per decisione dello sviluppatore: le migrazioni di produzione partono al merge.
+  - `SUPABASE_PROJECT_REF` e `NEXT_PUBLIC_SUPABASE_URL` sono variabili dell'environment, non segreti.
+- **Lavori successivi:**
+  - Spostare i form-bits di `features/decisions` in `src/components`.
+  - Aggiungere gli e2e per AC25 (tappe per rito) e AC7 (link aperto da un altro account).
+  - Valutare gli indici sulle FK segnalati dall'advisor Supabase.
+  - Configurare Resend e verificare AC9 dopo il dominio.
+  - Suggerire su Home a B di cambiare il codice iniziale, se desiderato.
+  - Togliere `R2Y_BOOTSTRAP_ACCESS_CODE` da Vercel dopo il primo accesso in produzione.
