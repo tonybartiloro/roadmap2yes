@@ -17,7 +17,7 @@ function DialogOverlay({
   return (
     <DialogPrimitive.Overlay
       data-slot="dialog-overlay"
-      className={cn("fixed inset-0 z-50 bg-foreground/50", className)}
+      className={cn("bg-foreground/50 fixed inset-0 z-50", className)}
       {...props}
     />
   );
@@ -34,13 +34,13 @@ function DialogContent({
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          "fixed left-1/2 top-1/2 z-50 grid max-h-[90dvh] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-lg border border-border bg-card p-6 text-foreground shadow-lg",
+          "border-border bg-card text-foreground fixed top-1/2 left-1/2 z-50 grid max-h-[90dvh] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-lg border p-6 shadow-lg",
           className,
         )}
         {...props}
       >
         {children}
-        <DialogPrimitive.Close className="absolute right-3 top-3 inline-flex size-11 items-center justify-center rounded-md text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        <DialogPrimitive.Close className="text-foreground hover:bg-muted focus-visible:ring-ring absolute top-3 right-3 inline-flex size-11 items-center justify-center rounded-md focus-visible:ring-2 focus-visible:outline-none">
           <X className="size-5" aria-hidden="true" />
           <span className="sr-only">Chiudi</span>
         </DialogPrimitive.Close>
@@ -73,7 +73,7 @@ function DialogTitle({ className, ...props }: React.ComponentProps<typeof Dialog
   return (
     <DialogPrimitive.Title
       data-slot="dialog-title"
-      className={cn("text-[22px] font-semibold leading-7", className)}
+      className={cn("text-[22px] leading-7 font-semibold", className)}
       {...props}
     />
   );
@@ -86,7 +86,7 @@ function DialogDescription({
   return (
     <DialogPrimitive.Description
       data-slot="dialog-description"
-      className={cn("text-base text-muted-foreground", className)}
+      className={cn("text-muted-foreground text-base", className)}
       {...props}
     />
   );

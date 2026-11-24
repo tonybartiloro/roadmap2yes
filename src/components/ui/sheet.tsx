@@ -36,7 +36,7 @@ function SheetContent({
     <SheetPrimitive.Portal>
       <SheetPrimitive.Overlay
         data-slot="sheet-overlay"
-        className="fixed inset-0 z-50 bg-foreground/50"
+        className="bg-foreground/50 fixed inset-0 z-50"
       />
       <SheetPrimitive.Content
         data-slot="sheet-content"
@@ -44,7 +44,7 @@ function SheetContent({
         {...props}
       >
         {children}
-        <SheetPrimitive.Close className="absolute right-3 top-3 inline-flex size-11 items-center justify-center rounded-md text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        <SheetPrimitive.Close className="text-foreground hover:bg-muted focus-visible:ring-ring absolute top-3 right-3 inline-flex size-11 items-center justify-center rounded-md focus-visible:ring-2 focus-visible:outline-none">
           <X className="size-5" aria-hidden="true" />
           <span className="sr-only">Chiudi</span>
         </SheetPrimitive.Close>
@@ -77,7 +77,7 @@ function SheetTitle({ className, ...props }: React.ComponentProps<typeof SheetPr
   return (
     <SheetPrimitive.Title
       data-slot="sheet-title"
-      className={cn("text-[22px] font-semibold leading-7", className)}
+      className={cn("text-[22px] leading-7 font-semibold", className)}
       {...props}
     />
   );
@@ -90,7 +90,7 @@ function SheetDescription({
   return (
     <SheetPrimitive.Description
       data-slot="sheet-description"
-      className={cn("text-base text-muted-foreground", className)}
+      className={cn("text-muted-foreground text-base", className)}
       {...props}
     />
   );

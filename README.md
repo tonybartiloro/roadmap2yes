@@ -21,6 +21,8 @@ Per fermare lo stack: `npm run db:stop`.
 
 Porte locali (diverse dai default di Supabase, per convivere con altri progetti): API `54421`, DB `54422`, Mailpit web `54426` (Auth: `54424`), SMTP app `54425`.
 
+Email dell'app in locale e in CI (Mailpit): `SMTP_HOST=127.0.0.1`, `SMTP_PORT=54425`, `MAILPIT_API_URL=http://127.0.0.1:54426` (UI e API, usate dagli e2e).
+
 Il primo utente si crea dalle variabili `R2Y_BOOTSTRAP_*` (vedi `.env.example`, solo valori finti `@example.test`): al primo accesso con quell'email oppure a mano con `npm run bootstrap`.
 
 ### Comandi

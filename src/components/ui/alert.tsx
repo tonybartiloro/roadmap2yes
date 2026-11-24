@@ -37,7 +37,7 @@ function AlertTitle({ className, ...props }: React.ComponentProps<"h5">) {
   return (
     <h5
       data-slot="alert-title"
-      className={cn("mb-1 font-semibold leading-6", className)}
+      className={cn("mb-1 leading-6 font-semibold", className)}
       {...props}
     />
   );
