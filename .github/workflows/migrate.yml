@@ -56,13 +56,13 @@ jobs:
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
           SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
       - name: Pending migrations (dry run)
-        run: npx supabase db push --remote --dry-run
+        run: npx supabase db push --remote --dry-run --password "$SUPABASE_DB_PASSWORD"
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
       # Never add --include-seed here, and never replace this step with `db reset --linked`.
       - name: Apply migrations
-        run: npx supabase db push --remote
+        run: npx supabase db push --remote --password "$SUPABASE_DB_PASSWORD" --yes
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
