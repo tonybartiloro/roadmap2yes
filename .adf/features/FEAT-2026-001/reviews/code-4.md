@@ -53,3 +53,15 @@ Review file: /Users/tonybartiloro/Documents/roadmap2yes/.adf/features/FEAT-2026-
 | N4 | Fixed: timer cleared on unmount, "Codice copiato" announced in an `aria-live` region. |
 | N5 | Fixed: `useId` for the ids. T8 to confirm that "Annulla" keeps the draft copyable. |
 | Q2 | Done in T3 (proxy edit above). Q3: copy kept; the designer confirms it in the visual check. |
+
+## Round 2 (reviewer, commit 020d063)
+
+Tests: `npx vitest run src/themes src/components src/lib/hooks src/proxy.test.ts` = 11 files, 138 tests, all pass.
+
+- S1 closed: the whole lookup is under one 1.5 s `withTimeout`; the proxy strips any client `x-r2y-backend` and sets it only on outage rewrites; tests for both sides.
+- S2 closed: `server.test.ts` and `mode.test.ts` cover the requested cases.
+- S3 / Q1 closed: secret-name guard on key and nested fields, required `scope` (`userId:weddingId`), `clearAllFormDrafts()`. Follow-up for T15: call it on sign-out (tracked by the coordinator).
+- S4 closed. N1, N2, N4, N5 closed. N3 closed (code is the reference). Q2 closed (T3 owns it). Q3 goes to the designer's visual check.
+- Observation, not blocking: a direct visit to `/servizio` (guards return `next`, not rewrite) does not get the header, so the layout still tries the DB lookup, now bounded to 1.5 s. Acceptable.
+
+Verdict round 2: **approved**. Open: 0.

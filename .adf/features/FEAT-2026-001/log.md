@@ -469,3 +469,14 @@ Developer's answers to the 4 remaining questions: 1. OK (min 10 characters, lett
 - T5 (bee42d9): ~130 tests. The location linked to a date scenario goes in the JSON export only, with no extra CSV column; AC42 requires CSV only for tasks and budget (coordinator decision).
 - Integrated tree: typecheck OK; 504 unit tests green across 28 files.
 - Committed AGENTS.md, which `next dev` generates.
+
+## F3 — T3 and T5 reviews closed — 2026-11-24
+- code-3 (T5): round 1 had 3 should and 4 nits, fixed in f40a436; round 2 approved.
+  - Coordinator decisions: ",50" parses as 0,50 €; the reference-change news line comes from the decision event only; events with a null actor are hidden, except the system `reference_auto` event, which uses a neutral phrase.
+- code-4 (T3): round 1 had 4 should and 5 nits, fixed in 020d063; round 2 approved.
+  - T3 owns the narrow `x-r2y-backend` change in proxy.ts.
+  - Form drafts are scoped `userId:weddingId`, and **T15 must call `clearAllFormDrafts()` on "Esci"**.
+  - The Countdown past/today copy goes to the designer's visual check.
+  - Non-blocking: a direct visit to /servizio still tries the DB theme lookup, capped at 1.5 s.
+- Integrated: 529 unit tests, build and check:fonts green.
+- In progress: T2 (blocked on a permission prompt the developer must answer) and T6.
