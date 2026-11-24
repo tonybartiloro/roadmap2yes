@@ -36,3 +36,18 @@ AC17 ✅ · AC18 ✅ · AC19 ✅ (reason, reopen) · AC20 ⚠️ (state in list;
 ## Questions for the developer
 1. Is `updateScenarioAction` with `locationOnly` meant to be the only path to edit the link on a taken decision? The UI sends it, and the trigger permits it. Please confirm this is covered by a component test.
    - Answer: yes, it is the only UI path; the form is locked to the link on a taken decision. Covered by the component test "after the date is chosen only the linked location can change" and, end to end, by `decisions.actions.test.ts`: a date change on a taken decision is refused with `decision_taken`, and with `locationOnly` a payload carrying other dates writes only the link (dates stay unchanged).
+
+## Round 2
+
+Verified commit 0798091 and `npx vitest run src/features/decisions` (2 files, 70 tests, PASS). I did not run `tests/integration/decisions.actions.test.ts` (needs the DB stack).
+
+- REV-1 closed: actions suite covers invalid input, expired session and revalidation on success only.
+- REV-2 closed: stale code closes the sheets, toasts and refreshes.
+- REV-3 closed: compensation error checked (`compensation_failed`, codes only in the log); views drop date options without a scenario.
+- REV-4 closed: targeted revalidation, wide scope only for choose/reopen/reference/option and scenario writes.
+- REV-5 closed: retry the update on 23505.
+- REV-6 closed: `REASON_MAX` and `NOTE_MAX` shared in `model.ts` and used by zod.
+- REV-7 closed: `previousOptionId` read just before the RPC. A tiny race remains between read and RPC; acceptable (last-write-wins).
+- Question 1 answered and accepted. AC20 confirmed with T11.
+
+Verdict: approved.
