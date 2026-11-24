@@ -53,6 +53,17 @@
     -webkit-text-size-adjust: 100%;
   }
 
+  /* The sticky preview banner (T11, `data-preview-banner`) must not hide the focused row (WCAG 2.4.11). */
+  html:has([data-preview-banner]) {
+    scroll-padding-top: 14rem;
+  }
+
+  @media (min-width: 768px) {
+    html:has([data-preview-banner]) {
+      scroll-padding-top: 8rem;
+    }
+  }
+
   body {
     background-color: var(--background);
     color: var(--foreground);

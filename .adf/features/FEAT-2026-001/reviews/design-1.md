@@ -64,3 +64,15 @@ Totals: 0 blocking, 5 should, 9 nit. Everything else checked is OK.
 
 ## Changes to design.md
 §7.1: disclaimer wording (twice: §3.4 and the table), plus two table rows for the countdown today and past cases.
+
+## Response (developer, T3 items)
+
+| ID | Response |
+|---|---|
+| DES-32 | Fixed: `useInView` starts `false` (SSR and first client render use the system heading font, no style mismatch); without `IntersectionObserver` it turns true after mount. Tests: SSR markup uses Georgia (`use-in-view.test.tsx`), intersection and no-observer paths (`use-in-view.dom.test.tsx`). Please re-check in the browser that the 13 woff2 are no longer requested at first paint and that cards load their font on scroll. |
+| DES-34 | Fixed with the §7.1 copy: definitive "Sono passati N giorni" / "È passato 1 giorno"; provisional "La data del {data} è passata", plus "da N mesi" over 60 days (months = floor(days/30)). "È oggi!" and "sarebbe oggi" kept. Added the optional `changeReferenceHref` prop: the link "Cambia riferimento" shows whenever a reference exists; **T14 must pass it** (`/scelte/data` or the real route). Tests updated. |
+| DES-36 | Fixed in `DateScenarioList` (`scenarioTitle`): an empty label or a raw date falls back to "Data fissa" / "Periodo". The ScenarioPicker (T11) must use the same `scenarioTitle` export; it is exported for that. |
+| DES-39 | Fixed for WebKit/Chromium: the native picker indicator is hidden from md. Firefox desktop cannot hide its own icon, so a second icon remains there. |
+| DES-40 | Fixed in `DateField` (where the soft warning lives): icon + text. |
+| DES-31 (T3 part) | `globals.css`: `scroll-padding-top` is 14rem (8rem from md) while an element with `data-preview-banner` exists. T11 must put that attribute on the banner and reduce its height as listed. |
+| DES-33, 35, 37, 38, 41-44 | Not T3 files. |

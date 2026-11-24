@@ -2,7 +2,7 @@
 
 import { useId, useState } from "react";
 import { Popover } from "radix-ui";
-import { CalendarDays } from "lucide-react";
+import { CalendarDays, TriangleAlert } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -92,6 +92,8 @@ export function DateField({
           min={min}
           max={max}
           disabled={disabled}
+          // From md the popover button is the calendar: hide the browser's own indicator.
+          className="md:[&::-webkit-calendar-picker-indicator]:hidden"
           aria-invalid={error ? true : undefined}
           aria-describedby={describedBy}
           onChange={(event) => {
@@ -142,7 +144,8 @@ export function DateField({
         </p>
       ) : null}
       {warning ? (
-        <p id={`${inputId}-warning`} className="text-warning text-sm">
+        <p id={`${inputId}-warning`} className="text-warning flex items-start gap-1.5 text-sm">
+          <TriangleAlert aria-hidden className="mt-0.5 size-4 shrink-0" />
           {warning}
         </p>
       ) : null}

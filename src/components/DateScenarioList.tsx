@@ -24,6 +24,13 @@ export interface DateScenarioItem {
   discarded?: boolean;
 }
 
+/** Title of a scenario: its label, or a neutral one when the label is empty or just a raw date. */
+export function scenarioTitle(item: DateScenarioItem): string {
+  const label = item.label.trim();
+  if (label && !/^\d{1,4}[/.-]\d{1,2}[/.-]\d{1,4}$/.test(label)) return label;
+  return item.kind === "period" ? "Periodo" : "Data fissa";
+}
+
 /** "14 mag 2028" or, for a period, "mag–giu 2028 · calcolata dal 1 mag". */
 export function scenarioDateText(item: DateScenarioItem): string {
   if (item.kind === "fixed") return formatShortDate(item.dateFrom);
@@ -71,7 +78,7 @@ export function DateScenarioList({
           <div className="flex items-start gap-2">
             <CalendarDays aria-hidden className="text-primary mt-0.5 size-5 shrink-0" />
             <div className="min-w-0 flex-1">
-              <p className="font-semibold">{item.label}</p>
+              <p className="font-semibold">{scenarioTitle(item)}</p>
               <p className="tabular-nums">{scenarioDateText(item)}</p>
             </div>
             {item.discarded ? <span className="text-sm">Scartata</span> : null}

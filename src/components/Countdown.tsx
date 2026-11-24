@@ -11,10 +11,13 @@ export function countdownText(value: CountdownValue): string {
     return value.kind === "provisional" ? `Se fosse il ${date}: sarebbe oggi` : "È oggi!";
   }
   if (value.phase === "past") {
-    const ago = plural(-value.days, "giorno", "giorni");
-    return value.kind === "provisional"
-      ? `La data del ${date} è passata da ${ago}`
-      : `È passato ${ago}`;
+    const elapsed = -value.days;
+    if (value.kind === "definitive") {
+      return elapsed === 1 ? "È passato 1 giorno" : `Sono passati ${elapsed} giorni`;
+    }
+    // Provisional: never a raw count like "548 giorni"; months once over 60 days (design §7.1).
+    const base = `La data del ${date} è passata`;
+    return elapsed > 60 ? `${base} da ${plural(Math.floor(elapsed / 30), "mese", "mesi")}` : base;
   }
   const days = plural(value.days, "giorno", "giorni");
   if (value.kind === "provisional")
@@ -30,11 +33,14 @@ export function Countdown({
   value,
   setBy,
   locationName,
+  changeReferenceHref,
   className,
 }: {
   value: CountdownValue;
   setBy?: string | null;
   locationName?: string | null;
+  /** Link "Cambia riferimento" (Scelte > Data); shown whenever there is a reference. */
+  changeReferenceHref?: string;
   className?: string;
 }) {
   return (
@@ -44,6 +50,11 @@ export function Countdown({
       </p>
       {value.kind !== "none" ? (
         <ReferenceBadge status={value.kind} setBy={setBy} locationName={locationName} />
+      ) : null}
+      {value.kind !== "none" && changeReferenceHref ? (
+        <a href={changeReferenceHref} className="text-primary self-start py-2.5 underline">
+          Cambia riferimento
+        </a>
       ) : null}
     </section>
   );
