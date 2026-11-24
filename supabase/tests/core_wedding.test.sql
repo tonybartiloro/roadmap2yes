@@ -2,7 +2,7 @@
 begin;
 -- :su = back to the superuser AND no JWT claims (reset role alone keeps auth.uid()).
 \set su 'reset role; do $x$ begin perform set_config(''request.jwt.claims'','''',true); perform set_config(''request.jwt.claim.sub'','''',true); end $x$;'
-select plan(29);
+select plan(30);
 
 -- ---- create_wedding -------------------------------------------------------------------------
 select tests.make_user('w.plain@example.test') as plain \gset
@@ -11,6 +11,10 @@ select tests.make_user('w.invited@example.test', true) as invited \gset
 
 select tests.login(:'plain'::uuid);
 select throws_ok($$select public.create_wedding()$$, '42501', 'not_founder', 'no founder claim: refused');
+-- REV-6: the claim only counts in app_metadata; user_metadata is writable by the user.
+select set_config('request.jwt.claims', jsonb_build_object('sub', :'plain'::uuid, 'role', 'authenticated',
+  'email', 'w.plain@example.test', 'user_metadata', jsonb_build_object('r2y_founder', true))::text, true);
+select throws_ok($$select public.create_wedding()$$, '42501', 'not_founder', 'founder flag in user_metadata is refused');
 
 :su
 insert into public.weddings (id) values ('11111111-1111-4111-8111-111111111111');

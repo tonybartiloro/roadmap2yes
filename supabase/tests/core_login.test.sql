@@ -1,7 +1,7 @@
 -- T2: login limiter (AC54, R23), Auth lookup, heartbeat and per-user state RPCs.
 begin;
 \set su 'reset role; do $x$ begin perform set_config(''request.jwt.claims'','''',true); perform set_config(''request.jwt.claim.sub'','''',true); end $x$;'
-select plan(27);
+select plan(31);
 
 select * from tests.make_wedding('l1') \gset w1_
 select tests.make_user('l.someone@example.test') as someone \gset
@@ -26,6 +26,16 @@ select public.login_record(decode(repeat('01', 32), 'hex'), decode(repeat('02', 
 select is((public.login_gate(decode(repeat('01', 32), 'hex'), decode(repeat('02', 32), 'hex')) ->> 'blocked')::boolean, false, '4 failures: not blocked');
 select is((public.login_record(decode(repeat('01', 32), 'hex'), decode(repeat('02', 32), 'hex'), false) ->> 'blocked')::boolean, true, '5th failure blocks the email key');
 select cmp_ok((public.login_gate(decode(repeat('01', 32), 'hex'), null) ->> 'retry_after_seconds')::int, '>', 800, 'locked for ~15 minutes');
+-- REV-5: a success never erases an active lock, and never clears the IP key; a failure while
+-- locked does not extend the lock or the count.
+select public.login_record(decode(repeat('01', 32), 'hex'), decode(repeat('02', 32), 'hex'), true);
+select is((public.login_gate(decode(repeat('01', 32), 'hex'), null) ->> 'blocked')::boolean, true, 'success while locked leaves the email lock');
+select cmp_ok((public.login_gate(decode(repeat('01', 32), 'hex'), null) ->> 'retry_after_seconds')::int, '>', 800, 'and does not shorten it');
+select public.login_record(decode(repeat('01', 32), 'hex'), decode(repeat('02', 32), 'hex'), false);
+:su
+select is((select failed_count from private.login_attempts where key_hash = decode(repeat('01', 32), 'hex')), 5, 'a failure while locked does not extend the count');
+select is((select failed_count from private.login_attempts where key_hash = decode(repeat('02', 32), 'hex')), 6, 'a success never clears the IP key');
+select tests.login_service();
 select is((public.login_gate(decode(repeat('03', 32), 'hex'), decode(repeat('02', 32), 'hex')) ->> 'blocked')::boolean, false, 'other email with a not yet blocked IP: open');
 select is((public.login_gate(decode(repeat('03', 32), 'hex'), null) ->> 'blocked')::boolean, false, 'unrelated email key unaffected');
 

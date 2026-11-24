@@ -230,7 +230,7 @@ describe("core DB through the API", () => {
     });
 
     it("a partner never sees account events of another wedding, and sees the other partner's", async () => {
-      const own = await w1.founderClient.rpc("record_account_event", { p_kind: "code_changed" });
+      const own = await w1.founderClient.rpc("authorize_account_op", { p_op: "change_own_code" });
       expect(own.error).toBeNull();
       const { data } = await b1.client.from("account_events").select("kind,actor_id");
       expect(data).toContainEqual({ kind: "code_changed", actor_id: w1.founder.id });

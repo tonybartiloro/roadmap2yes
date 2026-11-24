@@ -2,6 +2,8 @@
 -- `supabase db push` never runs seeds. Emails are @example.test (scripts/check-test-emails.ts).
 -- One demo wedding with both partners already inside. Access code of both demo users:
 -- 'demo-seed-code-2027' (fake, local stack only).
+-- RUNBOOK (REV-8): these accounts have a KNOWN code. Never run `supabase db reset --linked`
+-- (it would seed staging/production); remote environments only get `db push`, which never seeds.
 
 do $$
 declare

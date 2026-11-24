@@ -486,7 +486,7 @@ isOneToOne: false
 { Args: { "p_email": string }; Returns: string
                            },
 "authorize_account_op":
-{ Args: { "p_op": string,"p_target_slot"?: string }; Returns: Json
+{ Args: { "p_new_email"?: string,"p_op": string,"p_target_slot"?: string }; Returns: Json
                            },
 "choose_option":
 { Args: { "p_decision_id": string,"p_exact_date"?: string,"p_expected_version"?: number,"p_option_id": string }; Returns: Json
@@ -508,6 +508,9 @@ isOneToOne: false
                            },
 "insert_template_tasks":
 { Args: { "p_tasks": Json }; Returns: Json
+                           },
+"invitation_by_token":
+{ Args: { "p_token_hash": string }; Returns: Json
                            },
 "job_claim_notification":
 { Args: { "p_batch_key": string,"p_daily_cap"?: number,"p_item_keys"?: (string)[],"p_kind": string,"p_monthly_cap"?: number,"p_now"?: string,"p_user_id": string,"p_wedding_id": string }; Returns: Json
@@ -544,9 +547,6 @@ isOneToOne: false
 "move_budget_items":
 { Args: { "p_from": string,"p_to": string }; Returns: number
                            },
-"record_account_event":
-{ Args: { "p_kind": string,"p_target_user_id"?: string }; Returns: number
-                           },
 "record_export":
 { Args: Record<PropertyKey, never>; Returns: Json
                            },
@@ -560,7 +560,7 @@ isOneToOne: false
 { Args: { "p_decision_id": string,"p_expected_version"?: number,"p_reason": string }; Returns: Json
                            },
 "revoke_invitation":
-{ Args: { "p_invitation_id": string }; Returns: undefined
+{ Args: { "p_invitation_id": string }; Returns: Json
                            },
 "rotate_invitation":
 { Args: { "p_invitation_id": string,"p_token_hash": string }; Returns: Json
@@ -575,7 +575,7 @@ isOneToOne: false
 { Args: { "p_wedding_id"?: string }; Returns: number
                            },
 "update_partner_email":
-{ Args: { "p_email": string,"p_slot": string }; Returns: undefined
+{ Args: { "p_email": string,"p_slot": string }; Returns: Json
                            },
 "upsert_partner_b":
 { Args: { "p_email": string,"p_first_name"?: string,"p_label"?: string,"p_last_name"?: string }; Returns: string

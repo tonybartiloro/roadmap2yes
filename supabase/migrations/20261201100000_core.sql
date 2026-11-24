@@ -13,6 +13,16 @@
 --   * Every SECURITY DEFINER function sets search_path and schema-qualifies every relation.
 --   * Business errors raise `P0001` with a stable machine code as message; authorization
 --     failures raise `42501` (HTTP 403 through PostgREST).
+--   * ONE lock order everywhere (plan §4.8, REV-4): advisory locks -> weddings -> wedding_partners
+--     -> invitations -> inserts into memberships/account_events. RPCs that start from an invitation
+--     id/token read `wedding_id` WITHOUT a lock (immutable by trigger), lock the wedding, then lock
+--     the invitation and re-check its state. Always `for update`, never `for share`.
+--   * Account operations (plan §4.8): the DB mutation/authorization runs FIRST with the user's JWT
+--     (locks, re-checks, writes the account event, returns the target); the server then calls the
+--     Auth admin API ONLY on the returned id.
+--   * RUNBOOK: seeds create accounts with a KNOWN access code. They run only on the local stack and
+--     in CI. NEVER run `supabase db reset --linked` (it would seed staging/production): migrations
+--     reach remote environments through `db push` only, which never runs seeds.
 
 create extension if not exists citext with schema extensions;
 
@@ -106,7 +116,9 @@ create table public.weddings (
   theme_id text not null default 'giardino' check (theme_id ~ '^[a-z0-9-]{1,40}$'),
   onboarding_answers jsonb not null default '{}'::jsonb
     check (jsonb_typeof(onboarding_answers) = 'object' and octet_length(onboarding_answers::text) <= 20000),
-  onboarding_unknown text[] not null default '{}' check (cardinality(onboarding_unknown) <= 20),
+  -- at most 20 entries and 2000 bytes in total (REV-7: elements are otherwise unbounded text)
+  onboarding_unknown text[] not null default '{}'
+    check (cardinality(onboarding_unknown) <= 20 and octet_length(onboarding_unknown::text) <= 2000),
   onboarding_completed_at timestamptz,
   -- FK to decision_options is added by T8 (composite, deferred creation of that table).
   manual_reference_option_id uuid,
@@ -403,6 +415,47 @@ begin
 end;
 $$;
 
+-- The ONE predicate that says whether an existing Auth account may receive a code, change email or
+-- be deleted by someone who is not its owner (plan §4.8, REV-1). True only if the account exists,
+-- is not deleted, has NEVER signed in, has no membership anywhere, is not a founder and has no
+-- pending invitation of ANOTHER wedding (by id or email).
+create function private.account_reusable(p_user_id uuid, p_wedding_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = pg_catalog, pg_temp
+as $$
+  select exists (
+    select 1
+    from auth.users u
+    where u.id = p_user_id
+      and u.deleted_at is null
+      and u.last_sign_in_at is null
+      and coalesce(u.raw_app_meta_data ->> 'r2y_founder', '') <> 'true'
+      and not exists (select 1 from public.memberships m where m.user_id = u.id)
+      and not exists (
+        select 1 from public.invitations i
+        where i.wedding_id <> p_wedding_id and i.accepted_at is null and i.revoked_at is null
+          and (i.invitee_user_id = u.id or i.email::text = lower(btrim(u.email)))
+      )
+  );
+$$;
+
+-- Account events (append-only trail shown in "Novita", never the code). NOT callable through the
+-- API (REV-3): only the RPCs that authorize an account operation write them, in the same
+-- transaction, with the actor taken from auth.uid() and kind/target derived from the operation.
+create function private.record_account_event(p_wedding_id uuid, p_kind text, p_target_user_id uuid)
+returns bigint
+language sql
+security definer
+set search_path = pg_catalog, pg_temp
+as $$
+  insert into public.account_events (wedding_id, kind, actor_id, target_user_id)
+  values (p_wedding_id, p_kind, (select auth.uid()), p_target_user_id)
+  returning id;
+$$;
+
 -- ---------------------------------------------------------------------------------------------
 -- RLS and grants (matrix §3.1)
 -- ---------------------------------------------------------------------------------------------
@@ -572,10 +625,13 @@ begin
 end;
 $$;
 
--- update_partner_email(slot, email): only partner B, only while B has never entered. Updates the
--- partner row and the pending invitation; the Auth account is updated by the server (admin-ops).
+-- update_partner_email(slot, email) -> { target_user_id, old_email }
+-- Only partner B, only while B has never entered. Updates the partner row and the pending
+-- invitation, writes the `email_changed` event and returns the bound account to update through the
+-- Auth admin API (only if that account is still reusable). Compensation after an admin failure =
+-- call again with `old_email` (idempotent).
 create function public.update_partner_email(p_slot text, p_email text)
-returns void
+returns jsonb
 language plpgsql
 security definer
 set search_path = pg_catalog, pg_temp
@@ -584,6 +640,9 @@ declare
   v_wedding uuid := private.current_wedding_id();
   v_email text;
   v_partner public.wedding_partners%rowtype;
+  v_inv public.invitations%rowtype;
+  v_bound uuid;
+  v_old text;
 begin
   if v_wedding is null or not public.has_permission(v_wedding, 'partners', 'write') then
     raise exception 'forbidden' using errcode = '42501';
@@ -611,9 +670,29 @@ begin
     raise exception 'same_email' using errcode = 'P0001';
   end if;
 
-  update public.wedding_partners set email = v_email where id = v_partner.id;
-  update public.invitations set email = v_email
-  where wedding_id = v_wedding and accepted_at is null and revoked_at is null;
+  select * into v_inv from public.invitations i
+  where i.wedding_id = v_wedding and i.accepted_at is null and i.revoked_at is null for update;
+  v_bound := v_inv.invitee_user_id;
+  v_old := v_partner.email::text;
+
+  -- The bound account must still be reusable (never signed in, not a member, ...).
+  if v_bound is not null and not private.account_reusable(v_bound, v_wedding) then
+    raise exception 'partner_already_joined' using errcode = 'P0001';
+  end if;
+  -- A different Auth account already owns the new address.
+  if exists (
+    select 1 from auth.users u
+    where lower(btrim(u.email)) = v_email and u.id is distinct from v_bound
+  ) then
+    raise exception 'email_in_use' using errcode = 'P0001';
+  end if;
+
+  if v_old <> v_email then
+    update public.wedding_partners set email = v_email where id = v_partner.id;
+    update public.invitations set email = v_email where id = v_inv.id;
+    perform private.record_account_event(v_wedding, 'email_changed', v_bound);
+  end if;
+  return jsonb_build_object('target_user_id', v_bound, 'old_email', v_old);
 end;
 $$;
 
@@ -627,6 +706,7 @@ as $$
 declare
   v_uid uuid := auth.uid();
   v_email text;
+  v_wedding uuid;
 begin
   if v_uid is null then
     raise exception 'unauthenticated' using errcode = '42501';
@@ -635,15 +715,17 @@ begin
   if v_email is null then
     raise exception 'unauthenticated' using errcode = '42501';
   end if;
+  select wp.wedding_id into v_wedding from public.wedding_partners wp where wp.user_id = v_uid limit 1;
+  if v_wedding is null then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+  perform 1 from public.weddings w where w.id = v_wedding for update;
   begin
     update public.wedding_partners set email = v_email
     where user_id = v_uid and email::text <> v_email;
   exception when unique_violation then
     raise exception 'email_in_use' using errcode = 'P0001';
   end;
-  if not found and not exists (select 1 from public.wedding_partners where user_id = v_uid) then
-    raise exception 'forbidden' using errcode = '42501';
-  end if;
   return v_email;
 end;
 $$;
@@ -652,10 +734,16 @@ $$;
 -- RPC: invitations
 -- ---------------------------------------------------------------------------------------------
 
--- create_invitation(email, method, invitee_user_id, token_hash): invitation for partner B.
---   method 'code'  : the account already exists (created by the server with the initial code).
---   method 'email' : token_hash = sha256 of the one-time token (generated by the server).
--- Same email + same method while pending = re-delivery (updates the invitation, no duplicate).
+-- create_invitation(email, method, invitee_user_id, token_hash) -> { id, method, expires_at, invitee_user_id }
+-- Invitation for partner B. This is step 1 of "create B" (plan §4.8): the DB decides first.
+--   method 'code'  : the Auth account is created/updated by the server AFTER this call.
+--   method 'email' : token_hash = sha256 of the one-time token (32 random bytes made by the server).
+-- If an Auth account already exists for the email it must be REUSABLE (never signed in, no
+-- membership, not a founder, no pending invitation elsewhere) or the call fails with `email_in_use`;
+-- its id comes back as `invitee_user_id` and is the ONLY id the server may touch.
+-- Same email + same method while pending = re-delivery (send_count + 1, event written again).
+-- Passing `p_invitee_user_id` for a pending invitation that has no account yet BINDS the account the
+-- server has just created (no new delivery, no new event). The id must own the invitation email.
 create function public.create_invitation(
   p_email text, p_method text, p_invitee_user_id uuid default null, p_token_hash bytea default null
 )
@@ -697,15 +785,14 @@ begin
     raise exception 'same_email' using errcode = 'P0001';
   end if;
   select wp.email::text into v_partner_email
-  from public.wedding_partners wp where wp.wedding_id = v_wedding and wp.slot = 'B';
+  from public.wedding_partners wp where wp.wedding_id = v_wedding and wp.slot = 'B' for update;
   if v_partner_email is not null and v_partner_email <> v_email then
     raise exception 'partner_email_mismatch' using errcode = 'P0001';
   end if;
 
-  -- The account behind the email (if any) must not belong to a wedding already, and an explicit
-  -- invitee must really own that email (nobody can attach an unrelated user id).
-  select u.id into v_user from auth.users u where lower(btrim(u.email)) = v_email limit 1;
-  if v_user is not null and exists (select 1 from public.memberships m where m.user_id = v_user) then
+  select u.id into v_user from auth.users u
+  where lower(btrim(u.email)) = v_email and u.deleted_at is null limit 1;
+  if v_user is not null and not private.account_reusable(v_user, v_wedding) then
     raise exception 'email_in_use' using errcode = 'P0001';
   end if;
   if p_invitee_user_id is not null and p_invitee_user_id is distinct from v_user then
@@ -718,15 +805,22 @@ begin
     if v_pending.method = 'email' and v_pending.expires_at < now() then
       update public.invitations set revoked_at = now() where id = v_pending.id;
     elsif v_pending.email::text = v_email and v_pending.method = p_method then
+      if p_invitee_user_id is not null and v_pending.invitee_user_id is null then
+        update public.invitations set invitee_user_id = p_invitee_user_id where id = v_pending.id;
+        return jsonb_build_object('id', v_pending.id, 'method', p_method,
+          'expires_at', v_pending.expires_at, 'invitee_user_id', p_invitee_user_id);
+      end if;
       v_expires := case when p_method = 'email' then now() + interval '7 days' end;
       update public.invitations
-      set invitee_user_id = coalesce(p_invitee_user_id, invitee_user_id),
+      set invitee_user_id = v_user,
           token_hash = case when p_method = 'email' then p_token_hash end,
           expires_at = v_expires,
           last_sent_at = now(),
           send_count = send_count + 1
       where id = v_pending.id;
-      return jsonb_build_object('id', v_pending.id, 'method', p_method, 'expires_at', v_expires);
+      perform private.record_account_event(v_wedding, 'partner_account_created', v_user);
+      return jsonb_build_object('id', v_pending.id, 'method', p_method,
+        'expires_at', v_expires, 'invitee_user_id', v_user);
     else
       raise exception 'invitation_pending' using errcode = 'P0001';
     end if;
@@ -734,13 +828,15 @@ begin
 
   v_expires := case when p_method = 'email' then now() + interval '7 days' end;
   insert into public.invitations (wedding_id, email, method, invitee_user_id, token_hash, expires_at, last_sent_at, send_count)
-  values (v_wedding, v_email, p_method, coalesce(p_invitee_user_id, v_user), p_token_hash, v_expires, now(), 1)
+  values (v_wedding, v_email, p_method, v_user, p_token_hash, v_expires, now(), 1)
   returning id into v_id;
-  return jsonb_build_object('id', v_id, 'method', p_method, 'expires_at', v_expires);
+  perform private.record_account_event(v_wedding, 'partner_account_created', v_user);
+  return jsonb_build_object('id', v_id, 'method', p_method, 'expires_at', v_expires, 'invitee_user_id', v_user);
 end;
 $$;
 
 -- rotate_invitation(id, token_hash): "send again" for an email invitation; the old token stops working.
+-- Lock order: wedding first (wedding_id is immutable, read without lock), then the invitation, re-checked.
 create function public.rotate_invitation(p_invitation_id uuid, p_token_hash bytea)
 returns jsonb
 language plpgsql
@@ -748,11 +844,17 @@ security definer
 set search_path = pg_catalog, pg_temp
 as $$
 declare
+  v_wedding uuid;
   v_inv public.invitations%rowtype;
   v_expires timestamptz := now() + interval '7 days';
 begin
+  select i.wedding_id into v_wedding from public.invitations i where i.id = p_invitation_id;
+  if v_wedding is null or not public.has_permission(v_wedding, 'invitations', 'write') then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+  perform 1 from public.weddings w where w.id = v_wedding for update;
   select * into v_inv from public.invitations i where i.id = p_invitation_id for update;
-  if not found or not public.has_permission(v_inv.wedding_id, 'invitations', 'write') then
+  if not found then
     raise exception 'forbidden' using errcode = '42501';
   end if;
   if v_inv.method <> 'email' then
@@ -771,18 +873,29 @@ begin
 end;
 $$;
 
--- revoke_invitation(id): idempotent while not accepted.
+-- revoke_invitation(id) -> { delete_user_id }
+-- Idempotent while not accepted (`already_accepted` otherwise). Writes `invite_revoked` the first
+-- time. `delete_user_id` is the account bound to the invitation ONLY while it is still reusable
+-- (never signed in, no membership, ...): it is the only id the server may delete. Repeating the
+-- call returns it again until the account is gone.
 create function public.revoke_invitation(p_invitation_id uuid)
-returns void
+returns jsonb
 language plpgsql
 security definer
 set search_path = pg_catalog, pg_temp
 as $$
 declare
+  v_wedding uuid;
   v_inv public.invitations%rowtype;
+  v_delete uuid;
 begin
+  select i.wedding_id into v_wedding from public.invitations i where i.id = p_invitation_id;
+  if v_wedding is null or not public.has_permission(v_wedding, 'invitations', 'write') then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+  perform 1 from public.weddings w where w.id = v_wedding for update;
   select * into v_inv from public.invitations i where i.id = p_invitation_id for update;
-  if not found or not public.has_permission(v_inv.wedding_id, 'invitations', 'write') then
+  if not found then
     raise exception 'forbidden' using errcode = '42501';
   end if;
   if v_inv.accepted_at is not null then
@@ -790,13 +903,19 @@ begin
   end if;
   if v_inv.revoked_at is null then
     update public.invitations set revoked_at = now() where id = v_inv.id;
+    perform private.record_account_event(v_wedding, 'invite_revoked', v_inv.invitee_user_id);
   end if;
+  if v_inv.invitee_user_id is not null and private.account_reusable(v_inv.invitee_user_id, v_wedding) then
+    v_delete := v_inv.invitee_user_id;
+  end if;
+  return jsonb_build_object('delete_user_id', v_delete);
 end;
 $$;
 
 -- accept_pending_invitation(): called at B's first access. Outcome codes:
 --   ok | already_member | not_found | revoked | expired | full
--- Concurrency: the invitation row is locked first (same order as revoke/rotate), then the wedding.
+-- Lock order (REV-4): advisory -> wedding -> partner row -> invitation, same as every other RPC.
+-- The wedding of the candidate invitation is read without a lock, then everything is re-checked.
 create function public.accept_pending_invitation()
 returns text
 language plpgsql
@@ -806,6 +925,7 @@ as $$
 declare
   v_uid uuid := auth.uid();
   v_email text;
+  v_wedding uuid;
   v_inv public.invitations%rowtype;
   v_slot_taken boolean;
 begin
@@ -822,15 +942,35 @@ begin
     raise exception 'unauthenticated' using errcode = '42501';
   end if;
 
-  select * into v_inv from public.invitations i
+  select i.wedding_id into v_wedding from public.invitations i
   where i.email::text = v_email and i.slot = 'B' and i.accepted_at is null and i.revoked_at is null
+    and (i.invitee_user_id is null or i.invitee_user_id = v_uid)
+  order by i.created_at desc limit 1;
+  if v_wedding is null then
+    if exists (
+      select 1 from public.invitations i
+      where i.email::text = v_email and i.revoked_at is not null
+        and (i.invitee_user_id is null or i.invitee_user_id = v_uid)
+    ) then
+      return 'revoked';
+    end if;
+    return 'not_found';
+  end if;
+
+  perform 1 from public.weddings w where w.id = v_wedding for update;
+  perform 1 from public.wedding_partners wp where wp.wedding_id = v_wedding and wp.slot = 'B' for update;
+
+  -- Re-check after the locks: it may have been revoked, accepted, or its email changed meanwhile.
+  select * into v_inv from public.invitations i
+  where i.wedding_id = v_wedding and i.email::text = v_email and i.slot = 'B'
+    and i.accepted_at is null and i.revoked_at is null
     and (i.invitee_user_id is null or i.invitee_user_id = v_uid)
   order by i.created_at desc limit 1
   for update;
   if not found then
     if exists (
       select 1 from public.invitations i
-      where i.email::text = v_email and i.revoked_at is not null
+      where i.wedding_id = v_wedding and i.email::text = v_email and i.revoked_at is not null
         and (i.invitee_user_id is null or i.invitee_user_id = v_uid)
     ) then
       return 'revoked';
@@ -841,25 +981,23 @@ begin
     return 'expired';
   end if;
 
-  perform 1 from public.weddings w where w.id = v_inv.wedding_id for update;
-
   select exists (
-    select 1 from public.memberships m where m.wedding_id = v_inv.wedding_id and m.partner_slot = 'B'
+    select 1 from public.memberships m where m.wedding_id = v_wedding and m.partner_slot = 'B'
   ) or (
-    select count(*) from public.memberships m where m.wedding_id = v_inv.wedding_id and m.role = 'partner'
+    select count(*) from public.memberships m where m.wedding_id = v_wedding and m.role = 'partner'
   ) >= 2 into v_slot_taken;
   if v_slot_taken then
     return 'full';
   end if;
 
   insert into public.memberships (wedding_id, user_id, role, partner_slot)
-  values (v_inv.wedding_id, v_uid, 'partner', 'B');
+  values (v_wedding, v_uid, 'partner', 'B');
 
   update public.wedding_partners set user_id = v_uid
-  where wedding_id = v_inv.wedding_id and slot = 'B' and email::text = v_email;
+  where wedding_id = v_wedding and slot = 'B' and email::text = v_email;
   if not found then
     insert into public.wedding_partners (wedding_id, slot, email, user_id)
-    values (v_inv.wedding_id, 'B', v_email, v_uid);
+    values (v_wedding, 'B', v_email, v_uid);
   end if;
 
   update public.invitations set accepted_at = now(), accepted_by = v_uid where id = v_inv.id;
@@ -867,17 +1005,63 @@ begin
 end;
 $$;
 
--- ---------------------------------------------------------------------------------------------
--- RPC: account operations (the DB decides, the server executes with the secret key)
--- ---------------------------------------------------------------------------------------------
-
--- authorize_account_op(op, target_slot) -> { allowed, wedding_id, target_user_id, target_email }
--- or { allowed:false, error }. Ops: create_partner, set_temp_code, update_pending_email,
--- delete_pending, change_own_email.
-create function public.authorize_account_op(p_op text, p_target_slot text default null)
+-- invitation_by_token(token_hash) -> { ok, invitation_id, user_id }   (SECRET KEY ONLY)
+-- Used by the one-time link `/invito/[token]` (no session). Neutral answer `{ ok: false }` for an
+-- unknown, used, revoked or expired token, an invitation without account, or an account that is no
+-- longer reusable. On success `user_id` is the only account the server may set a password on.
+create function public.invitation_by_token(p_token_hash bytea)
 returns jsonb
 language plpgsql
-stable
+security definer
+set search_path = pg_catalog, pg_temp
+as $$
+declare
+  v_id uuid;
+  v_wedding uuid;
+  v_inv public.invitations%rowtype;
+begin
+  if p_token_hash is null or octet_length(p_token_hash) <> 32 then
+    return jsonb_build_object('ok', false);
+  end if;
+  select i.id, i.wedding_id into v_id, v_wedding from public.invitations i
+  where i.token_hash = p_token_hash and i.method = 'email' limit 1;
+  if v_id is null then
+    return jsonb_build_object('ok', false);
+  end if;
+  perform 1 from public.weddings w where w.id = v_wedding for update;
+  select * into v_inv from public.invitations i
+  where i.id = v_id and i.token_hash = p_token_hash and i.accepted_at is null and i.revoked_at is null
+    and i.expires_at > now()
+  for update;
+  if not found or v_inv.invitee_user_id is null
+     or not private.account_reusable(v_inv.invitee_user_id, v_wedding) then
+    return jsonb_build_object('ok', false);
+  end if;
+  return jsonb_build_object('ok', true, 'invitation_id', v_inv.id, 'user_id', v_inv.invitee_user_id);
+end;
+$$;
+
+-- ---------------------------------------------------------------------------------------------
+-- RPC: account operations that change no DB row (the DB decides AND records, the server executes)
+-- ---------------------------------------------------------------------------------------------
+
+-- authorize_account_op(op, target_slot, new_email) -> { allowed, wedding_id, target_user_id,
+--   target_email [, new_email] } or { allowed:false, error }.   VOLATILE: it writes the event.
+-- Ops (REV-3: kind and target are derived here, never declared by the caller):
+--   set_temp_code    target = the OTHER member, or the pending invitee if still reusable;
+--                    event temp_code_set
+--   change_own_code  target = caller; event code_changed
+--   change_own_email target = caller; `email_in_use` if the new address has an Auth account or is
+--                    the other partner's; event email_changed
+-- create_partner / update_pending_email / delete_pending are NOT here any more: create_invitation,
+-- update_partner_email and revoke_invitation are their step 1.
+-- The event is written BEFORE the admin call (a spare warning is safe, a missing one is not).
+create function public.authorize_account_op(
+  p_op text, p_target_slot text default null, p_new_email text default null
+)
+returns jsonb
+language plpgsql
+volatile
 security definer
 set search_path = pg_catalog, pg_temp
 as $$
@@ -889,117 +1073,77 @@ declare
   v_target_user uuid;
   v_target_email text;
   v_inv public.invitations%rowtype;
-  v_partner public.wedding_partners%rowtype;
+  v_new text;
+  v_current text;
 begin
   if v_uid is null then
     return jsonb_build_object('allowed', false, 'error', 'unauthenticated');
   end if;
-  select m.wedding_id, m.partner_slot into v_wedding, v_slot
+  select m.wedding_id into v_wedding
   from public.memberships m
   where m.user_id = v_uid and m.role = 'partner'
   order by m.created_at, m.wedding_id limit 1;
-  if v_wedding is null or not public.has_permission(v_wedding, 'partners', 'write') then
+  if v_wedding is null then
     return jsonb_build_object('allowed', false, 'error', 'not_partner');
   end if;
 
-  if p_op = 'change_own_email' then
+  perform 1 from public.weddings w where w.id = v_wedding for update;
+  select m.partner_slot into v_slot from public.memberships m
+  where m.wedding_id = v_wedding and m.user_id = v_uid and m.role = 'partner';
+  if v_slot is null or not public.has_permission(v_wedding, 'partners', 'write') then
+    return jsonb_build_object('allowed', false, 'error', 'not_partner');
+  end if;
+
+  if p_op = 'change_own_code' then
+    perform private.record_account_event(v_wedding, 'code_changed', v_uid);
     return jsonb_build_object('allowed', true, 'wedding_id', v_wedding,
       'target_user_id', v_uid, 'target_email', private.account_email(v_uid));
+
+  elsif p_op = 'change_own_email' then
+    v_new := private.norm_email(p_new_email);
+    v_current := private.account_email(v_uid);
+    if v_new = v_current then
+      return jsonb_build_object('allowed', false, 'error', 'same_email');
+    end if;
+    if exists (select 1 from auth.users u where lower(btrim(u.email)) = v_new and u.id <> v_uid)
+       or exists (
+         select 1 from public.wedding_partners wp
+         where wp.wedding_id = v_wedding and wp.email::text = v_new and wp.user_id is distinct from v_uid
+       ) then
+      return jsonb_build_object('allowed', false, 'error', 'email_in_use');
+    end if;
+    perform private.record_account_event(v_wedding, 'email_changed', v_uid);
+    return jsonb_build_object('allowed', true, 'wedding_id', v_wedding,
+      'target_user_id', v_uid, 'target_email', v_current, 'new_email', v_new);
 
   elsif p_op = 'set_temp_code' then
     v_other := case v_slot when 'A' then 'B' else 'A' end;
     if p_target_slot is not null and p_target_slot <> v_other then
       return jsonb_build_object('allowed', false, 'error', 'self_target');
     end if;
-    select * into v_partner from public.wedding_partners wp
-    where wp.wedding_id = v_wedding and wp.slot = v_other;
-    if not found then
+    select m.user_id into v_target_user from public.memberships m
+    where m.wedding_id = v_wedding and m.partner_slot = v_other and m.role = 'partner';
+    if v_target_user is not null then
+      v_target_email := private.account_email(v_target_user);
+    else
+      -- The other partner has not entered yet: only the invited account, and only if reusable.
+      select * into v_inv from public.invitations i
+      where i.wedding_id = v_wedding and i.accepted_at is null and i.revoked_at is null for update;
+      if found and v_inv.invitee_user_id is not null
+         and private.account_reusable(v_inv.invitee_user_id, v_wedding) then
+        v_target_user := v_inv.invitee_user_id;
+        v_target_email := v_inv.email::text;
+      end if;
+    end if;
+    if v_target_user is null then
       return jsonb_build_object('allowed', false, 'error', 'no_account');
     end if;
-    v_target_user := v_partner.user_id;
-    v_target_email := v_partner.email::text;
-    if v_target_user is null then
-      select i.invitee_user_id into v_target_user from public.invitations i
-      where i.wedding_id = v_wedding and i.accepted_at is null and i.revoked_at is null;
-    end if;
-    if v_target_user is null then
-      return jsonb_build_object('allowed', false, 'error', 'no_account');
-    end if;
-    return jsonb_build_object('allowed', true, 'wedding_id', v_wedding,
-      'target_user_id', v_target_user, 'target_email', v_target_email);
-
-  elsif p_op in ('create_partner', 'update_pending_email', 'delete_pending') then
-    if p_target_slot is distinct from 'B' then
-      return jsonb_build_object('allowed', false, 'error', 'invalid_slot');
-    end if;
-    if exists (select 1 from public.memberships m where m.wedding_id = v_wedding and m.partner_slot = 'B') then
-      return jsonb_build_object('allowed', false, 'error', 'partner_already_joined');
-    end if;
-    select * into v_inv from public.invitations i
-    where i.wedding_id = v_wedding and i.accepted_at is null and i.revoked_at is null;
-    select * into v_partner from public.wedding_partners wp
-    where wp.wedding_id = v_wedding and wp.slot = 'B';
-    v_target_user := coalesce(v_inv.invitee_user_id, v_partner.user_id);
-    v_target_email := coalesce(v_inv.email::text, v_partner.email::text);
-    if p_op <> 'create_partner' and v_inv.id is null and v_partner.id is null then
-      return jsonb_build_object('allowed', false, 'error', 'no_pending_partner');
-    end if;
+    perform private.record_account_event(v_wedding, 'temp_code_set', v_target_user);
     return jsonb_build_object('allowed', true, 'wedding_id', v_wedding,
       'target_user_id', v_target_user, 'target_email', v_target_email);
   end if;
 
   return jsonb_build_object('allowed', false, 'error', 'unknown_op');
-end;
-$$;
-
--- record_account_event(kind, target_user_id): append-only trail shown in "Novita" (never the code).
--- Rules: code_changed/email_changed are about the caller; temp_code_set targets the OTHER member;
--- partner_account_created and invite_revoked target the invited account (null allowed only for
--- invite_revoked, e.g. when the unused account has been deleted already).
-create function public.record_account_event(p_kind text, p_target_user_id uuid default null)
-returns bigint
-language plpgsql
-security definer
-set search_path = pg_catalog, pg_temp
-as $$
-declare
-  v_uid uuid := auth.uid();
-  v_wedding uuid := private.current_wedding_id();
-  v_target uuid := p_target_user_id;
-  v_in_wedding boolean;
-  v_id bigint;
-begin
-  if v_uid is null or v_wedding is null or not public.has_permission(v_wedding, 'partners', 'write') then
-    raise exception 'forbidden' using errcode = '42501';
-  end if;
-  if p_kind not in ('partner_account_created', 'temp_code_set', 'code_changed', 'email_changed', 'invite_revoked') then
-    raise exception 'invalid_kind' using errcode = 'P0001';
-  end if;
-
-  if p_kind in ('code_changed', 'email_changed') then
-    if v_target is not null and v_target <> v_uid then
-      raise exception 'invalid_target' using errcode = 'P0001';
-    end if;
-    v_target := v_uid;
-  else
-    if v_target is null and p_kind <> 'invite_revoked' then
-      raise exception 'invalid_target' using errcode = 'P0001';
-    end if;
-    if v_target is not null then
-      select exists (select 1 from public.memberships m where m.wedding_id = v_wedding and m.user_id = v_target)
-        or exists (select 1 from public.wedding_partners wp where wp.wedding_id = v_wedding and wp.user_id = v_target)
-        or exists (select 1 from public.invitations i where i.wedding_id = v_wedding and i.invitee_user_id = v_target)
-      into v_in_wedding;
-      if not v_in_wedding or (p_kind = 'temp_code_set' and v_target = v_uid) then
-        raise exception 'invalid_target' using errcode = 'P0001';
-      end if;
-    end if;
-  end if;
-
-  insert into public.account_events (wedding_id, kind, actor_id, target_user_id)
-  values (v_wedding, p_kind, v_uid, v_target)
-  returning id into v_id;
-  return v_id;
 end;
 $$;
 
@@ -1176,11 +1320,23 @@ begin
   end if;
 
   -- No history beyond the window: drop finished, unlocked rows.
+  -- (skip locked: never wait for, or deadlock with, a concurrent failure on the same key)
   delete from private.login_attempts la
-  where la.window_start < now() - v_window and (la.locked_until is null or la.locked_until <= now());
+  where la.key_hash in (
+    select x.key_hash from private.login_attempts x
+    where x.window_start < now() - v_window and (x.locked_until is null or x.locked_until <= now())
+    for update skip locked
+  );
 
   if p_success then
-    delete from private.login_attempts la where la.key_hash = p_email_key;
+    -- REV-5: a success clears the EMAIL counter only while it is NOT locked, so a burst of parallel
+    -- guesses cannot erase a lock set by the others. The IP key is never cleared by a success.
+    delete from private.login_attempts la
+    where la.key_hash in (
+      select x.key_hash from private.login_attempts x
+      where x.key_hash = p_email_key and (x.locked_until is null or x.locked_until <= now())
+      for update skip locked
+    );
   else
     perform private.register_login_failure(p_email_key, p_max_email, v_window, v_lock);
     if p_ip_key is not null then
@@ -1191,7 +1347,8 @@ begin
 end;
 $$;
 
--- auth_user_id_by_email(email): used by bootstrap and account ops (create-only, idempotent).
+-- auth_user_id_by_email(email): bootstrap ONLY (create-only, idempotent). Account operations never
+-- take an id from an email lookup: they use the id returned by the DB step (plan §4.8).
 create function public.auth_user_id_by_email(p_email text)
 returns uuid
 language sql
@@ -1235,8 +1392,7 @@ grant execute on function
   public.upsert_partner_b(text, text, text, text),
   public.update_partner_email(text, text),
   public.sync_my_email(),
-  public.authorize_account_op(text, text),
-  public.record_account_event(text, uuid),
+  public.authorize_account_op(text, text, text),
   public.record_seen(),
   public.record_export(),
   public.dismiss_welcome(),
@@ -1248,5 +1404,6 @@ grant execute on function
   public.record_heartbeat(text, jsonb),
   public.login_gate(bytea, bytea),
   public.login_record(bytea, bytea, boolean, integer, integer, integer, integer),
-  public.auth_user_id_by_email(text)
+  public.auth_user_id_by_email(text),
+  public.invitation_by_token(bytea)
 to service_role;

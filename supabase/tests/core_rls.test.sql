@@ -2,7 +2,7 @@
 -- (versioning, guard_row, audit append-only), roles without permissions.
 begin;
 \set su 'reset role; do $x$ begin perform set_config(''request.jwt.claims'','''',true); perform set_config(''request.jwt.claim.sub'','''',true); end $x$;'
-select plan(33);
+select plan(34);
 
 select * from tests.make_wedding('r1') \gset w1_
 select * from tests.make_wedding('r2') \gset w2_
@@ -48,6 +48,7 @@ select is((select version from public.weddings), 2, 'version bumped by trigger')
 select is((select updated_by from public.weddings), :'w1_founder'::uuid, 'updated_by is the caller');
 select lives_ok($$update public.wedding_partners set label = 'sposo', first_name = 'Anna', last_name = 'Demo'$$, 'partner names/label editable');
 select throws_ok($$update public.weddings set rite = 'barbecue'$$, '23514', null, 'check constraint on rite');
+select throws_ok($$update public.weddings set onboarding_unknown = array[repeat('x', 3000)]$$, '23514', null, 'onboarding_unknown is bounded in size (REV-7)');
 
 -- audit
 :su

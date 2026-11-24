@@ -1,6 +1,6 @@
 -- T2: structure, RLS everywhere, EXECUTE allowlist, grants, private schema.
 begin;
-select plan(16);
+select plan(18);
 
 select is(
   (select count(*)::int from pg_class c join pg_namespace n on n.oid = c.relnamespace
@@ -14,11 +14,11 @@ select is(
      and has_function_privilege('authenticated', p.oid, 'execute')),
   array[
     'accept_pending_invitation()', 'acknowledge_task_review(uuid)', 'add_decision_note(uuid,text,uuid)',
-    'authorize_account_op(text,text)', 'choose_option(uuid,uuid,integer,date)', 'complete_onboarding(jsonb,jsonb)',
+    'authorize_account_op(text,text,text)', 'choose_option(uuid,uuid,integer,date)', 'complete_onboarding(jsonb,jsonb)',
     'create_invitation(text,text,uuid,bytea)',
     'create_wedding()', 'dismiss_welcome()', 'has_permission(uuid,text,text)', 'insert_template_tasks(jsonb)',
     'last_heartbeat(text)',
-    'move_budget_items(uuid,uuid)', 'record_account_event(text,uuid)', 'record_export()', 'record_seen()',
+    'move_budget_items(uuid,uuid)', 'record_export()', 'record_seen()',
     'reopen_decision(uuid,text,integer)', 'revoke_invitation(uuid)',
     'rotate_invitation(uuid,bytea)', 'set_reference_scenario(uuid)', 'sync_my_email()', 'update_partner_email(text,text)',
     'upsert_partner_b(text,text,text,text)'
@@ -34,7 +34,7 @@ select is(
    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public' and p.prokind = 'f' and has_function_privilege('service_role', p.oid, 'execute')
      and not has_function_privilege('authenticated', p.oid, 'execute')),
-  array['auth_user_id_by_email', 'job_claim_notification', 'job_fail_notification',
+  array['auth_user_id_by_email', 'invitation_by_token', 'job_claim_notification', 'job_fail_notification',
     'job_mark_notification_sent', 'job_quota_status', 'job_recipients', 'job_sent_item_keys',
     'job_unsubscribe', 'login_gate', 'login_record', 'record_heartbeat', 'sync_timeline']::text[],
   'secret-key-only functions are not executable by authenticated');
@@ -132,6 +132,17 @@ select ok(has_column_privilege('authenticated', 'public.invitations', 'email', '
 select is(
   (select count(*)::int from public.has_permission('00000000-0000-0000-0000-000000000000', 'wedding', 'read') h where h),
   0, 'has_permission false for unknown wedding');
+
+-- REV-3: account events cannot be declared through the API any more.
+select is(
+  (select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public' and p.proname = 'record_account_event'),
+  0, 'record_account_event does not exist in the exposed schema');
+select ok(
+  not has_function_privilege('authenticated', 'private.record_account_event(uuid,text,uuid)', 'execute')
+  and not has_function_privilege('authenticated', 'private.account_reusable(uuid,uuid)', 'execute')
+  and not has_function_privilege('anon', 'public.invitation_by_token(bytea)', 'execute'),
+  'private account helpers and invitation_by_token are not executable by API roles');
 
 select * from finish();
 rollback;
