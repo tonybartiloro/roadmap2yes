@@ -82,13 +82,23 @@ web3 = 30
 enabled = true
 # Defence in depth: the email provider refuses signups too (top-level enable_signup is false).
 enable_signup = false
-# Accounts are created already confirmed by the admin API: no confirmation emails needed.
-enable_confirmations = false
-double_confirm_changes = false
-secure_password_change = false
+# Hardening against a direct `PUT /user` with a stolen session (plan §4.1, P2, risk R26):
+# - enable_confirmations: an email change asked to GoTrue is not applied without confirmation;
+# - double_confirm_changes: confirmation needed on BOTH addresses (with emails off it never arrives);
+# - secure_password_change: a direct code change needs a session younger than 24 h (or a nonce).
+# The app never uses `PUT /user`: it verifies the current code and then calls the admin API with
+# `email_confirm: true`, so none of these three settings needs an email provider.
+enable_confirmations = true
+double_confirm_changes = true
+secure_password_change = true
 max_frequency = "1s"
 otp_length = 6
 otp_expiry = 3600
+
+# Recovery link (only offered when emails are on): confirmed by POST on /auth/conferma.
+[auth.email.template.recovery]
+subject = "Il tuo accesso a roadmap2yes"
+content_path = "./supabase/templates/recovery.html"
 
 [auth.sms]
 enabled = false
