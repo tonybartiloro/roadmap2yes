@@ -48,3 +48,10 @@ AC14 ⚠️ (decisions, scenarios, tasks yes; budget, partner B no, see question
 2. `sync_timeline_for` sets `due_date = null` on non-overridden dependent tasks when the last scenario is deleted. Is that the intended product behavior, or should they keep the last date?
 3. `insert_template_tasks` does not look at `task_suggestion_dismissals` (kind `add`). Is the filter intentionally left to the client (T4 suggestions)?
 4. REV-8: is the version bump of `weddings` on automatic sync acceptable?
+
+## Round 2
+
+Verdict: approved
+Scope: commit 6a33fe2. T8 pgTAP (decisions_*, timeline_*, 247 tests) PASS; `tests/unit/sql-offset-vectors.test.ts` PASS (2 tests).
+
+REV-1 closed (state guard in scenarios_before_write, skipped under in_rpc, location link still editable). REV-2 closed (restore refused on taken, restored option always candidate, reopen resets deleted ones too). REV-3 closed (wedding locked first in insert_tasks_core; cap 2000 with too_many_tasks). REV-4 closed (drift test compares every row). REV-5 closed (wedding lock first in choose/reopen, order in header; lock-free read of wedding_id before permission check is fine). REV-6 closed (decisions_review covers the listed denied paths). REV-7 closed. REV-8 closed (keep_version flag set only around the derived UPDATE; transaction-local, not settable via API). Answers to questions 1-4 accepted. No new findings.
