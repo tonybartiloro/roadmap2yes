@@ -105,6 +105,122 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"date_scenarios": {
+                  Row: {
+                    "created_at": string,"created_by": string | null,"date_from": string,"date_to": string | null,"id": string,"kind": string,"location_option_id": string | null,"option_id": string,"updated_at": string,"updated_by": string | null,"version": number,"wedding_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"created_by"?: string | null,"date_from": string,"date_to"?: string | null,"id"?: string,"kind": string,"location_option_id"?: string | null,"option_id": string,"updated_at"?: string,"updated_by"?: string | null,"version"?: number,"wedding_id": string
+                  }
+                  Update: {
+                    "created_at"?: string,"created_by"?: string | null,"date_from"?: string,"date_to"?: string | null,"id"?: string,"kind"?: string,"location_option_id"?: string | null,"option_id"?: string,"updated_at"?: string,"updated_by"?: string | null,"version"?: number,"wedding_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "date_scenarios_location_option_id_wedding_id_fkey"
+      columns: ["location_option_id","wedding_id"]
+isOneToOne: false
+      referencedRelation: "decision_options"
+      referencedColumns: ["id","wedding_id"]
+    },{
+      foreignKeyName: "date_scenarios_option_id_wedding_id_fkey"
+      columns: ["option_id","wedding_id"]
+isOneToOne: false
+      referencedRelation: "decision_options"
+      referencedColumns: ["id","wedding_id"]
+    },{
+      foreignKeyName: "date_scenarios_wedding_id_fkey"
+      columns: ["wedding_id"]
+isOneToOne: false
+      referencedRelation: "weddings"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"decision_events": {
+                  Row: {
+                    "actor_id": string | null,"at": string,"decision_id": string,"id": number,"kind": string,"option_id": string | null,"payload": NonNullable<Json>,"reason": string | null,"wedding_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "actor_id"?: string | null,"at"?: string,"decision_id": string,"id"?: never,"kind": string,"option_id"?: string | null,"payload"?: NonNullable<Json>,"reason"?: string | null,"wedding_id": string
+                  }
+                  Update: {
+                    "actor_id"?: string | null,"at"?: string,"decision_id"?: string,"id"?: never,"kind"?: string,"option_id"?: string | null,"payload"?: NonNullable<Json>,"reason"?: string | null,"wedding_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "decision_events_decision_id_wedding_id_fkey"
+      columns: ["decision_id","wedding_id"]
+isOneToOne: false
+      referencedRelation: "decisions"
+      referencedColumns: ["id","wedding_id"]
+    },{
+      foreignKeyName: "decision_events_option_id_wedding_id_fkey"
+      columns: ["option_id","wedding_id"]
+isOneToOne: false
+      referencedRelation: "decision_options"
+      referencedColumns: ["id","wedding_id"]
+    },{
+      foreignKeyName: "decision_events_wedding_id_fkey"
+      columns: ["wedding_id"]
+isOneToOne: false
+      referencedRelation: "weddings"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"decision_options": {
+                  Row: {
+                    "comune": string | null,"cons": (string)[],"cost_cents": number | null,"created_at": string,"created_by": string | null,"decision_id": string,"deleted_at": string | null,"deleted_by": string | null,"id": string,"link": string | null,"notes": string | null,"pros": (string)[],"status": string,"title": string,"updated_at": string,"updated_by": string | null,"version": number,"wedding_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "comune"?: string | null,"cons"?: (string)[],"cost_cents"?: number | null,"created_at"?: string,"created_by"?: string | null,"decision_id": string,"deleted_at"?: string | null,"deleted_by"?: string | null,"id"?: string,"link"?: string | null,"notes"?: string | null,"pros"?: (string)[],"status"?: string,"title": string,"updated_at"?: string,"updated_by"?: string | null,"version"?: number,"wedding_id": string
+                  }
+                  Update: {
+                    "comune"?: string | null,"cons"?: (string)[],"cost_cents"?: number | null,"created_at"?: string,"created_by"?: string | null,"decision_id"?: string,"deleted_at"?: string | null,"deleted_by"?: string | null,"id"?: string,"link"?: string | null,"notes"?: string | null,"pros"?: (string)[],"status"?: string,"title"?: string,"updated_at"?: string,"updated_by"?: string | null,"version"?: number,"wedding_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "decision_options_decision_id_wedding_id_fkey"
+      columns: ["decision_id","wedding_id"]
+isOneToOne: false
+      referencedRelation: "decisions"
+      referencedColumns: ["id","wedding_id"]
+    },{
+      foreignKeyName: "decision_options_wedding_id_fkey"
+      columns: ["wedding_id"]
+isOneToOne: false
+      referencedRelation: "weddings"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"decisions": {
+                  Row: {
+                    "chosen_at": string | null,"chosen_by": string | null,"chosen_option_id": string | null,"created_at": string,"created_by": string | null,"id": string,"key": string,"question": string,"status": string,"type": string,"updated_at": string,"updated_by": string | null,"version": number,"wedding_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "chosen_at"?: string | null,"chosen_by"?: string | null,"chosen_option_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"id"?: string,"key": string,"question": string,"status"?: string,"type": string,"updated_at"?: string,"updated_by"?: string | null,"version"?: number,"wedding_id": string
+                  }
+                  Update: {
+                    "chosen_at"?: string | null,"chosen_by"?: string | null,"chosen_option_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"id"?: string,"key"?: string,"question"?: string,"status"?: string,"type"?: string,"updated_at"?: string,"updated_by"?: string | null,"version"?: number,"wedding_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "decisions_chosen_option_fk"
+      columns: ["chosen_option_id","wedding_id"]
+isOneToOne: false
+      referencedRelation: "decision_options"
+      referencedColumns: ["id","wedding_id"]
+    },{
+      foreignKeyName: "decisions_wedding_id_fkey"
+      columns: ["wedding_id"]
+isOneToOne: false
+      referencedRelation: "weddings"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"heartbeats": {
                   Row: {
                     "details": NonNullable<Json>,"id": number,"ran_at": string,"source": string
@@ -199,6 +315,32 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"option_reactions": {
+                  Row: {
+                    "created_at": string,"created_by": string | null,"id": string,"option_id": string,"reaction": string,"updated_at": string,"updated_by": string | null,"user_id": string,"version": number,"wedding_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"created_by"?: string | null,"id"?: string,"option_id": string,"reaction": string,"updated_at"?: string,"updated_by"?: string | null,"user_id": string,"version"?: number,"wedding_id": string
+                  }
+                  Update: {
+                    "created_at"?: string,"created_by"?: string | null,"id"?: string,"option_id"?: string,"reaction"?: string,"updated_at"?: string,"updated_by"?: string | null,"user_id"?: string,"version"?: number,"wedding_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "option_reactions_option_id_wedding_id_fkey"
+      columns: ["option_id","wedding_id"]
+isOneToOne: false
+      referencedRelation: "decision_options"
+      referencedColumns: ["id","wedding_id"]
+    },{
+      foreignKeyName: "option_reactions_wedding_id_fkey"
+      columns: ["wedding_id"]
+isOneToOne: false
+      referencedRelation: "weddings"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"payments": {
                   Row: {
                     "amount_cents": number,"created_at": string,"created_by": string | null,"deleted_at": string | null,"due_date": string | null,"id": string,"item_id": string,"kind": string,"paid": boolean,"paid_on": string | null,"updated_at": string,"updated_by": string | null,"version": number,"wedding_id": string
@@ -219,6 +361,46 @@ isOneToOne: false
       referencedColumns: ["id","wedding_id"]
     },{
       foreignKeyName: "payments_wedding_id_fkey"
+      columns: ["wedding_id"]
+isOneToOne: false
+      referencedRelation: "weddings"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"task_suggestion_dismissals": {
+                  Row: {
+                    "dismissed_at": string,"dismissed_by": string | null,"id": string,"kind": string,"template_key": string,"wedding_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "dismissed_at"?: string,"dismissed_by"?: string | null,"id"?: string,"kind": string,"template_key": string,"wedding_id": string
+                  }
+                  Update: {
+                    "dismissed_at"?: string,"dismissed_by"?: string | null,"id"?: string,"kind"?: string,"template_key"?: string,"wedding_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "task_suggestion_dismissals_wedding_id_fkey"
+      columns: ["wedding_id"]
+isOneToOne: false
+      referencedRelation: "weddings"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"tasks": {
+                  Row: {
+                    "advice": string | null,"assignee": string,"category": string | null,"completed_at": string | null,"completed_by": string | null,"created_at": string,"created_by": string | null,"deleted_at": string | null,"deleted_by": string | null,"due_date": string | null,"due_overridden": boolean,"id": string,"needs_review": boolean,"notes": string | null,"reminders_enabled": boolean,"source": string,"status": string,"template_key": string | null,"template_offset": Json | null,"template_version": number | null,"title": string,"updated_at": string,"updated_by": string | null,"version": number,"wedding_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "advice"?: string | null,"assignee"?: string,"category"?: string | null,"completed_at"?: string | null,"completed_by"?: string | null,"created_at"?: string,"created_by"?: string | null,"deleted_at"?: string | null,"deleted_by"?: string | null,"due_date"?: string | null,"due_overridden"?: boolean,"id"?: string,"needs_review"?: boolean,"notes"?: string | null,"reminders_enabled"?: boolean,"source"?: string,"status"?: string,"template_key"?: string | null,"template_offset"?: Json | null,"template_version"?: number | null,"title": string,"updated_at"?: string,"updated_by"?: string | null,"version"?: number,"wedding_id": string
+                  }
+                  Update: {
+                    "advice"?: string | null,"assignee"?: string,"category"?: string | null,"completed_at"?: string | null,"completed_by"?: string | null,"created_at"?: string,"created_by"?: string | null,"deleted_at"?: string | null,"deleted_by"?: string | null,"due_date"?: string | null,"due_overridden"?: boolean,"id"?: string,"needs_review"?: boolean,"notes"?: string | null,"reminders_enabled"?: boolean,"source"?: string,"status"?: string,"template_key"?: string | null,"template_offset"?: Json | null,"template_version"?: number | null,"title"?: string,"updated_at"?: string,"updated_by"?: string | null,"version"?: number,"wedding_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "tasks_wedding_id_fkey"
       columns: ["wedding_id"]
 isOneToOne: false
       referencedRelation: "weddings"
@@ -277,7 +459,13 @@ isOneToOne: false
                     "applied_reference_date"?: string | null,"comune"?: string | null,"created_at"?: string,"created_by"?: string | null,"guest_band"?: string | null,"id"?: string,"manual_reference_option_id"?: string | null,"onboarding_answers"?: NonNullable<Json>,"onboarding_completed_at"?: string | null,"onboarding_unknown"?: (string)[],"region"?: string | null,"rite"?: string | null,"style_label"?: string | null,"style_note"?: string | null,"theme_id"?: string,"updated_at"?: string,"updated_by"?: string | null,"version"?: number
                   }
                   Relationships: [
-                    
+                    {
+      foreignKeyName: "weddings_manual_reference_fk"
+      columns: ["manual_reference_option_id","id"]
+isOneToOne: false
+      referencedRelation: "decision_options"
+      referencedColumns: ["id","wedding_id"]
+    }
                   ]
                 }
           }
@@ -288,11 +476,23 @@ isOneToOne: false
             "accept_pending_invitation":
 { Args: Record<PropertyKey, never>; Returns: string
                            },
+"acknowledge_task_review":
+{ Args: { "p_task_id"?: string }; Returns: number
+                           },
+"add_decision_note":
+{ Args: { "p_decision_id": string,"p_note": string,"p_option_id"?: string }; Returns: number
+                           },
 "auth_user_id_by_email":
 { Args: { "p_email": string }; Returns: string
                            },
 "authorize_account_op":
 { Args: { "p_op": string,"p_target_slot"?: string }; Returns: Json
+                           },
+"choose_option":
+{ Args: { "p_decision_id": string,"p_exact_date"?: string,"p_expected_version"?: number,"p_option_id": string }; Returns: Json
+                           },
+"complete_onboarding":
+{ Args: { "p_scenarios"?: Json,"p_tasks"?: Json }; Returns: Json
                            },
 "create_invitation":
 { Args: { "p_email": string,"p_invitee_user_id"?: string,"p_method": string,"p_token_hash"?: string }; Returns: Json
@@ -305,6 +505,9 @@ isOneToOne: false
                            },
 "has_permission":
 { Args: { "p_action": string,"p_area": string,"p_wedding_id": string }; Returns: boolean
+                           },
+"insert_template_tasks":
+{ Args: { "p_tasks": Json }; Returns: Json
                            },
 "job_claim_notification":
 { Args: { "p_batch_key": string,"p_daily_cap"?: number,"p_item_keys"?: (string)[],"p_kind": string,"p_monthly_cap"?: number,"p_now"?: string,"p_user_id": string,"p_wedding_id": string }; Returns: Json
@@ -353,14 +556,23 @@ isOneToOne: false
 "record_seen":
 { Args: Record<PropertyKey, never>; Returns: Json
                            },
+"reopen_decision":
+{ Args: { "p_decision_id": string,"p_expected_version"?: number,"p_reason": string }; Returns: Json
+                           },
 "revoke_invitation":
 { Args: { "p_invitation_id": string }; Returns: undefined
                            },
 "rotate_invitation":
 { Args: { "p_invitation_id": string,"p_token_hash": string }; Returns: Json
                            },
+"set_reference_scenario":
+{ Args: { "p_option_id"?: string }; Returns: Json
+                           },
 "sync_my_email":
 { Args: Record<PropertyKey, never>; Returns: string
+                           },
+"sync_timeline":
+{ Args: { "p_wedding_id"?: string }; Returns: number
                            },
 "update_partner_email":
 { Args: { "p_email": string,"p_slot": string }; Returns: undefined

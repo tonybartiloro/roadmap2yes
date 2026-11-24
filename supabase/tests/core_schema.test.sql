@@ -1,6 +1,6 @@
 -- T2: structure, RLS everywhere, EXECUTE allowlist, grants, private schema.
 begin;
-select plan(15);
+select plan(16);
 
 select is(
   (select count(*)::int from pg_class c join pg_namespace n on n.oid = c.relnamespace
@@ -13,10 +13,14 @@ select is(
    where n.nspname = 'public' and p.prokind = 'f'
      and has_function_privilege('authenticated', p.oid, 'execute')),
   array[
-    'accept_pending_invitation()', 'authorize_account_op(text,text)', 'create_invitation(text,text,uuid,bytea)',
-    'create_wedding()', 'dismiss_welcome()', 'has_permission(uuid,text,text)', 'last_heartbeat(text)',
-    'move_budget_items(uuid,uuid)', 'record_account_event(text,uuid)', 'record_export()', 'record_seen()', 'revoke_invitation(uuid)',
-    'rotate_invitation(uuid,bytea)', 'sync_my_email()', 'update_partner_email(text,text)',
+    'accept_pending_invitation()', 'acknowledge_task_review(uuid)', 'add_decision_note(uuid,text,uuid)',
+    'authorize_account_op(text,text)', 'choose_option(uuid,uuid,integer,date)', 'complete_onboarding(jsonb,jsonb)',
+    'create_invitation(text,text,uuid,bytea)',
+    'create_wedding()', 'dismiss_welcome()', 'has_permission(uuid,text,text)', 'insert_template_tasks(jsonb)',
+    'last_heartbeat(text)',
+    'move_budget_items(uuid,uuid)', 'record_account_event(text,uuid)', 'record_export()', 'record_seen()',
+    'reopen_decision(uuid,text,integer)', 'revoke_invitation(uuid)',
+    'rotate_invitation(uuid,bytea)', 'set_reference_scenario(uuid)', 'sync_my_email()', 'update_partner_email(text,text)',
     'upsert_partner_b(text,text,text,text)'
   ]::text[], 'authenticated can execute exactly the allowlist (T8/T9 extend it)');
 
@@ -32,7 +36,7 @@ select is(
      and not has_function_privilege('authenticated', p.oid, 'execute')),
   array['auth_user_id_by_email', 'job_claim_notification', 'job_fail_notification',
     'job_mark_notification_sent', 'job_quota_status', 'job_recipients', 'job_sent_item_keys',
-    'job_unsubscribe', 'login_gate', 'login_record', 'record_heartbeat']::text[],
+    'job_unsubscribe', 'login_gate', 'login_record', 'record_heartbeat', 'sync_timeline']::text[],
   'secret-key-only functions are not executable by authenticated');
 
 select is(
@@ -57,8 +61,13 @@ select is(
 
 select is(
   (select count(*)::int from information_schema.role_table_grants
-   where table_schema = 'public' and grantee = 'authenticated' and privilege_type in ('INSERT', 'DELETE', 'TRUNCATE')),
-  0, 'authenticated has no INSERT/DELETE/TRUNCATE on any table');
+   where table_schema = 'public' and grantee = 'authenticated' and privilege_type in ('INSERT', 'TRUNCATE')),
+  0, 'authenticated has no table-level INSERT/TRUNCATE on any table');
+
+select is(
+  (select array_agg(table_name::text order by table_name) from information_schema.role_table_grants
+   where table_schema = 'public' and grantee = 'authenticated' and privilege_type = 'DELETE'),
+  array['option_reactions']::text[], 'DELETE only on option_reactions (own rows, RLS)');
 
 select is(
   (select array_agg(table_name::text order by table_name) from information_schema.role_table_grants
@@ -74,9 +83,16 @@ select is(
     'budget_categories.sort_order',
     'budget_items.agreed_cents', 'budget_items.deleted_at', 'budget_items.description',
     'budget_items.planned_cents', 'budget_items.status',
+    'date_scenarios.date_from', 'date_scenarios.date_to', 'date_scenarios.kind', 'date_scenarios.location_option_id',
+    'decision_options.comune', 'decision_options.cons', 'decision_options.cost_cents', 'decision_options.deleted_at',
+    'decision_options.link', 'decision_options.notes', 'decision_options.pros', 'decision_options.title',
+    'decisions.question',
     'notification_preferences.digest_enabled', 'notification_preferences.reminders_enabled',
+    'option_reactions.reaction',
     'payments.amount_cents', 'payments.deleted_at', 'payments.due_date', 'payments.kind',
     'payments.paid', 'payments.paid_on',
+    'tasks.assignee', 'tasks.category', 'tasks.deleted_at', 'tasks.due_date', 'tasks.notes',
+    'tasks.reminders_enabled', 'tasks.status', 'tasks.title',
     'wedding_partners.first_name', 'wedding_partners.label', 'wedding_partners.last_name',
     'weddings.comune', 'weddings.guest_band', 'weddings.onboarding_answers', 'weddings.onboarding_unknown',
     'weddings.region', 'weddings.rite', 'weddings.style_label', 'weddings.style_note', 'weddings.theme_id'
@@ -92,10 +108,21 @@ select is(
     'budget_items.agreed_cents', 'budget_items.category_id', 'budget_items.description',
     'budget_items.planned_cents', 'budget_items.status', 'budget_items.wedding_id',
     'budget_versions.reason', 'budget_versions.total_cents', 'budget_versions.wedding_id',
+    'date_scenarios.date_from', 'date_scenarios.date_to', 'date_scenarios.kind',
+    'date_scenarios.location_option_id', 'date_scenarios.option_id', 'date_scenarios.wedding_id',
+    'decision_options.comune', 'decision_options.cons', 'decision_options.cost_cents',
+    'decision_options.decision_id', 'decision_options.link', 'decision_options.notes', 'decision_options.pros',
+    'decision_options.title', 'decision_options.wedding_id',
     'notification_preferences.digest_enabled', 'notification_preferences.reminders_enabled',
     'notification_preferences.user_id', 'notification_preferences.wedding_id',
+    'option_reactions.option_id', 'option_reactions.reaction', 'option_reactions.user_id',
+    'option_reactions.wedding_id',
     'payments.amount_cents', 'payments.due_date', 'payments.item_id', 'payments.kind',
-    'payments.paid', 'payments.paid_on', 'payments.wedding_id'
+    'payments.paid', 'payments.paid_on', 'payments.wedding_id',
+    'task_suggestion_dismissals.kind', 'task_suggestion_dismissals.template_key',
+    'task_suggestion_dismissals.wedding_id',
+    'tasks.assignee', 'tasks.category', 'tasks.due_date', 'tasks.notes', 'tasks.reminders_enabled',
+    'tasks.title', 'tasks.wedding_id'
   ]::text[], 'column INSERT grants match matrix 3.1 (T8/T9 extend it; sorted in C collation)');
 
 select ok(not has_column_privilege('authenticated', 'public.invitations', 'token_hash', 'select'),
