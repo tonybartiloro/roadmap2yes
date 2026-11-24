@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Countdown } from "@/components/Countdown";
+import { EmailOffBanner } from "@/components/EmailOffBanner";
 import { formatShortDate } from "@/components/format";
 import { Button } from "@/components/ui/button";
 import type { UpcomingPayment } from "@/domain/budget";
@@ -27,6 +28,8 @@ export function HomeScreen({ data }: { data: HomeData }) {
           ? `Ciao ${data.myName}, ecco cosa ti aspetta oggi`
           : "Ciao, ecco cosa ti aspetta oggi"}
       </h1>
+
+      <EmailOffBanner />
 
       <div className="grid gap-6 md:grid-cols-2 md:items-start">
         {data.reference.ok ? (

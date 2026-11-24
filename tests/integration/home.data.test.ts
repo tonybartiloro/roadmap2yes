@@ -275,12 +275,68 @@ describe("Home (T14) on the local stack", () => {
 
   it("two requests registering at once do not wipe the news (concurrent tabs)", async () => {
     const stored = await lastSeen(a, wedding.founder.id);
+    // Barrier at `record_seen`: each call has already READ the state when it reaches the RPC, so
+    // waiting for both forces the interleaving (both read the same state, then both register).
+    let arrived = 0;
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    const gated = new Proxy(a, {
+      get(target, prop, receiver) {
+        if (prop === "rpc") {
+          return async (fn: string, ...args: unknown[]) => {
+            if (fn === "record_seen") {
+              arrived += 1;
+              if (arrived === 2) release();
+              await gate;
+            }
+            return (target.rpc as (...a: unknown[]) => unknown)(fn, ...args);
+          };
+        }
+        return Reflect.get(target, prop, receiver) as unknown;
+      },
+    });
     const [one, two] = await Promise.all([
-      registerVisit(a, wedding.founder.id, Date.now() + 8 * HOUR),
-      registerVisit(a, wedding.founder.id, Date.now() + 8 * HOUR),
+      registerVisit(gated, wedding.founder.id, Date.now() + 8 * HOUR),
+      registerVisit(gated, wedding.founder.id, Date.now() + 8 * HOUR),
     ]);
     expect(Date.parse(one.previousSeenAt!)).toBe(Date.parse(stored!));
     expect(Date.parse(two.previousSeenAt!)).toBe(Date.parse(stored!));
+  });
+
+  it("a burst of your own edits does not push the partner's change out of the news (REV-2)", async () => {
+    const other = await createWedding();
+    const second = await addPartnerB(other);
+    const asA = other.founderClient;
+    const asB = second.client;
+    const loadOther = (nowMs?: number) =>
+      loadHomeData(asB, second.user.id, { today: TODAY, ...(nowMs ? { nowMs } : {}) });
+    await serviceClient()
+      .from("wedding_partners")
+      .update({ first_name: "Jessica" })
+      .eq("user_id", second.user.id);
+    await asA
+      .from("wedding_partners")
+      .update({ first_name: "Tony" })
+      .eq("user_id", other.founder.id);
+
+    await loadOther(); // first visit of B
+    const one = await asA
+      .from("tasks")
+      .insert({ wedding_id: other.weddingId, title: "Compito di Tony" });
+    expect(one.error).toBeNull();
+    // 250 newer rows of the viewer's own, more than the fetch window.
+    const own = Array.from({ length: 250 }, (_, i) => ({
+      wedding_id: other.weddingId,
+      title: `Mio ${i}`,
+    }));
+    const bulk = await asB.from("tasks").insert(own);
+    expect(bulk.error).toBeNull();
+
+    const back = await loadOther(Date.now() + 2 * HOUR);
+    if (!back?.news.ok || back.news.data === null) throw new Error("no news");
+    expect(back.news.data.map((n) => n.text)).toEqual([
+      "Tony ha aggiunto il compito «Compito di Tony»",
+    ]);
   });
 
   it("one block failing leaves the others on screen (AC39)", async () => {

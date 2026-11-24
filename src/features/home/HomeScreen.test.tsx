@@ -2,6 +2,7 @@
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { EmailStatusProvider } from "@/components/EmailOffBanner";
 import { countdown } from "@/domain/home";
 import { lastExport } from "@/domain/export";
 import type { HomeData, StepsData } from "./types";
@@ -76,6 +77,21 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("Home screen", () => {
+  it("shows the email-off notice when the app sends no email, and not when it does (AC59)", () => {
+    const { rerender } = render(
+      <EmailStatusProvider emailEnabled={false}>
+        <HomeScreen data={makeHome()} />
+      </EmailStatusProvider>,
+    );
+    expect(screen.getByRole("status").textContent).toContain("Le email sono spente");
+    rerender(
+      <EmailStatusProvider emailEnabled>
+        <HomeScreen data={makeHome()} />
+      </EmailStatusProvider>,
+    );
+    expect(screen.queryByText(/Le email sono spente/)).toBeNull();
+  });
+
   it("greets by name and shows the provisional countdown with its label and the link (AC26)", () => {
     render(
       <HomeScreen

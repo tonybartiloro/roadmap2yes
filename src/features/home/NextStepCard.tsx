@@ -32,7 +32,11 @@ export function NextStepCard({
   return (
     <section
       aria-labelledby="home-next-step"
-      className="border-border bg-card flex flex-col gap-4 rounded-lg border p-4"
+      // The saved switch is read after hydration and can swap the list: when there is something
+      // to swap, reserve the height of a full card (primary + 2 + switch) so nothing jumps.
+      className={`border-border bg-card flex flex-col gap-4 rounded-lg border p-4 ${
+        steps.hasPartnerTasks ? "min-h-80" : ""
+      }`}
     >
       <h2
         id="home-next-step"

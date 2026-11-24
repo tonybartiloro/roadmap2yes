@@ -343,6 +343,7 @@ const DECISION_KINDS: readonly string[] = [
   "reference_auto",
 ];
 const AUDIT_TABLES = ["tasks", "budget_versions", "payments"];
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const AUDIT_FETCH = 200;
 const EVENT_FETCH = 100;
 
@@ -358,24 +359,31 @@ async function newsSection(
   userId: string,
   since: string,
 ): Promise<NewsItem[]> {
+  // The viewer's own rows (and system audit rows) are filtered IN the query, before the limit:
+  // a burst of own edits must not push the partner's changes out of the window. `userId` comes
+  // from the verified claims; the shape check keeps it out of the `.or()` filter syntax otherwise.
+  if (!UUID.test(userId)) throw new HomeLoadError("utente", new Error("invalid user id"));
   const [audit, accounts, events] = await Promise.all([
     db
       .from("audit_log")
       .select("id, at, actor_id, table_name, op, old_data, new_data")
       .in("table_name", AUDIT_TABLES)
       .gt("at", since)
+      .neq("actor_id", userId) // also drops null (system) actors, which are never news
       .order("at", { ascending: false })
       .limit(AUDIT_FETCH),
     db
       .from("account_events")
       .select("id, at, kind, actor_id, target_user_id")
       .gt("at", since)
+      .neq("actor_id", userId)
       .order("at", { ascending: false })
       .limit(EVENT_FETCH),
     db
       .from("decision_events")
       .select("id, at, kind, actor_id, decision_id, option_id, payload")
       .gt("at", since)
+      .or(`actor_id.is.null,actor_id.neq.${userId}`)
       .order("at", { ascending: false })
       .limit(EVENT_FETCH),
   ]);
