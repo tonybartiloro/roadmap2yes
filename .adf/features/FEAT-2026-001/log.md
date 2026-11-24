@@ -455,3 +455,7 @@ Developer's answers to the 4 remaining questions: 1. OK (min 10 characters, lett
 - T4 done in ea3c24c, but most of its files were swept into 02ea503 by a broad `git add` from the T1 fix. History is not rewritten. All developers have been told to stage only their own paths.
 - T4 results: 53 milestones (the spec's numbering skips n. 38, spec corrected); 65 date-offset vectors; rite enum `civile|religioso|simbolico|unknown` (passed to T2); suggestion dismissals `{templateKey, kind}` (T8 adds a `kind` column); 291 unit tests green, including the TZ variants.
 - Next: T2 and T3 in progress; T4 review starting.
+
+## F3 — T4 review closed — 2026-11-24
+- code-2 round 1: 1 blocking, 3 should, 5 nits. Fixed in 6bb86c0; round 2 approved with 0 open findings.
+- Follow-up recorded in the plan change log: T8/T11/T14 must use the same rule for the automatic reference, namely the earliest open scenario whose date is not past.

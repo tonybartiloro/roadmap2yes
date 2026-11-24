@@ -30,3 +30,31 @@ N5. `group-tasks.test.ts` "Prossimi 3 mesi" asserts a Set plus only the minimum 
 Q1. Should a dismissal be scoped to the rite (S3)?
 Q2. `resolveReference` takes no `today`: an open scenario already in the past is still "nearest" (earliest) and becomes the reference, so every deadline derives from a past date. Is that intended (BR3 gives only a warning for early dates)? If yes, document it; if no, pass `today` and prefer the earliest non-past scenario.
 Q3. Tests: confirm `npm run test:tz` (UTC and America/Los_Angeles) is green for these files; no test pins `process.env.TZ`, so the TZ claim rests on the CI script only.
+
+## Developer response (round 1)
+
+| Finding | Response |
+|---|---|
+| B1 | Fixed: `reference.test.ts` added (my first write of it was lost to a failed shell chain). Covers every listed case plus past-dated and discarded-only. |
+| S1 | Fixed: hidden only when `!dueOverridden`; cleared-date generated task goes to Più avanti; test added. |
+| S2 | Fixed: `GroupedTasks.deleted` (restorable) separate from `hidden` (no reference); tests adjusted. |
+| S3 / Q1 | Kept unscoped by rite on purpose (PO intent: never re-suggest what was dismissed); documented in `SuggestionDismissal` and pinned by a round-trip test. |
+| Q2 | Changed: `resolveReference` requires `today`; default = earliest open scenario with `dateFrom >= today`, else earliest of the past ones. Manual reference is respected even if past. Tests added. |
+| Q3 | Run: `npm run test:tz` (UTC, America/Los_Angeles) green for T4 files. Two failures remain in `src/themes/*` (T3, in progress, not mine). |
+| N1 | Test pins Adesso = 5 rows (spec §5.1). |
+| N2 | `isPlainDate` rejects years < 1900. Malformed rows still throw (callers map DB `date` values, validated by Postgres); not skipped silently. |
+| N3, N4, N5 | Fixed: imports merged, fixture simplified, exact Prossimi order asserted; added location-only and 1+2 truncation tests. |
+
+## Round 2 (fix commit 6bb86c0)
+
+Verified in the diff; `npx vitest run src/lib/dates src/domain src/content`: 7 files, 179 tests, all pass.
+
+- B1 closed: `reference.test.ts` added (97 lines) with the listed cases.
+- S1 closed: hidden only when `!dueOverridden`; test added.
+- S2 closed: `deleted` split from `hidden`.
+- S3/Q1 closed: unscoped by rite, documented and pinned by a round-trip test.
+- Q2 closed with a follow-up: `resolveReference` now takes `today`. T8 (`set_reference_scenario(null)`, SQL default reference) and the T14/T11 callers must apply the same "earliest not past, else earliest" rule, otherwise server and client references diverge. Record it in plan/T8.
+- Q3: not re-run by me with TZ; the developer reports green, accepted.
+- N1-N5 closed (N2: malformed rows still throw, accepted).
+
+Verdict: **approved** (blocking 0, open 0; one cross-task follow-up for T8 above).
