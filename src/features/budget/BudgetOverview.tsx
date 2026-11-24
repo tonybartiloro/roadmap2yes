@@ -116,7 +116,7 @@ export function BudgetOverview({
       <WarningList warnings={warnings} />
 
       <section aria-labelledby="categories-heading" className="flex flex-col gap-3">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 id="categories-heading" className="text-xl leading-7 font-semibold">
             Categorie
           </h2>
