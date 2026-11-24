@@ -16,7 +16,7 @@ environments:
   staging: pending           # pending | deployed <date> | not-applicable
   production: pending
 links:
-  pr: ""
+  pr: "https://github.com/tonybartiloro/roadmap2yes/pull/1"
   brief: ""
   plan: ""
   docs_functional: docs/functional
