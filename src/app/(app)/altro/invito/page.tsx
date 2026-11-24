@@ -84,8 +84,8 @@ export default async function InvitePage() {
           {state === "active" ? <span>{name} è dentro: ha gli stessi permessi tuoi.</span> : null}
           {state === "pending_code" && invitation ? (
             <span>
-              L&apos;accesso per {invitation.email} è pronto: aspetta che entri con il codice che
-              gli hai dato.
+              L&apos;accesso per {invitation.email} è pronto: aspetta il primo accesso con il codice
+              che hai consegnato.
             </span>
           ) : null}
           {state === "pending_email" && invitation?.expiresAt ? (
@@ -107,7 +107,7 @@ export default async function InvitePage() {
         <>
           <section aria-labelledby="invite-section-code" className="flex flex-col gap-4">
             <h2 id="invite-section-code" className="text-xl font-semibold">
-              Con un codice che gli dai di persona
+              Con un codice che consegni di persona
             </h2>
             <CreateWithCodeForm defaults={defaults} />
           </section>
@@ -167,8 +167,8 @@ export default async function InvitePage() {
             Codice dimenticato?
           </h2>
           <p className="text-muted-foreground">
-            Se {name} non ricorda il suo codice, gliene imposti uno temporaneo e glielo dici di
-            persona. Lo vedrà tra le novità e dovrà cambiarlo appena entra.
+            Se {name} non ricorda il codice, imposti un codice temporaneo e lo consegni di persona.
+            L&apos;evento sarà tra le novità e il codice andrà cambiato appena si entra.
           </p>
           <TemporaryCodeForm partnerName={name} subject={subject} />
         </section>

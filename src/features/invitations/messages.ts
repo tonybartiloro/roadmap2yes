@@ -25,7 +25,10 @@ export function failureMessage(error: AccountOpError): { message: string; field?
     case "same_email":
       return { message: "È la tua stessa email: scrivi quella del tuo partner.", field: "email" };
     case "partner_already_joined":
-      return { message: "Il tuo partner è già entrato: l'email di accesso la cambia solo lui." };
+      return {
+        message:
+          "Il tuo partner ha già fatto il primo accesso: l'email di accesso può cambiarla solo il tuo partner.",
+      };
     case "invitation_pending":
       return {
         message:

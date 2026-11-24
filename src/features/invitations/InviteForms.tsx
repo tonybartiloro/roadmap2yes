@@ -181,7 +181,7 @@ export function CreateWithCodeForm({ defaults }: { defaults: PartnerDefaults }) 
       <TextField
         id="partner-label"
         name="label"
-        label="Come lo chiami (facoltativo, es. sposo)"
+        label="Come vuoi chiamare il tuo partner (facoltativo, es. sposo)"
         value={label}
         onChange={setLabel}
       />
@@ -289,8 +289,8 @@ export function RevokeForm({
           <AlertDialogHeader>
             <AlertDialogTitle>Vuoi revocare l&apos;invito?</AlertDialogTitle>
             <AlertDialogDescription>
-              {partnerName} non potrà più entrare con questo invito o con il codice che gli hai
-              dato. Potrai invitarlo di nuovo quando vuoi.
+              {partnerName} non potrà più entrare con questo invito o con il codice che hai
+              consegnato. Potrai inviare un nuovo invito quando vuoi.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -367,8 +367,8 @@ export function TemporaryCodeForm({
         error={fieldError(state, "code")}
       />
       <p className="text-muted-foreground text-sm">
-        Consegnalo di persona. Chiude i suoi accessi attuali e, al prossimo ingresso, gli chiede di
-        scegliere un codice tutto suo.
+        Consegnalo di persona. Chiude gli accessi attuali del tuo partner e, al prossimo ingresso,
+        chiede di scegliere un codice tutto suo.
       </p>
       <FormFeedback state={state} testId="temp-code-feedback" />
       <SubmitButton>Imposta il codice temporaneo</SubmitButton>
