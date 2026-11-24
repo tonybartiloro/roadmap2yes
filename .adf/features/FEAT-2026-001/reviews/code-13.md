@@ -56,3 +56,22 @@ Verified `git show 282651c` and `npx vitest run scripts src/features/jobs src/do
 | REV-6 | closed ✅ | Comment added in `run-daily-job.ts`. The runbook mention is T18. |
 
 Answers to the questions: the production check covers the whole week, and the branch policy goes on the release checklist (both from the coordinator).
+
+## Round 3 (0903221)
+
+Verdict: approved
+Reviewed `git show 0903221` only. `npx vitest run src/features/jobs`: 3 files, 34 tests pass.
+
+| ID | Severity | Evidence | Finding | Closed |
+|---|---|---|---|---|
+| REV-7 | closed ✅ | `supabase-job-db.ts:53-66` (`allPages`), `:91`, `:96-102` | Paging is correct. Ordering is total: `job_recipients` orders by `(wedding_id, partner_slot)`, which is unique (`memberships unique (wedding_id, partner_slot)`, core.sql:165). The memberships read orders by `(wedding_id, user_id)`. The loop ends on the first short page; an exact multiple costs one extra empty request and the test covers it. Errors go through `unwrap`, so a DB error or null data throws and the job fails (heartbeat `ok:false`, route 500) instead of continuing with partial recipients. The test uses a fake pager (no live PostgREST), but the regression it guards is covered. | ✅ |
+
+Caveat: `PAGE_LIMIT` (1000) must stay at or below the server `max_rows` (`supabase/config.toml:14`, 1000). If a remote project lowers it, the first page is short and `allPages` stops silently. Comment it next to the constant, or use a smaller page (the export uses 500, `export/data.ts:49`).
+
+Other reads that could be truncated at 1000 rows (none realistic for a two-person wedding; notes, not blocking):
+- Job, per wedding, silent `.limit(1000)`: `supabase-job-db.ts:137` (`doneItemKeys`, no ORDER BY, so the kept rows are arbitrary), `:211` (tasks), `:219` (payments), `:237` (`audit_log`, 7 days, the most plausible after bulk edits: it would drop the oldest entries from the digest news and the D38 due-date-change check), `:244` (`decision_events`).
+- `supabase-job-db.ts:263`: `budget_items ... .in("id", itemIds)` with up to 1000 ids can exceed the request URL limit. Only unpaid payments with a due date count, so it is small in practice.
+- Unbounded user-facing reads (the cap applies silently): `home/data.ts:317` (tasks), `home/data.ts:222-227` (budget categories, items, payments), `timeline/queries.ts:67` (tasks), `budget/data.ts:111-113` (categories, items, payments), `decisions/data.ts:138` (tasks) and `:119-120` (options, events).
+- `home/data.ts:374-388` (`AUDIT_FETCH`, `EVENT_FETCH`) are deliberate caps; `export/data.ts` already pages at 500 (correct).
+
+Proposal (optional, a later task): a shared `allPages` helper in `lib/supabase`, used by the job per-wedding reads (`:137`, `:237`, `:244` first) with an ORDER BY.
