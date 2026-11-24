@@ -71,7 +71,7 @@
     "db:test": "supabase test db",
     "db:types": "supabase gen types typescript --local --schema public > src/lib/supabase/database.types.ts.tmp && mv src/lib/supabase/database.types.ts.tmp src/lib/supabase/database.types.ts",
     "db:env": "supabase status -o json 2>/dev/null | node -e \"let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const j=JSON.parse(s);console.log('NEXT_PUBLIC_SUPABASE_URL='+j.API_URL+'\\\\nNEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY='+j.PUBLISHABLE_KEY+'\\\\nSUPABASE_SECRET_KEY='+j.SECRET_KEY)})\"",
-    "mail:start": "docker start roadmap2yes-mailpit 2>/dev/null || docker run -d --name roadmap2yes-mailpit -p 127.0.0.1:54425:1025 -p 127.0.0.1:54426:8025 public.ecr.aws/supabase/mailpit:v1.31.3",
+    "mail:start": "docker start roadmap2yes-mailpit 2>/dev/null || docker run -d --name roadmap2yes-mailpit -p 127.0.0.1:54425:1025 -p 127.0.0.1:54426:8025 public.ecr.aws/supabase/mailpit:v1.31.3@sha256:ed9b00c609e77e99c79b93f1178255ebc271868920f2c69a8d166bd5634ed10d",
     "mail:stop": "docker rm -f roadmap2yes-mailpit >/dev/null 2>&1 || true",
     "bootstrap": "tsx scripts/bootstrap.ts",
     "gen:themes": "tsx scripts/gen-themes-css.ts",

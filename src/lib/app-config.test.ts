@@ -203,15 +203,38 @@ describe("Supabase config", () => {
 });
 
 describe("readSiteUrl", () => {
-  it("prefers NEXT_PUBLIC_SITE_URL, strips trailing slashes", () => {
+  it("prefers NEXT_PUBLIC_SITE_URL and strips trailing slashes", () => {
     expect(
-      readSiteUrl({ NEXT_PUBLIC_SITE_URL: "https://x.example.test//", VERCEL_BRANCH_URL: "b" }),
+      readSiteUrl({
+        NEXT_PUBLIC_SITE_URL: "https://x.example.test//",
+        VERCEL_ENV: "production",
+        VERCEL_PROJECT_PRODUCTION_URL: "p.example.test",
+      }),
     ).toBe("https://x.example.test");
   });
-  it("falls back to the Vercel branch URL, then localhost", () => {
-    expect(readSiteUrl({ VERCEL_BRANCH_URL: "branch.example.test" })).toBe(
-      "https://branch.example.test",
+  it("uses the production URL on Vercel Production, the branch URL on Preview", () => {
+    expect(
+      readSiteUrl({
+        VERCEL_ENV: "production",
+        VERCEL_PROJECT_PRODUCTION_URL: "p.example.test",
+        VERCEL_BRANCH_URL: "b.example.test",
+      }),
+    ).toBe("https://p.example.test");
+    expect(readSiteUrl({ VERCEL_ENV: "preview", VERCEL_BRANCH_URL: "b.example.test" })).toBe(
+      "https://b.example.test",
     );
+  });
+  it("never uses the preview alias in production", () => {
+    expect(() =>
+      readSiteUrl({ VERCEL_ENV: "production", VERCEL_BRANCH_URL: "b.example.test" }),
+    ).toThrow("NEXT_PUBLIC_SITE_URL");
+  });
+  it("throws in a production runtime without a site URL", () => {
+    expect(() => readSiteUrl({ NODE_ENV: "production" })).toThrow("NEXT_PUBLIC_SITE_URL");
+    expect(() => readSiteUrl({ VERCEL_ENV: "preview" })).toThrow("NEXT_PUBLIC_SITE_URL");
+  });
+  it("falls back to localhost only in dev/test", () => {
     expect(readSiteUrl({})).toBe("http://localhost:3000");
+    expect(readSiteUrl({ NODE_ENV: "development" })).toBe("http://localhost:3000");
   });
 });

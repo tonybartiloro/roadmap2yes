@@ -80,6 +80,8 @@ web3 = 30
 
 [auth.email]
 enabled = true
+# Defence in depth: the email provider refuses signups too (top-level enable_signup is false).
+enable_signup = false
 # Accounts are created already confirmed by the admin API: no confirmation emails needed.
 enable_confirmations = false
 double_confirm_changes = false

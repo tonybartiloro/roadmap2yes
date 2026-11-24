@@ -168,13 +168,30 @@ export function readLoginLimits(env: Env = process.env): LoginLimits {
 
 // ---------------------------------------------------------------- Misc
 
-/** Public site URL (links in emails, redirects). Falls back to localhost for local dev. */
+/**
+ * Public site URL (links in emails, redirects).
+ * Order: `NEXT_PUBLIC_SITE_URL`; on Vercel Production `VERCEL_PROJECT_PRODUCTION_URL`; on Vercel
+ * Preview `VERCEL_BRANCH_URL`. In any production runtime without a usable value it THROWS (a
+ * silent localhost link in an invitation email would be worse). Localhost only in dev/test.
+ */
 export function readSiteUrl(env: Env = process.env): string {
-  const raw =
-    clean(env["NEXT_PUBLIC_SITE_URL"]) ??
-    (clean(env["VERCEL_BRANCH_URL"]) ? `https://${clean(env["VERCEL_BRANCH_URL"])}` : undefined) ??
-    "http://localhost:3000";
-  return raw.replace(/\/+$/, "");
+  const strip = (url: string) => url.replace(/\/+$/, "");
+  const explicit = clean(env["NEXT_PUBLIC_SITE_URL"]);
+  if (explicit) return strip(explicit);
+
+  const vercelEnv = clean(env["VERCEL_ENV"]);
+  if (vercelEnv === "production") {
+    const host = clean(env["VERCEL_PROJECT_PRODUCTION_URL"]);
+    if (host) return strip(`https://${host}`);
+  } else if (vercelEnv === "preview") {
+    const host = clean(env["VERCEL_BRANCH_URL"]);
+    if (host) return strip(`https://${host}`);
+  }
+
+  if (vercelEnv !== undefined || env["NODE_ENV"] === "production") {
+    throw new Error("Missing site configuration: NEXT_PUBLIC_SITE_URL");
+  }
+  return "http://localhost:3000";
 }
 
 /** Secrets for the cron route and email links: presence only is read here, never logged. */

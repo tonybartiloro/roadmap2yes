@@ -1,11 +1,9 @@
 # Secret scan (plan §12, brief AC45). CI runs gitleaks on the WHOLE history.
-# The repository is public: every finding must be fixed (rotate the secret), not allowlisted.
+# The repository is public: every finding must be fixed (rotate the secret), never allowlisted.
+# No allowlist on purpose: the placeholders in .env.example do not match the default rules, so a
+# real key pasted there IS flagged.
 
 title = "roadmap2yes gitleaks config"
 
 [extend]
 useDefault = true
-
-[[allowlists]]
-description = "Documented fake values: .env.example only holds placeholders and local demo values"
-paths = ['''^\.env\.example$''']

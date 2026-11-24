@@ -1,0 +1,527 @@
+{
+  "description": "Shared vectors for src/lib/dates/plain-date.ts (Vitest) and private.add_date_offset (pgTAP, T8). reference minus offset: months first (end-of-month clamp), then weeks and days; positive = before, negative = after.",
+  "vectors": [
+    {
+      "reference": "2027-08-31",
+      "offset": {
+        "months": 12
+      },
+      "expected": "2026-08-31",
+      "note": "end of month: 12m"
+    },
+    {
+      "reference": "2027-08-31",
+      "offset": {
+        "months": 11
+      },
+      "expected": "2026-09-30",
+      "note": "end of month: 11m clamp 31->30"
+    },
+    {
+      "reference": "2027-08-31",
+      "offset": {
+        "months": 10
+      },
+      "expected": "2026-10-31",
+      "note": "end of month: 10m"
+    },
+    {
+      "reference": "2027-08-31",
+      "offset": {
+        "months": 9
+      },
+      "expected": "2026-11-30",
+      "note": "end of month: 9m clamp"
+    },
+    {
+      "reference": "2027-08-31",
+      "offset": {
+        "months": 8
+      },
+      "expected": "2026-12-31",
+      "note": "end of month: 8m"
+    },
+    {
+      "reference": "2027-08-31",
+      "offset": {
+        "months": 7
+      },
+      "expected": "2027-01-31",
+      "note": "end of month: 7m"
+    },
+    {
+      "reference": "2027-08-31",
+      "offset": {
+        "months": 6
+      },
+      "expected": "2027-02-28",
+      "note": "end of month: 6m clamp to 28 (non-leap)"
+    },
+    {
+      "reference": "2027-08-31",
+      "offset": {
+        "months": 5
+      },
+      "expected": "2027-03-31",
+      "note": "end of month: 5m"
+    },
+    {
+      "reference": "2027-08-31",
+      "offset": {
+        "months": 4
+      },
+      "expected": "2027-04-30",
+      "note": "end of month: 4m clamp"
+    },
+    {
+      "reference": "2027-08-31",
+      "offset": {
+        "months": 3
+      },
+      "expected": "2027-05-31",
+      "note": "end of month: 3m"
+    },
+    {
+      "reference": "2027-08-31",
+      "offset": {
+        "months": 2
+      },
+      "expected": "2027-06-30",
+      "note": "end of month: 2m clamp"
+    },
+    {
+      "reference": "2027-08-31",
+      "offset": {
+        "months": 1
+      },
+      "expected": "2027-07-31",
+      "note": "end of month: 1m"
+    },
+    {
+      "reference": "2027-08-31",
+      "offset": {
+        "months": 2,
+        "weeks": 2
+      },
+      "expected": "2027-06-16",
+      "note": "discriminating: months first (-> 06-30) then -14 days; weeks first would give 06-17"
+    },
+    {
+      "reference": "2027-08-31",
+      "offset": {
+        "weeks": 6
+      },
+      "expected": "2027-07-20",
+      "note": "6 weeks"
+    },
+    {
+      "reference": "2027-08-31",
+      "offset": {
+        "weeks": 1
+      },
+      "expected": "2027-08-24",
+      "note": "1 week"
+    },
+    {
+      "reference": "2027-08-31",
+      "offset": {
+        "days": 3
+      },
+      "expected": "2027-08-28",
+      "note": "3 days"
+    },
+    {
+      "reference": "2027-08-31",
+      "offset": {
+        "weeks": -2
+      },
+      "expected": "2027-09-14",
+      "note": "after the date: -2 weeks"
+    },
+    {
+      "reference": "2028-08-31",
+      "offset": {
+        "months": 6
+      },
+      "expected": "2028-02-29",
+      "note": "leap year: 6m -> 29 Feb 2028"
+    },
+    {
+      "reference": "2028-08-31",
+      "offset": {
+        "months": 12
+      },
+      "expected": "2027-08-31",
+      "note": "12m"
+    },
+    {
+      "reference": "2028-08-31",
+      "offset": {
+        "months": 11
+      },
+      "expected": "2027-09-30",
+      "note": "11m clamp"
+    },
+    {
+      "reference": "2028-08-31",
+      "offset": {
+        "months": 2,
+        "weeks": 2
+      },
+      "expected": "2028-06-16",
+      "note": "2m+2w"
+    },
+    {
+      "reference": "2028-05-01",
+      "offset": {
+        "months": 12
+      },
+      "expected": "2027-05-01",
+      "note": "period first day: 12m"
+    },
+    {
+      "reference": "2028-05-01",
+      "offset": {
+        "months": 9
+      },
+      "expected": "2027-08-01",
+      "note": "9m"
+    },
+    {
+      "reference": "2028-05-01",
+      "offset": {
+        "months": 6
+      },
+      "expected": "2027-11-01",
+      "note": "6m"
+    },
+    {
+      "reference": "2028-05-01",
+      "offset": {
+        "months": 3
+      },
+      "expected": "2028-02-01",
+      "note": "3m"
+    },
+    {
+      "reference": "2028-05-01",
+      "offset": {
+        "weeks": 1
+      },
+      "expected": "2028-04-24",
+      "note": "1w"
+    },
+    {
+      "reference": "2027-09-03",
+      "offset": {
+        "months": 12
+      },
+      "expected": "2026-09-03",
+      "note": "12m"
+    },
+    {
+      "reference": "2027-09-03",
+      "offset": {
+        "months": 2,
+        "weeks": 2
+      },
+      "expected": "2027-06-19",
+      "note": "2m+2w"
+    },
+    {
+      "reference": "2027-09-03",
+      "offset": {
+        "weeks": 6
+      },
+      "expected": "2027-07-23",
+      "note": "6w"
+    },
+    {
+      "reference": "2027-09-03",
+      "offset": {
+        "weeks": 4
+      },
+      "expected": "2027-08-06",
+      "note": "4w"
+    },
+    {
+      "reference": "2027-09-03",
+      "offset": {
+        "days": 3
+      },
+      "expected": "2027-08-31",
+      "note": "3d"
+    },
+    {
+      "reference": "2027-09-03",
+      "offset": {
+        "weeks": -2
+      },
+      "expected": "2027-09-17",
+      "note": "-2w"
+    },
+    {
+      "reference": "2027-09-03",
+      "offset": {
+        "weeks": -4
+      },
+      "expected": "2027-10-01",
+      "note": "-4w"
+    },
+    {
+      "reference": "2028-02-29",
+      "offset": {
+        "months": 12
+      },
+      "expected": "2027-02-28",
+      "note": "leap day minus 12m clamps to 28 Feb"
+    },
+    {
+      "reference": "2028-02-29",
+      "offset": {
+        "months": 1
+      },
+      "expected": "2028-01-29",
+      "note": "leap day minus 1m"
+    },
+    {
+      "reference": "2028-02-29",
+      "offset": {
+        "months": -12
+      },
+      "expected": "2029-02-28",
+      "note": "negative: leap day plus 12m"
+    },
+    {
+      "reference": "2028-03-31",
+      "offset": {
+        "months": 1
+      },
+      "expected": "2028-02-29",
+      "note": "31 Mar - 1m in leap year"
+    },
+    {
+      "reference": "2028-03-30",
+      "offset": {
+        "months": 1
+      },
+      "expected": "2028-02-29",
+      "note": "30 Mar - 1m in leap year"
+    },
+    {
+      "reference": "2027-03-31",
+      "offset": {
+        "months": 1
+      },
+      "expected": "2027-02-28",
+      "note": "31 Mar - 1m non-leap"
+    },
+    {
+      "reference": "2024-02-29",
+      "offset": {
+        "months": -12
+      },
+      "expected": "2025-02-28",
+      "note": "negative: 29 Feb 2024 plus 12m"
+    },
+    {
+      "reference": "2027-01-31",
+      "offset": {
+        "months": -1
+      },
+      "expected": "2027-02-28",
+      "note": "negative: 31 Jan plus 1m clamps"
+    },
+    {
+      "reference": "2027-12-31",
+      "offset": {
+        "months": -2
+      },
+      "expected": "2028-02-29",
+      "note": "negative: plus 2m into leap February"
+    },
+    {
+      "reference": "2027-12-15",
+      "offset": {
+        "months": -1
+      },
+      "expected": "2028-01-15",
+      "note": "negative: plus 1m across year"
+    },
+    {
+      "reference": "2027-01-31",
+      "offset": {
+        "months": -1,
+        "days": 3
+      },
+      "expected": "2027-02-25",
+      "note": "mixed signs: months applied first (+1m -> 02-28) then 3 days before"
+    },
+    {
+      "reference": "2027-01-15",
+      "offset": {
+        "months": 3
+      },
+      "expected": "2026-10-15",
+      "note": "3m across year"
+    },
+    {
+      "reference": "2027-01-01",
+      "offset": {
+        "days": 1
+      },
+      "expected": "2026-12-31",
+      "note": "1 day across year"
+    },
+    {
+      "reference": "2026-12-31",
+      "offset": {
+        "days": -1
+      },
+      "expected": "2027-01-01",
+      "note": "negative: +1 day across year"
+    },
+    {
+      "reference": "2027-05-10",
+      "offset": {},
+      "expected": "2027-05-10",
+      "note": "zero offset"
+    },
+    {
+      "reference": "2027-03-28",
+      "offset": {
+        "days": 1
+      },
+      "expected": "2027-03-27",
+      "note": "DST spring (28 Mar 2027): 1d"
+    },
+    {
+      "reference": "2027-03-28",
+      "offset": {
+        "days": -1
+      },
+      "expected": "2027-03-29",
+      "note": "DST spring: +1d"
+    },
+    {
+      "reference": "2027-03-28",
+      "offset": {
+        "weeks": 1
+      },
+      "expected": "2027-03-21",
+      "note": "DST spring: 1w"
+    },
+    {
+      "reference": "2027-03-28",
+      "offset": {
+        "weeks": -1
+      },
+      "expected": "2027-04-04",
+      "note": "DST spring: -1w"
+    },
+    {
+      "reference": "2027-03-28",
+      "offset": {
+        "months": 1
+      },
+      "expected": "2027-02-28",
+      "note": "DST spring: 1m"
+    },
+    {
+      "reference": "2027-03-27",
+      "offset": {
+        "days": -1
+      },
+      "expected": "2027-03-28",
+      "note": "DST spring: day before, +1d"
+    },
+    {
+      "reference": "2027-03-27",
+      "offset": {
+        "days": -2
+      },
+      "expected": "2027-03-29",
+      "note": "DST spring: day before, +2d"
+    },
+    {
+      "reference": "2027-04-01",
+      "offset": {
+        "days": 4
+      },
+      "expected": "2027-03-28",
+      "note": "DST spring: 4d"
+    },
+    {
+      "reference": "2027-10-31",
+      "offset": {
+        "days": 1
+      },
+      "expected": "2027-10-30",
+      "note": "DST autumn (31 Oct 2027): 1d"
+    },
+    {
+      "reference": "2027-10-31",
+      "offset": {
+        "days": -1
+      },
+      "expected": "2027-11-01",
+      "note": "DST autumn: +1d"
+    },
+    {
+      "reference": "2027-10-31",
+      "offset": {
+        "weeks": 1
+      },
+      "expected": "2027-10-24",
+      "note": "DST autumn: 1w"
+    },
+    {
+      "reference": "2027-10-31",
+      "offset": {
+        "weeks": -1
+      },
+      "expected": "2027-11-07",
+      "note": "DST autumn: -1w"
+    },
+    {
+      "reference": "2027-10-31",
+      "offset": {
+        "months": 1
+      },
+      "expected": "2027-09-30",
+      "note": "DST autumn: 1m clamp"
+    },
+    {
+      "reference": "2027-10-31",
+      "offset": {
+        "months": -1
+      },
+      "expected": "2027-11-30",
+      "note": "DST autumn: +1m clamp"
+    },
+    {
+      "reference": "2027-10-31",
+      "offset": {
+        "months": 2
+      },
+      "expected": "2027-08-31",
+      "note": "DST autumn: 2m"
+    },
+    {
+      "reference": "2027-10-30",
+      "offset": {
+        "days": -1
+      },
+      "expected": "2027-10-31",
+      "note": "DST autumn: day before, +1d"
+    },
+    {
+      "reference": "2027-11-01",
+      "offset": {
+        "days": 1
+      },
+      "expected": "2027-10-31",
+      "note": "DST autumn: day after, 1d"
+    }
+  ]
+}

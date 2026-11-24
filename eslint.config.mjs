@@ -47,7 +47,8 @@ const r2yPlugin = {
       },
       create(context) {
         const isAdmin = (value) =>
-          typeof value === "string" && /(^|\/)supabase\/admin(\.ts)?$/.test(value);
+          typeof value === "string" &&
+          /(^|\/)supabase\/admin(\.(ts|js))?$|^\.\/admin(\.(ts|js))?$/.test(value);
         return {
           ImportExpression(node) {
             if (node.source.type === "Literal" && isAdmin(node.source.value)) {
@@ -96,6 +97,9 @@ const r2yPlugin = {
   },
 };
 
+// Integration/acceptance tests do NOT import admin.ts (it is `server-only`): their helper builds a
+// service client directly with `createClient` from `@supabase/supabase-js` (tests/ only), so no
+// fifth scope is needed.
 // 3. Scopes allowed to import the secret-key client (plan §1 and ADR-0001).
 export const ADMIN_ALLOWED_SCOPES = [
   "src/features/auth/login.ts",
@@ -114,7 +118,14 @@ const CACHE_PATHS = [
 ];
 
 const ADMIN_PATTERN = {
-  group: ["**/supabase/admin", "**/supabase/admin.ts"],
+  group: [
+    "**/supabase/admin",
+    "**/supabase/admin.ts",
+    "**/supabase/admin.js",
+    "./admin",
+    "./admin.ts",
+    "./admin.js",
+  ],
   message:
     "lib/supabase/admin.ts (secret key) may only be imported from features/auth/{login,bootstrap}.ts, features/accounts/admin-ops.ts, features/jobs/** and app/(public)/email/** (plan §1).",
 };

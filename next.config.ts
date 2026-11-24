@@ -13,6 +13,9 @@ function supabaseOrigin(): string | null {
 }
 
 /**
+ * NOTE: `connect-src` uses the Supabase origin known at BUILD time; a runtime override of the
+ * backend URL (e.g. the e2e `degraded` server) leaves it stale. Harmless: that server never
+ * reaches a working backend anyway.
  * Base CSP (plan §4.7): no nonce in R1 (follow-up in ADR-0001), so inline scripts/styles that
  * Next.js emits are allowed; everything else is same-origin, plus the Supabase API for the browser
  * client. `frame-ancestors 'none'` forbids embedding.
@@ -32,6 +35,8 @@ function contentSecurityPolicy(): string {
     "base-uri 'self'",
     "form-action 'self'",
     "frame-ancestors 'none'",
+    // Only on Vercel: local/e2e servers talk plain http to 127.0.0.1.
+    ...(process.env.VERCEL ? ["upgrade-insecure-requests"] : []),
   ].join("; ");
 }
 
