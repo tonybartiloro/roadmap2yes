@@ -63,7 +63,7 @@ export function CompareOptions({
         role="region"
         aria-labelledby={headingId}
         tabIndex={0}
-        className="border-border focus-visible:ring-ring overflow-x-auto rounded-lg border focus-visible:ring-2 focus-visible:outline-none"
+        className="border-border focus-visible:ring-ring relative max-w-full overflow-x-auto rounded-lg border focus-visible:ring-2 focus-visible:outline-none"
       >
         <table className="w-full min-w-[34rem] border-collapse text-left text-base md:min-w-0">
           <caption className="sr-only">

@@ -86,7 +86,7 @@ export function OptionCard({
       )}
     >
       <div className="flex flex-wrap items-start justify-between gap-2">
-        <h3 className="min-w-0 text-[22px] leading-7 font-semibold break-words">{option.title}</h3>
+        <h2 className="min-w-0 text-[22px] leading-7 font-semibold break-words">{option.title}</h2>
         {chosen ? (
           <Badge>
             <Check aria-hidden className="size-4" />
