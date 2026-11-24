@@ -40,3 +40,19 @@ AC43 ✅ (`migrate.yml`; additive-only and no seed) · AC44 ✅ with REV-1 (job,
 ## Questions for the developer
 1. Is the keepalive production check meant to catch failures across the whole week (REV-1), or only the last run?
 2. Can you confirm the GitHub environments will carry a `main`-only deployment branch policy (REV-3)? It is not recorded anywhere I could find.
+
+## Round 2
+
+Verdict: approved
+Verified `git show 282651c` and `npx vitest run scripts src/features/jobs src/domain/reminders`: 7 files, 78 tests pass.
+
+| ID | Status | Reason |
+|---|---|---|
+| REV-1 | closed ✅ | `evaluateHeartbeats` reads the `daily_job` rows of the last 8 days (`gte ran_at`, limit 100). It fails on any `ok:false`, any `over_quota`, a gap over 36 h or a newest row over 36 h. Tests cover an old failed row followed by healthy ones. |
+| REV-2 | closed ✅ | Secrets moved to step-level `env` in `migrate.yml` (link, dry-run, push) and `keepalive.yml` (only the `keepalive:check` step). `npm ci` no longer sees them. |
+| REV-3 | closed ✅ | `if: github.ref == 'refs/heads/main'` on every secret-using job, plus a header comment naming the required main-only environment policy. The coordinator confirmed the policy is a release-checklist item, since it lives outside the repo. |
+| REV-4 | closed ✅ | Accepted as is. |
+| REV-5 | closed ✅ | Ordering and backward-compatible-migration note added to the `migrate.yml` header. The runbook text is T18. |
+| REV-6 | closed ✅ | Comment added in `run-daily-job.ts`. The runbook mention is T18. |
+
+Answers to the questions: the production check covers the whole week, and the branch policy goes on the release checklist (both from the coordinator).
