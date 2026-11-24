@@ -10,11 +10,14 @@ begin
     return;
   end if;
 
-  -- Two versions: the total went from 20.000 to 25.000 euro.
-  insert into public.budget_versions (id, wedding_id, total_cents, reason, created_at) values
-    ('00000000-0000-4000-8000-0000000b0001', v_wedding, 2000000, 'Prima stima', now() - interval '10 days'),
-    ('00000000-0000-4000-8000-0000000b0002', v_wedding, 2500000, 'Aiuto dai genitori', now() - interval '2 days')
-  on conflict (id) do nothing;
+  -- Two versions: the total went from 20.000 to 25.000 euro. Timestamps are stamped by the DB
+  -- (clock_timestamp, in insert order), so the second row is the latest.
+  insert into public.budget_versions (id, wedding_id, total_cents, reason)
+  select '00000000-0000-4000-8000-0000000b0001', v_wedding, 2000000, 'Prima stima'
+  where not exists (select 1 from public.budget_versions where id = '00000000-0000-4000-8000-0000000b0001');
+  insert into public.budget_versions (id, wedding_id, total_cents, reason)
+  select '00000000-0000-4000-8000-0000000b0002', v_wedding, 2500000, 'Aiuto dai genitori'
+  where not exists (select 1 from public.budget_versions where id = '00000000-0000-4000-8000-0000000b0002');
 
   insert into public.budget_categories (id, wedding_id, name, default_key, assigned_cents, sort_order) values
     ('00000000-0000-4000-8000-0000000c0001', v_wedding, 'Location', 'location', 800000, 1),

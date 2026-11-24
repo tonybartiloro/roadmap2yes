@@ -3,7 +3,7 @@
 -- one-click unsubscribe (AC52). Time is injected through the p_now parameter.
 begin;
 \set su 'reset role; do $x$ begin perform set_config(''request.jwt.claims'','''',true); perform set_config(''request.jwt.claim.sub'','''',true); end $x$;'
-select plan(44);
+select plan(69);
 
 select * from tests.make_wedding('nj1') \gset w1_
 select * from tests.make_wedding('nj2') \gset w2_
@@ -93,6 +93,64 @@ select is((public.job_claim_notification(:'w1_founder'::uuid, :'w1_wedding'::uui
 select is((select count(*)::int from public.notification_log where batch_key = 'digest:a:2027-W03'), 0, 'no row for an opted-out kind');
 select throws_ok(format($$select public.job_unsubscribe(%L, 'invite')$$, :'w1_founder'::uuid), 'P0001', 'invalid_kind', 'only reminders|digest can be switched off');
 select throws_ok(format($$select public.job_unsubscribe(%L, 'reminders')$$, gen_random_uuid()), 'P0001', 'not_member', 'unknown user');
+
+-- REV-3: an email that really left is sent, even after a stale sender marked the row failed
+select is((public.job_claim_notification(:'w2_founder'::uuid, :'w2_wedding'::uuid, 'reminder', 'reminder:u2:r3',
+  '{}', 50, 1500, '2027-03-05 05:00+00'))->>'status', 'claimed', 'r3: claimed');
+select is(public.job_fail_notification((select id from public.notification_log where batch_key = 'reminder:u2:r3'), 'stale sender'),
+  'failed', 'r3: a stale sender marks it failed');
+select is(public.job_mark_notification_sent((select id from public.notification_log where batch_key = 'reminder:u2:r3'), '2027-03-05 05:01+00'),
+  'sent', 'r3: mark-sent accepts a failed row');
+select is((select status from public.notification_log where batch_key = 'reminder:u2:r3'), 'sent', 'r3: ledger says sent');
+
+-- REV-1: a resumed failure re-passes the cap (daily cap 2)
+select is((public.job_claim_notification(:'w2_founder'::uuid, :'w2_wedding'::uuid, 'reminder', 'reminder:u2:x1',
+  '{}', 2, 1500, '2027-03-06 05:00+00'))->>'status', 'claimed', 'x1 claimed');
+select is((public.job_claim_notification(:'w2_founder'::uuid, :'w2_wedding'::uuid, 'reminder', 'reminder:u2:x2',
+  '{}', 2, 1500, '2027-03-06 05:01+00'))->>'status', 'claimed', 'x2 claimed');
+select is(public.job_fail_notification((select id from public.notification_log where batch_key = 'reminder:u2:x2'), 'boom'), 'failed', 'x2 failed (not counted)');
+select is((public.job_claim_notification(:'w2_founder'::uuid, :'w2_wedding'::uuid, 'reminder', 'reminder:u2:x3',
+  '{}', 2, 1500, '2027-03-06 05:02+00'))->>'status', 'claimed', 'x3 takes the free slot');
+select is((public.job_claim_notification(:'w2_founder'::uuid, :'w2_wedding'::uuid, 'reminder', 'reminder:u2:x2',
+  '{}', 2, 1500, '2027-03-06 05:03+00'))->>'status', 'skipped_quota', 'resuming x2 at the cap is refused (51st email)');
+select is((public.job_claim_notification(:'w2_founder'::uuid, :'w2_wedding'::uuid, 'reminder', 'reminder:u2:x2',
+  '{}', 2, 1500, '2027-03-06 05:04+00'))->'reason', '"daily"'::jsonb, 'x2: reason daily');
+select is((select status from public.notification_log where batch_key = 'reminder:u2:x2'), 'failed', 'x2 stays failed');
+
+-- REV-1: an old claim resumed on a later day counts on that day and re-passes the cap (daily cap 1)
+select is((public.job_claim_notification(:'w2_founder'::uuid, :'w2_wedding'::uuid, 'reminder', 'reminder:u2:y',
+  '{}', 1, 1500, '2027-03-07 23:00+00'))->>'status', 'claimed', 'y claimed late in the evening');
+select is((public.job_claim_notification(:'w2_founder'::uuid, :'w2_wedding'::uuid, 'reminder', 'reminder:u2:z',
+  '{}', 1, 1500, '2027-03-08 04:00+00'))->>'status', 'claimed', 'z claimed the next morning');
+select is((public.job_claim_notification(:'w2_founder'::uuid, :'w2_wedding'::uuid, 'reminder', 'reminder:u2:y',
+  '{}', 1, 1500, '2027-03-08 05:00+00'))->>'status', 'skipped_quota', 'y resumed on a full day is refused');
+
+-- REV-2: poison batch (expired claims) stops after 5 attempts
+select is((public.job_claim_notification(:'w2_founder'::uuid, :'w2_wedding'::uuid, 'reminder', 'reminder:u2:poison',
+  '{}', 50, 1500, '2027-04-01 05:00+00'))->>'status', 'claimed', 'poison: attempt 1');
+select is((public.job_claim_notification(:'w2_founder'::uuid, :'w2_wedding'::uuid, 'reminder', 'reminder:u2:poison',
+  '{}', 50, 1500, '2027-04-01 05:20+00'))->>'status', 'resumed', 'poison: attempt 2');
+select is((public.job_claim_notification(:'w2_founder'::uuid, :'w2_wedding'::uuid, 'reminder', 'reminder:u2:poison',
+  '{}', 50, 1500, '2027-04-01 05:40+00'))->>'status', 'resumed', 'poison: attempt 3');
+select is((public.job_claim_notification(:'w2_founder'::uuid, :'w2_wedding'::uuid, 'reminder', 'reminder:u2:poison',
+  '{}', 50, 1500, '2027-04-01 06:00+00'))->>'status', 'resumed', 'poison: attempt 4');
+select is((public.job_claim_notification(:'w2_founder'::uuid, :'w2_wedding'::uuid, 'reminder', 'reminder:u2:poison',
+  '{}', 50, 1500, '2027-04-01 06:20+00'))->>'status', 'resumed', 'poison: attempt 5');
+select is((public.job_claim_notification(:'w2_founder'::uuid, :'w2_wedding'::uuid, 'reminder', 'reminder:u2:poison',
+  '{}', 50, 1500, '2027-04-01 06:40+00'))->>'status', 'failed_final', 'poison: failed_final after 5 attempts');
+select is((select status from public.notification_log where batch_key = 'reminder:u2:poison'), 'failed', 'poison row is failed');
+select is((public.job_claim_notification(:'w2_founder'::uuid, :'w2_wedding'::uuid, 'reminder', 'reminder:u2:poison',
+  '{}', 50, 1500, '2027-04-02 06:40+00'))->>'status', 'failed_final', 'failed_final is stable');
+
+-- REV-2: failed path
+select is((public.job_claim_notification(:'w2_founder'::uuid, :'w2_wedding'::uuid, 'reminder', 'reminder:u2:q',
+  '{}', 50, 1500, '2027-05-01 05:00+00'))->>'status', 'claimed', 'q claimed');
+select is(public.job_fail_notification((select id from public.notification_log where batch_key = 'reminder:u2:q'), 'x'), 'failed', 'q failed');
+:su
+update public.notification_log set attempts = 5 where batch_key = 'reminder:u2:q';
+select tests.login_service();
+select is((public.job_claim_notification(:'w2_founder'::uuid, :'w2_wedding'::uuid, 'reminder', 'reminder:u2:q',
+  '{}', 50, 1500, '2027-05-01 05:30+00'))->>'status', 'failed_final', 'failed batch with 5 attempts is final');
 
 select * from finish();
 rollback;

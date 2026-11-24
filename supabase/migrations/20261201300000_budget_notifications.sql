@@ -72,6 +72,8 @@ create table public.budget_items (
 create index budget_items_category_idx on public.budget_items (category_id) where deleted_at is null;
 create index budget_items_wedding_idx on public.budget_items (wedding_id);
 
+-- Product rule (REV-5a): soft-deleting an item does NOT touch its payments, so "Annulla" restores
+-- them. Aggregates and "Prossimi pagamenti" must exclude payments of deleted items (domain/budget).
 create table public.payments (
   id uuid primary key default gen_random_uuid(),
   wedding_id uuid not null references public.weddings (id),
@@ -139,8 +141,10 @@ language plpgsql
 set search_path = pg_catalog, pg_temp
 as $$
 begin
+  -- clock_timestamp(), not now(): versions written in one transaction still get distinct, increasing
+  -- instants. "Latest" = highest (created_at, id); id is only a last-resort tie-break.
   new.created_by := auth.uid();
-  new.created_at := now();
+  new.created_at := clock_timestamp();
   return new;
 end;
 $$;
@@ -431,6 +435,7 @@ declare
   v_month integer;
   v_reason text;
   v_id bigint;
+  v_prev text;
 begin
   if p_kind not in ('reminder', 'digest') then
     raise exception 'invalid_kind' using errcode = 'P0001';
@@ -465,29 +470,29 @@ begin
     end if;
     if v_row.status = 'sent' then
       return jsonb_build_object('status', 'already_sent', 'id', v_row.id);
-    elsif v_row.status = 'claimed' then
-      if v_row.claimed_at > p_now - interval '15 minutes' then
-        return jsonb_build_object('status', 'in_progress', 'id', v_row.id);
-      end if;
-      update public.notification_log set claimed_at = p_now, attempts = attempts + 1
-      where id = v_row.id;
-      return jsonb_build_object('status', 'resumed', 'id', v_row.id, 'batch_key', p_batch_key);
-    elsif v_row.status = 'failed' then
-      if v_row.attempts >= 5 then
-        return jsonb_build_object('status', 'failed_final', 'id', v_row.id);
-      end if;
-      update public.notification_log
-      set status = 'claimed', claimed_at = p_now, attempts = attempts + 1, last_error = null
-      where id = v_row.id;
-      return jsonb_build_object('status', 'resumed', 'id', v_row.id, 'batch_key', p_batch_key);
     end if;
-    -- skipped_quota: fall through and re-evaluate the caps.
+    if v_row.status = 'claimed' and v_row.claimed_at > p_now - interval '15 minutes' then
+      return jsonb_build_object('status', 'in_progress', 'id', v_row.id);
+    end if;
+    -- Poison batch guard: an expired claim or a failure counts as an attempt; 5 is the limit.
+    if v_row.status in ('claimed', 'failed') and v_row.attempts >= 5 then
+      if v_row.status = 'claimed' then
+        update public.notification_log set status = 'failed', last_error = 'max_attempts' where id = v_row.id;
+      end if;
+      return jsonb_build_object('status', 'failed_final', 'id', v_row.id);
+    end if;
+    v_prev := v_row.status;
+    -- claimed (expired), failed and skipped_quota rows fall through: they re-pass the cap check.
   end if;
 
+  -- Caps (REV-1): the row being resumed is excluded from the count, because it is counted anew
+  -- (a failed row is not counted, and an old claim moves to the current day/month).
+  -- Load assumption: the job runs once a day, so one global advisory lock is cheap.
   select count(*) filter (where l.claimed_at >= v_day_start), count(*)
   into v_today, v_month
   from public.notification_log l
-  where l.status in ('claimed', 'sent') and l.claimed_at >= v_month_start;
+  where l.status in ('claimed', 'sent') and l.claimed_at >= v_month_start
+    and l.id is distinct from v_row.id;
 
   v_reason := case when v_today >= p_daily_cap then 'daily'
                    when v_month >= p_monthly_cap then 'monthly' end;
@@ -509,11 +514,13 @@ begin
     returning id into v_id;
   else
     update public.notification_log
-    set status = 'claimed', attempts = attempts + 1, claimed_at = p_now,
-        item_keys = coalesce(p_item_keys, item_keys)
+    set status = 'claimed', attempts = attempts + 1, claimed_at = p_now, last_error = null,
+        item_keys = case when cardinality(coalesce(p_item_keys, '{}')) > 0 then p_item_keys else item_keys end
     where id = v_row.id returning id into v_id;
   end if;
-  return jsonb_build_object('status', 'claimed', 'id', v_id, 'batch_key', p_batch_key);
+  return jsonb_build_object(
+    'status', case when v_prev in ('claimed', 'failed') then 'resumed' else 'claimed' end,
+    'id', v_id, 'batch_key', p_batch_key);
 end;
 $$;
 
@@ -534,7 +541,9 @@ begin
   if v_status = 'sent' then
     return 'sent';
   end if;
-  if v_status <> 'claimed' then
+  -- An email that has actually left is sent, even if a stale sender marked the row failed meanwhile
+  -- (REV-3). Only a skipped_quota row (never claimed) cannot be marked.
+  if v_status not in ('claimed', 'failed') then
     raise exception 'invalid_state' using errcode = 'P0001';
   end if;
   update public.notification_log set status = 'sent', sent_at = p_now, last_error = null where id = p_id;

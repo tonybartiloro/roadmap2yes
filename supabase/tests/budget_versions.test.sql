@@ -1,7 +1,7 @@
 -- T9: budget total as versions (AC33): append-only, author, reason, cents checks (AC38), isolation.
 begin;
 \set su 'reset role; do $x$ begin perform set_config(''request.jwt.claims'','''',true); perform set_config(''request.jwt.claim.sub'','''',true); end $x$;'
-select plan(21);
+select plan(22);
 
 select * from tests.make_wedding('bv1') \gset w1_
 select * from tests.make_wedding('bv2') \gset w2_
@@ -47,6 +47,10 @@ select tests.login_service();
 select throws_ok($$delete from public.budget_versions$$, '23000', 'append_only', 'DELETE refused for the secret key');
 select throws_ok($$truncate public.budget_versions$$, '23000', 'append_only', 'TRUNCATE refused');
 :su
+
+-- REV-4: versions written in one transaction still order by their stamped instants
+select is((select total_cents from public.budget_versions where wedding_id = :'w1_wedding'::uuid order by created_at desc, id desc limit 1),
+  100000000000::bigint, 'latest version = last inserted, even inside one transaction');
 
 -- isolation + audit
 select tests.login(:'w2_founder'::uuid);
