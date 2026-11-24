@@ -526,3 +526,9 @@ Developer's answers to the 4 remaining questions: 1. OK (min 10 characters, lett
   - `(app)/loading.tsx` is the fallback skeleton, so T15 should add its own;
   - T15 calls `clearAllFormDrafts` on "Esci";
   - T18 runbook: never `db reset --linked`, env/secret names, main-only environments.
+
+## Plan change approved (P2) — 2026-11-24
+- The developer answered "Sì, approvo" to the change approval (Gate B for this change).
+- Approved: the 3 Supabase Auth settings (`enable_confirmations`, `double_confirm_changes`, `secure_password_change`), locally and on the remote checklist, plus the residual risk R26 for R1.
+- This also approves the architect's plan changes from the T2 security review (§4.8 and the account contract).
+- Next: T7a.
