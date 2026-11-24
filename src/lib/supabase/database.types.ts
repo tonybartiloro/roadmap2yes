@@ -39,6 +39,72 @@ isOneToOne: false
                   Relationships: [
                     
                   ]
+                },"budget_categories": {
+                  Row: {
+                    "assigned_cents": number | null,"created_at": string,"created_by": string | null,"default_key": string | null,"deleted_at": string | null,"id": string,"name": string,"sort_order": number,"updated_at": string,"updated_by": string | null,"version": number,"wedding_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "assigned_cents"?: number | null,"created_at"?: string,"created_by"?: string | null,"default_key"?: string | null,"deleted_at"?: string | null,"id"?: string,"name": string,"sort_order"?: number,"updated_at"?: string,"updated_by"?: string | null,"version"?: number,"wedding_id": string
+                  }
+                  Update: {
+                    "assigned_cents"?: number | null,"created_at"?: string,"created_by"?: string | null,"default_key"?: string | null,"deleted_at"?: string | null,"id"?: string,"name"?: string,"sort_order"?: number,"updated_at"?: string,"updated_by"?: string | null,"version"?: number,"wedding_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "budget_categories_wedding_id_fkey"
+      columns: ["wedding_id"]
+isOneToOne: false
+      referencedRelation: "weddings"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"budget_items": {
+                  Row: {
+                    "agreed_cents": number | null,"category_id": string,"created_at": string,"created_by": string | null,"deleted_at": string | null,"description": string,"id": string,"planned_cents": number,"status": string,"updated_at": string,"updated_by": string | null,"version": number,"wedding_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "agreed_cents"?: number | null,"category_id": string,"created_at"?: string,"created_by"?: string | null,"deleted_at"?: string | null,"description": string,"id"?: string,"planned_cents"?: number,"status"?: string,"updated_at"?: string,"updated_by"?: string | null,"version"?: number,"wedding_id": string
+                  }
+                  Update: {
+                    "agreed_cents"?: number | null,"category_id"?: string,"created_at"?: string,"created_by"?: string | null,"deleted_at"?: string | null,"description"?: string,"id"?: string,"planned_cents"?: number,"status"?: string,"updated_at"?: string,"updated_by"?: string | null,"version"?: number,"wedding_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "budget_items_category_id_wedding_id_fkey"
+      columns: ["category_id","wedding_id"]
+isOneToOne: false
+      referencedRelation: "budget_categories"
+      referencedColumns: ["id","wedding_id"]
+    },{
+      foreignKeyName: "budget_items_wedding_id_fkey"
+      columns: ["wedding_id"]
+isOneToOne: false
+      referencedRelation: "weddings"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"budget_versions": {
+                  Row: {
+                    "created_at": string,"created_by": string | null,"id": string,"reason": string | null,"total_cents": number,"wedding_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"created_by"?: string | null,"id"?: string,"reason"?: string | null,"total_cents": number,"wedding_id": string
+                  }
+                  Update: {
+                    "created_at"?: string,"created_by"?: string | null,"id"?: string,"reason"?: string | null,"total_cents"?: number,"wedding_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "budget_versions_wedding_id_fkey"
+      columns: ["wedding_id"]
+isOneToOne: false
+      referencedRelation: "weddings"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"heartbeats": {
                   Row: {
                     "details": NonNullable<Json>,"id": number,"ran_at": string,"source": string
@@ -87,6 +153,72 @@ isOneToOne: false
                   Relationships: [
                     {
       foreignKeyName: "memberships_wedding_id_fkey"
+      columns: ["wedding_id"]
+isOneToOne: false
+      referencedRelation: "weddings"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"notification_log": {
+                  Row: {
+                    "attempts": number,"batch_key": string,"claimed_at": string | null,"created_at": string,"id": number,"item_keys": (string)[],"kind": string,"last_error": string | null,"sent_at": string | null,"status": string,"user_id": string,"wedding_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "attempts"?: number,"batch_key": string,"claimed_at"?: string | null,"created_at"?: string,"id"?: never,"item_keys"?: (string)[],"kind": string,"last_error"?: string | null,"sent_at"?: string | null,"status": string,"user_id": string,"wedding_id": string
+                  }
+                  Update: {
+                    "attempts"?: number,"batch_key"?: string,"claimed_at"?: string | null,"created_at"?: string,"id"?: never,"item_keys"?: (string)[],"kind"?: string,"last_error"?: string | null,"sent_at"?: string | null,"status"?: string,"user_id"?: string,"wedding_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "notification_log_wedding_id_fkey"
+      columns: ["wedding_id"]
+isOneToOne: false
+      referencedRelation: "weddings"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"notification_preferences": {
+                  Row: {
+                    "digest_enabled": boolean,"reminders_enabled": boolean,"updated_at": string,"user_id": string,"wedding_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "digest_enabled"?: boolean,"reminders_enabled"?: boolean,"updated_at"?: string,"user_id": string,"wedding_id": string
+                  }
+                  Update: {
+                    "digest_enabled"?: boolean,"reminders_enabled"?: boolean,"updated_at"?: string,"user_id"?: string,"wedding_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "notification_preferences_wedding_id_fkey"
+      columns: ["wedding_id"]
+isOneToOne: false
+      referencedRelation: "weddings"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"payments": {
+                  Row: {
+                    "amount_cents": number,"created_at": string,"created_by": string | null,"deleted_at": string | null,"due_date": string | null,"id": string,"item_id": string,"kind": string,"paid": boolean,"paid_on": string | null,"updated_at": string,"updated_by": string | null,"version": number,"wedding_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "amount_cents": number,"created_at"?: string,"created_by"?: string | null,"deleted_at"?: string | null,"due_date"?: string | null,"id"?: string,"item_id": string,"kind"?: string,"paid"?: boolean,"paid_on"?: string | null,"updated_at"?: string,"updated_by"?: string | null,"version"?: number,"wedding_id": string
+                  }
+                  Update: {
+                    "amount_cents"?: number,"created_at"?: string,"created_by"?: string | null,"deleted_at"?: string | null,"due_date"?: string | null,"id"?: string,"item_id"?: string,"kind"?: string,"paid"?: boolean,"paid_on"?: string | null,"updated_at"?: string,"updated_by"?: string | null,"version"?: number,"wedding_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "payments_item_id_wedding_id_fkey"
+      columns: ["item_id","wedding_id"]
+isOneToOne: false
+      referencedRelation: "budget_items"
+      referencedColumns: ["id","wedding_id"]
+    },{
+      foreignKeyName: "payments_wedding_id_fkey"
       columns: ["wedding_id"]
 isOneToOne: false
       referencedRelation: "weddings"
@@ -174,6 +306,29 @@ isOneToOne: false
 "has_permission":
 { Args: { "p_action": string,"p_area": string,"p_wedding_id": string }; Returns: boolean
                            },
+"job_claim_notification":
+{ Args: { "p_batch_key": string,"p_daily_cap"?: number,"p_item_keys"?: (string)[],"p_kind": string,"p_monthly_cap"?: number,"p_now"?: string,"p_user_id": string,"p_wedding_id": string }; Returns: Json
+                           },
+"job_fail_notification":
+{ Args: { "p_error"?: string,"p_id": number }; Returns: string
+                           },
+"job_mark_notification_sent":
+{ Args: { "p_id": number,"p_now"?: string }; Returns: string
+                           },
+"job_quota_status":
+{ Args: { "p_now"?: string }; Returns: Json
+                           },
+"job_recipients":
+{ Args: Record<PropertyKey, never>; Returns: {
+              "digest_enabled": boolean,"email": string,"first_name": string,"label": string,"partner_slot": string,"reminders_enabled": boolean,"user_id": string,"wedding_id": string
+            }[]
+                           },
+"job_sent_item_keys":
+{ Args: { "p_since": string,"p_user_id": string }; Returns: (string)[]
+                           },
+"job_unsubscribe":
+{ Args: { "p_kind": string,"p_user_id": string }; Returns: undefined
+                           },
 "last_heartbeat":
 { Args: { "p_source"?: string }; Returns: string
                            },
@@ -182,6 +337,9 @@ isOneToOne: false
                            },
 "login_record":
 { Args: { "p_email_key": string,"p_ip_key": string,"p_lock_minutes"?: number,"p_max_email"?: number,"p_max_ip"?: number,"p_success": boolean,"p_window_minutes"?: number }; Returns: Json
+                           },
+"move_budget_items":
+{ Args: { "p_from": string,"p_to": string }; Returns: number
                            },
 "record_account_event":
 { Args: { "p_kind": string,"p_target_user_id"?: string }; Returns: number
