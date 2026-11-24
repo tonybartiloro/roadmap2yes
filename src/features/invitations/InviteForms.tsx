@@ -274,9 +274,9 @@ export function RevokeForm({
   partnerName: string;
 }) {
   const [state, action] = useActionState(revokeInviteAction, IDLE);
-  const formId = "revoke-invite-form";
+  const formRef = useRef<HTMLFormElement>(null);
   return (
-    <form id={formId} action={action} className="flex flex-col gap-3" data-testid="revoke-form">
+    <form ref={formRef} action={action} className="flex flex-col gap-3" data-testid="revoke-form">
       <input type="hidden" name="invitationId" value={invitationId} />
       <FormFeedback state={state} testId="revoke-feedback" />
       <AlertDialog>
@@ -295,7 +295,13 @@ export function RevokeForm({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>No, lascia stare</AlertDialogCancel>
-            <AlertDialogAction type="submit" form={formId} data-testid="revoke-confirm">
+            {/* Submit FIRST: the dialog unmounts its content on click, so a native `type=submit`
+                button would be gone before the browser submits (QA-1). */}
+            <AlertDialogAction
+              type="button"
+              data-testid="revoke-confirm"
+              onClick={() => formRef.current?.requestSubmit()}
+            >
               Sì, revoca
             </AlertDialogAction>
           </AlertDialogFooter>

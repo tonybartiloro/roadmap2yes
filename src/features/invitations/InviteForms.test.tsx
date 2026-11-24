@@ -1,15 +1,18 @@
 // @vitest-environment jsdom
 import { readFileSync } from "node:fs";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+const revokeSpy = vi.fn(async () => ({ status: "idle" as const }));
 vi.mock("./actions", () => {
   const noop = async () => ({ status: "idle" as const });
   return {
+    revokeInviteAction: (...args: unknown[]) =>
+      (revokeSpy as (...a: unknown[]) => unknown)(...args),
     createPartnerWithCodeAction: noop,
     inviteByEmailAction: noop,
     resendInviteAction: noop,
-    revokeInviteAction: noop,
     changePendingEmailAction: noop,
     setTemporaryCodeAction: noop,
   };
@@ -62,5 +65,31 @@ describe("Altro > Invito ids and accessible names (code-16 REV-2)", () => {
     const all = [...formIds, ...new Set(pageIds)];
     const duplicated = all.filter((id, index) => all.indexOf(id) !== index);
     expect(duplicated).toEqual([]);
+  });
+});
+
+describe("revoke confirmation (QA-1)", () => {
+  it("'Sì, revoca' really submits the form with the invitation id, then the dialog closes", async () => {
+    render(
+      <RevokeForm invitationId="00000000-0000-4000-8000-000000000001" partnerName="Jessica" />,
+    );
+    const user = userEvent.setup();
+    await user.click(screen.getByTestId("revoke-open"));
+    await user.click(await screen.findByTestId("revoke-confirm"));
+    await waitFor(() => expect(revokeSpy).toHaveBeenCalledTimes(1));
+    const sent = (revokeSpy.mock.calls[0] as unknown[])[1] as FormData;
+    expect(sent.get("invitationId")).toBe("00000000-0000-4000-8000-000000000001");
+    await waitFor(() => expect(screen.queryByTestId("revoke-confirm")).toBeNull());
+  });
+
+  it("'No, lascia stare' sends nothing", async () => {
+    revokeSpy.mockClear();
+    render(
+      <RevokeForm invitationId="00000000-0000-4000-8000-000000000001" partnerName="Jessica" />,
+    );
+    const user = userEvent.setup();
+    await user.click(screen.getByTestId("revoke-open"));
+    await user.click(await screen.findByRole("button", { name: "No, lascia stare" }));
+    expect(revokeSpy).not.toHaveBeenCalled();
   });
 });
