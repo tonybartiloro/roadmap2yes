@@ -30,6 +30,9 @@ import {
  * Mailpit is shared: every assertion is scoped to this test's own fake addresses.
  */
 
+// The job walks every wedding of the shared local database: give it room as the database grows.
+vi.setConfig({ testTimeout: 180_000, hookTimeout: 60_000 });
+
 const SECRET = "qa-cron-secret-0123456789";
 const today = new Date().toISOString().slice(0, 10);
 const plus = (days: number): string => {
