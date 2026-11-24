@@ -38,17 +38,17 @@ function inviteText(invite: InviteOutcome, summary: OnboardingSummary): string {
   const name = displayName(partner ? { firstName: partner.firstName, label: partner.label } : null);
   switch (invite.kind) {
     case "none":
-      return "Non hai ancora aggiunto il tuo partner: puoi invitarlo quando vuoi da Altro > Invito al partner.";
+      return "Non hai ancora aggiunto il tuo partner: puoi aggiungere il tuo partner quando vuoi da Altro > Invito al partner.";
     case "joined":
       return `${name} è già dentro.`;
     case "later":
       return `L'invito a ${name} è da fare: lo trovi in Altro > Invito al partner.`;
     case "code_ready":
-      return `L'accesso di ${name} è pronto: consegnagli il codice di persona.`;
+      return `L'accesso di ${name} è pronto: consegna il codice di persona.`;
     case "email_pending":
       return `L'invito a ${partner?.email ?? name} è già partito: lo trovi in Altro > Invito al partner.`;
     case "email_off":
-      return "Le email dell'app sono spente, quindi l'invito non è partito. Da Altro > Invito al partner puoi dargli un codice di persona.";
+      return "Le email dell'app sono spente, quindi l'invito non è partito. Da Altro > Invito al partner puoi dare un codice di persona.";
     case "sent":
       return `Invito inviato a ${partner?.email ?? name}.`;
     case "not_sent":

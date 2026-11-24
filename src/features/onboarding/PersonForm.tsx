@@ -136,7 +136,7 @@ export function PersonForm({
   email?: EmailMode;
   firstNameError?: string | undefined;
   firstNameRequired?: boolean;
-  /** Question above the label choices ("Come lo chiami?" for the partner). */
+  /** Question above the label choices ("Come vuoi chiamare il tuo partner?" for the partner). */
   labelLegend?: string;
   disabled?: boolean;
   className?: string;

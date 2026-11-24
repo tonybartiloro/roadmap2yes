@@ -261,8 +261,8 @@ function PartnerForm({
         }}
       >
         <p data-testid="partner-joined">
-          {partner.firstName?.trim() || "Il tuo partner"} è già entrato: i dati di accesso li
-          gestisce da sé.
+          {partner.firstName?.trim() || "Il tuo partner"} ha già fatto il primo accesso: i dati di
+          accesso li gestisce da sé.
         </p>
         <Actions busy={ctx.busy} onBack={ctx.onBack} />
       </StepForm>
@@ -278,7 +278,7 @@ function PartnerForm({
   const modes: ReadonlyArray<{ value: PartnerMode; label: string; hint: string }> = [
     {
       value: "code",
-      label: "Con un codice che gli dai di persona",
+      label: "Con un codice che consegni di persona",
       hint: "Funziona sempre. Potrà cambiarlo al primo accesso.",
     },
     ...(ctx.emailOn
@@ -305,7 +305,10 @@ function PartnerForm({
           return;
         }
         if (value.mode === "code" && code === "" && !codeReady) {
-          setLocal({ field: "code", message: "Scrivi o genera un codice da consegnargli." });
+          setLocal({
+            field: "code",
+            message: "Scrivi o genera un codice da consegnare di persona.",
+          });
           return;
         }
         setLocal(null);
@@ -328,7 +331,7 @@ function PartnerForm({
     >
       <PersonForm
         idPrefix="partner"
-        labelLegend="Come lo chiami?"
+        labelLegend="Come vuoi chiamare il tuo partner?"
         value={value}
         onChange={(next) => change({ ...value, ...next })}
         email={{
@@ -340,13 +343,11 @@ function PartnerForm({
       />
 
       <fieldset className="flex flex-col gap-3">
-        <legend className="text-base leading-6 font-semibold">
-          Come gli diamo l&apos;accesso?
-        </legend>
+        <legend className="text-base leading-6 font-semibold">Come entra nell&apos;app?</legend>
         <RadioGroup
           value={value.mode}
           onValueChange={(mode) => change({ ...value, mode: mode as PartnerMode })}
-          aria-label="Come gli diamo l'accesso?"
+          aria-label="Come entra nell'app?"
         >
           {modes.map((mode) => (
             <Label

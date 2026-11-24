@@ -231,7 +231,7 @@ describe("OnboardingWizard (AC12, AC13)", () => {
       "3 settembre 2027 (provvisoria)",
     );
     expect(screen.getByTestId("summary-style-tip").textContent).toContain("Lascia spazio");
-    expect(screen.getByTestId("summary-invite").textContent).toContain("consegnagli il codice");
+    expect(screen.getByTestId("summary-invite").textContent).toContain("consegna il codice");
     expect(screen.getByTestId("summary-home").getAttribute("href")).toBe("/");
   });
 

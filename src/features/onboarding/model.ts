@@ -33,7 +33,7 @@ export const STEP_COUNT = STEP_IDS.length;
 
 export const STEP_TITLES: Readonly<Record<StepId, string>> = {
   you: "Iniziamo da te: come ti chiami?",
-  partner: "Ora il tuo partner. Gli mandiamo un invito per entrare con te.",
+  partner: "Ora il tuo partner: prepariamo il suo accesso.",
   rite: "Che tipo di cerimonia avete in mente?",
   dates: "Quando vorresti sposarti?",
   guests: "Quanti invitati pensate di avere?",

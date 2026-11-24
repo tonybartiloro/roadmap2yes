@@ -178,7 +178,7 @@ function CardForm({
       >
         <PersonForm
           idPrefix={`profile-${id}`}
-          {...(person.isMe ? {} : { labelLegend: "Come lo chiami?" })}
+          {...(person.isMe ? {} : { labelLegend: "Come vuoi chiamare il tuo partner?" })}
           value={value}
           onChange={change}
           firstNameRequired={person.isMe}
