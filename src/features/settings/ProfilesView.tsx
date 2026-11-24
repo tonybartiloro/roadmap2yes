@@ -97,6 +97,7 @@ function CardForm({
   const [value, setValue] = useState(initial);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [missingName, setMissingName] = useState(false);
 
   const title = person.isMe
     ? "Tu"
@@ -133,6 +134,12 @@ function CardForm({
   }
 
   async function onSubmit() {
+    // Your own first name is required, like in the onboarding (it is how the app names you).
+    if (person.isMe && value.firstName.trim() === "") {
+      setMissingName(true);
+      return;
+    }
+    setMissingName(false);
     setBusy(true);
     setError(null);
     try {
@@ -174,6 +181,8 @@ function CardForm({
           {...(person.isMe ? {} : { labelLegend: "Come lo chiami?" })}
           value={value}
           onChange={change}
+          firstNameRequired={person.isMe}
+          firstNameError={missingName ? "Scrivi il tuo nome." : undefined}
           email={{
             kind: "readonly",
             value: person.email,

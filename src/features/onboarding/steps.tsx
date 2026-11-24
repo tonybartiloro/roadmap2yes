@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, type FormEvent, type ReactNode } from "react";
 import { Loader2 } from "lucide-react";
 import { AccessCodeField } from "@/components/AccessCodeField";
@@ -372,23 +373,33 @@ function PartnerForm({
         <div className="flex flex-col gap-3">
           {codeReady ? (
             <p className="text-muted-foreground" data-testid="partner-code-ready">
-              L&apos;accesso per questa email è già pronto. Se vuoi cambiare il codice, scrivine uno
-              nuovo; altrimenti continua.
+              <strong>Accesso creato.</strong> Per cambiare il codice o l&apos;invito usa{" "}
+              <Link href="/altro/invito" className="text-primary underline underline-offset-4">
+                Altro &gt; Invito
+              </Link>{" "}
+              (da lì puoi impostare un codice temporaneo). Qui puoi continuare.
             </p>
-          ) : null}
-          <AccessCodeField
-            label="Il codice iniziale"
-            name="partnerAccessCode"
-            id="partner-code"
-            mode="new"
-            value={code}
-            onChange={setCode}
-            subject={{ email: value.email, firstName: value.firstName, lastName: value.lastName }}
-            error={fieldError("code")}
-          />
-          <p className="text-muted-foreground text-sm">
-            Consegnalo di persona: dopo la conferma non lo rivedrai.
-          </p>
+          ) : (
+            <>
+              <AccessCodeField
+                label="Il codice iniziale"
+                name="partnerAccessCode"
+                id="partner-code"
+                mode="new"
+                value={code}
+                onChange={setCode}
+                subject={{
+                  email: value.email,
+                  firstName: value.firstName,
+                  lastName: value.lastName,
+                }}
+                error={fieldError("code")}
+              />
+              <p className="text-muted-foreground text-sm">
+                Consegnalo di persona: dopo la conferma non lo rivedrai.
+              </p>
+            </>
+          )}
         </div>
       ) : null}
 

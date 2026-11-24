@@ -47,6 +47,8 @@ function inviteText(invite: InviteOutcome, summary: OnboardingSummary): string {
       return `L'invito a ${name} è da fare: lo trovi in Altro > Invito.`;
     case "code_ready":
       return `L'accesso di ${name} è pronto: consegnagli il codice di persona.`;
+    case "email_pending":
+      return `L'invito a ${partner?.email ?? name} è già partito: lo trovi in Altro > Invito.`;
     case "email_off":
       return "Le email dell'app sono spente, quindi l'invito non è partito. Da Altro > Invito puoi dargli un codice di persona.";
     case "sent":

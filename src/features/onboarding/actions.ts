@@ -6,14 +6,17 @@ import { createPartnerAccount, invitePartnerByEmail } from "@/features/invitatio
 import { failureMessage } from "@/features/invitations/messages";
 import { emailEnabled } from "@/lib/email";
 import { createClient } from "@/lib/supabase/server";
+import { DEFAULT_THEME_ID } from "@/themes/approved";
 import {
   failureOf,
   finishOnboarding,
+  loadOnboarding,
   saveStep,
   savePartnerRow,
   savePersonRow,
   type Db,
   type Failure,
+  type OnboardingState,
   type StepPatch,
 } from "./data";
 import { toRpcScenario } from "./model";
@@ -38,12 +41,43 @@ const INVALID = "Controlla i dati: qualcosa non torna.";
 const expired: Failure = { ok: false, code: "forbidden", message: SESSION_EXPIRED };
 const invalid: Failure = { ok: false, code: "invalid", message: INVALID };
 
-async function session(): Promise<{ raw: UserRpc; db: Db; userId: string } | null> {
+type Ctx = { raw: UserRpc; db: Db; userId: string; onboarding: OnboardingState };
+
+const NOT_FOUNDER: Failure = {
+  ok: false,
+  code: "forbidden",
+  message: "Solo chi ha iniziato può compilare l'onboarding.",
+};
+const ALREADY_DONE: Failure = {
+  ok: false,
+  code: "completed",
+  message: "L'onboarding è già concluso.",
+};
+
+/**
+ * The session from the cookies AND the authorization of every entry point: the caller must be
+ * partner A of a wedding. Steps also need the onboarding NOT completed; `allowCompleted` is only for
+ * the idempotent retry of "finish". All of it before any write: the page redirect is UX, a server
+ * action can be called directly.
+ */
+async function session(options: { allowCompleted?: boolean } = {}): Promise<Ctx | Failure> {
   const client = await createClient();
   const { data } = await client.auth.getClaims();
   const userId = data?.claims?.sub;
-  return userId ? { raw: client as unknown as UserRpc, db: client as unknown as Db, userId } : null;
+  if (!userId) return expired;
+  const db = client as unknown as Db;
+  let onboarding: OnboardingState | null;
+  try {
+    onboarding = await loadOnboarding(db, userId);
+  } catch (error) {
+    return failureOf(error as { code?: string });
+  }
+  if (!onboarding || onboarding.selfSlot !== "A") return NOT_FOUNDER;
+  if (onboarding.completed && !options.allowCompleted) return ALREADY_DONE;
+  return { raw: client as unknown as UserRpc, db, userId, onboarding };
 }
+
+const isFailure = (value: Ctx | Failure): value is Failure => "ok" in value;
 
 /** Onboarding answers feed Home (next step), Percorso (tasks), Scelte (decisions) and Budget. */
 function refreshAfterFinish(): void {
@@ -53,30 +87,11 @@ function refreshAfterFinish(): void {
   revalidatePath("/budget");
 }
 
-/**
- * Names for the partner operations of T7b. Their zod schema accepts a missing field but REJECTS
- * `null` (although the TypeScript signature allows it), so empty ones are left out.
- */
-function optionalNames(names: {
-  firstName?: string | null;
-  lastName?: string | null;
-  label?: string | null;
-}): { firstName?: string; lastName?: string; label?: string } {
-  return {
-    ...(names.firstName ? { firstName: names.firstName } : {}),
-    ...(names.lastName ? { lastName: names.lastName } : {}),
-    ...(names.label ? { label: names.label } : {}),
-  };
-}
-
 function fail(message: string, field?: string): Failure {
   return { ok: false, code: "invalid", message, ...(field ? { field } : {}) };
 }
 
-async function savePartnerStep(
-  ctx: { raw: UserRpc; db: Db; userId: string },
-  input: PartnerInput,
-): Promise<StepActionResult> {
+async function savePartnerStep(ctx: Ctx, input: PartnerInput): Promise<StepActionResult> {
   if (input.skip) {
     // "Non lo so ancora": nothing to create now. A partner already on file stays as it is.
     const hasPartner = (await ctx.db.from("wedding_partners").select("id").eq("slot", "B")).data;
@@ -112,12 +127,21 @@ async function savePartnerStep(
 
   if (mode === "code") {
     const code = input.code ?? "";
-    if (code !== "") {
-      const created = await createPartnerAccount({
-        email: emailAddress,
-        code,
-        ...optionalNames(names),
-      });
+    // The access for THIS email may already exist (a resumed step, or a retry after the access was
+    // created but the step could not be saved): then it is kept as it is, whatever code was typed.
+    // A new code is not set here: changes go through Altro > Invito (temporary code).
+    const pending = await ctx.db
+      .from("invitations")
+      .select("email,method")
+      .is("accepted_at", null)
+      .is("revoked_at", null)
+      .maybeSingle();
+    const ready = pending.data?.method === "code" && pending.data.email === emailAddress;
+    if (ready) {
+      const row = await savePartnerRow(ctx.db, { email: emailAddress, ...names }, changeEmail);
+      if (!row.ok) return row;
+    } else if (code !== "") {
+      const created = await createPartnerAccount({ email: emailAddress, code, ...names });
       if (!created.ok) {
         return fail(
           created.message,
@@ -125,17 +149,7 @@ async function savePartnerStep(
         );
       }
     } else {
-      // No new code: fine only when the access for THIS email is already prepared (a resumed step).
-      const state = await ctx.db
-        .from("invitations")
-        .select("email,method")
-        .is("accepted_at", null)
-        .is("revoked_at", null)
-        .maybeSingle();
-      const ready = state.data?.method === "code" && state.data.email === emailAddress;
-      if (!ready) return fail("Scrivi o genera un codice da consegnare al tuo partner.", "code");
-      const row = await savePartnerRow(ctx.db, { email: emailAddress, ...names }, changeEmail);
-      if (!row.ok) return row;
+      return fail("Scrivi o genera un codice da consegnare al tuo partner.", "code");
     }
   } else {
     const row = await savePartnerRow(ctx.db, { email: emailAddress, ...names }, changeEmail);
@@ -162,7 +176,7 @@ export async function saveStepAction(input: unknown): Promise<StepActionResult> 
       : invalid;
   }
   const ctx = await session();
-  if (!ctx) return expired;
+  if (isFailure(ctx)) return ctx;
   const step = parsed.data;
 
   let result: StepActionResult;
@@ -237,12 +251,18 @@ async function inviteOutcome(state: OnboardingSummary["state"]): Promise<InviteO
   if (!partner) return { kind: "none" };
   if (partner.joined) return { kind: "joined" };
   const mode = state.answers.partnerMode;
+  // An invitation already exists (a retry, or access made at step 2): never send a second one.
   if (state.invitation) {
-    return state.invitation.method === "code" ? { kind: "code_ready" } : { kind: "later" };
+    return state.invitation.method === "code" ? { kind: "code_ready" } : { kind: "email_pending" };
   }
   if (mode === "email" && state.answers.inviteAtEnd) {
     if (!emailEnabled()) return { kind: "email_off" };
-    const sent = await invitePartnerByEmail({ email: partner.email, ...optionalNames(partner) });
+    const sent = await invitePartnerByEmail({
+      email: partner.email,
+      firstName: partner.firstName,
+      lastName: partner.lastName,
+      label: partner.label,
+    });
     if (!sent.ok) return { kind: "failed", message: sent.message };
     return sent.delivery === "sent"
       ? { kind: "sent", link: sent.link ?? "" }
@@ -259,13 +279,14 @@ async function inviteOutcome(state: OnboardingSummary["state"]): Promise<InviteO
 export async function finishOnboardingAction(input: unknown): Promise<FinishActionResult> {
   const parsed = finishSchema.safeParse(input);
   if (!parsed.success) return invalid;
-  const ctx = await session();
-  if (!ctx) return expired;
+  const ctx = await session({ allowCompleted: true });
+  if (isFailure(ctx)) return ctx;
 
-  // The theme step is confirmed by finishing (the theme itself is saved by the gallery).
+  // The theme step is confirmed by finishing (the theme itself is saved by the gallery). "Non lo so
+  // ancora" only counts as unknown while the theme is still the default: a saved choice is an answer.
   const marked = await saveStep(ctx.db, ctx.userId, {
     step: "theme",
-    unknown: parsed.data.skipTheme,
+    unknown: parsed.data.skipTheme && ctx.onboarding.themeId === DEFAULT_THEME_ID,
   });
   if (!marked.ok && marked.code !== "completed") return marked;
 

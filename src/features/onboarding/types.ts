@@ -10,6 +10,8 @@ export type InviteOutcome =
   | { readonly kind: "joined" }
   | { readonly kind: "later" }
   | { readonly kind: "code_ready" }
+  /** The email invitation was already made (a retry): nothing is sent twice. */
+  | { readonly kind: "email_pending" }
   /** The couple chose the email invite but the emails are off: nothing was sent. */
   | { readonly kind: "email_off" }
   | { readonly kind: "sent"; readonly link: string }

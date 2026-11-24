@@ -1,7 +1,9 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { EmailMessage } from "@/lib/email";
 import {
+  addPartnerB,
   anonClient,
+  createUser,
   createWedding,
   randomCode,
   serviceClient,
@@ -22,6 +24,7 @@ const state = vi.hoisted(() => ({
   revalidate: [] as unknown[][],
   emailOn: false,
   sent: [] as unknown[],
+  sendOk: true,
 }));
 
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => state.client }));
@@ -39,7 +42,9 @@ vi.mock("@/lib/email", async (importOriginal) => {
       transport: "smtp" as const,
       async send(message: EmailMessage) {
         state.sent.push(message);
-        return { ok: true as const };
+        return state.sendOk
+          ? { ok: true as const }
+          : { ok: false as const, error: "refused", retryable: false };
       },
     }),
   };
@@ -66,6 +71,7 @@ describe("onboarding server actions", () => {
     state.revalidate = [];
     state.emailOn = false;
     state.sent = [];
+    state.sendOk = true;
   });
 
   it("rejects malformed input before touching anything, and without a session writes nothing", async () => {
@@ -273,5 +279,127 @@ describe("onboarding server actions", () => {
     await saveStepAction({ step: "partner", skip: false, email, mode: "code", code: randomCode() });
     const done = await finishOnboardingAction({ skipTheme: false });
     expect(done.ok && done.summary.invite).toEqual({ kind: "code_ready" });
+  });
+
+  describe("only founder A may fill in the onboarding (REV-1)", () => {
+    it("partner B calling the actions directly is refused before any write", async () => {
+      const b = await addPartnerB(wedding);
+      state.client = b.client as TestClient;
+      state.revalidate = [];
+      const results = [
+        await saveStepAction({ step: "you", firstName: "Intruso" }),
+        await saveStepAction({ step: "rite", rite: "civile" }),
+        await saveStepAction({ step: "partner", skip: false, email: uniqueEmail(), mode: "later" }),
+        await finishOnboardingAction({ skipTheme: false }),
+      ];
+      for (const result of results) expect(result).toMatchObject({ ok: false, code: "forbidden" });
+      expect(state.revalidate).toEqual([]);
+      const service = serviceClient();
+      const row = await service
+        .from("weddings")
+        .select("rite,onboarding_completed_at,onboarding_answers")
+        .eq("id", wedding.weddingId)
+        .single();
+      expect(row.data?.rite).toBeNull();
+      expect(row.data?.onboarding_completed_at).toBeNull();
+      expect(row.data?.onboarding_answers).toEqual({});
+      const partners = await service
+        .from("wedding_partners")
+        .select("first_name")
+        .eq("wedding_id", wedding.weddingId)
+        .eq("slot", "A");
+      expect(partners.data).toEqual([{ first_name: null }]);
+    });
+
+    it("a user without a wedding is refused", async () => {
+      const outsider = await createUser();
+      state.client = await signInAs(outsider);
+      expect(await saveStepAction({ step: "rite", rite: "civile" })).toMatchObject({
+        ok: false,
+        code: "forbidden",
+      });
+      expect(await finishOnboardingAction({ skipTheme: false })).toMatchObject({
+        ok: false,
+        code: "forbidden",
+      });
+    });
+
+    it("after completion the steps are refused; finish stays an idempotent retry", async () => {
+      expect((await finishOnboardingAction({ skipTheme: false })).ok).toBe(true);
+      expect(await saveStepAction({ step: "rite", rite: "civile" })).toMatchObject({
+        ok: false,
+        code: "completed",
+      });
+      const again = await finishOnboardingAction({ skipTheme: false });
+      expect(again.ok && again.summary.state.completed).toBe(true);
+    });
+  });
+
+  describe("the partner step converges (REV-2)", () => {
+    it("typing a new code when the access already exists keeps the access and the old code", async () => {
+      const email = uniqueEmail("luca");
+      const first = randomCode();
+      const second = randomCode();
+      await saveStepAction({ step: "partner", skip: false, email, mode: "code", code: first });
+      const again = await saveStepAction({
+        step: "partner",
+        skip: false,
+        email,
+        firstName: "Luca",
+        mode: "code",
+        code: second,
+      });
+      expect(again.ok && again.state.partner?.firstName).toBe("Luca");
+      expect(JSON.stringify(again)).not.toContain(second);
+      expect(await canSignIn(email, first)).toBe(true);
+      expect(await canSignIn(email, second)).toBe(false);
+    });
+
+    it("a retry with the same code after the step could not be saved succeeds", async () => {
+      const email = uniqueEmail("luca");
+      const code = randomCode();
+      // The access is created (first call) but the client never got the answer: the same call again.
+      await saveStepAction({ step: "partner", skip: false, email, mode: "code", code });
+      const retry = await saveStepAction({
+        step: "partner",
+        skip: false,
+        email,
+        mode: "code",
+        code,
+      });
+      expect(retry.ok).toBe(true);
+      expect(retry.ok && retry.state.answers.partnerMode).toBe("code");
+      expect(await canSignIn(email, code)).toBe(true);
+    });
+  });
+
+  describe("finish retried (REV-3, REV-5, REV-6)", () => {
+    it("an email invite that did not go out is not sent twice when finish is repeated", async () => {
+      state.emailOn = true;
+      state.sendOk = false;
+      const email = uniqueEmail("luca");
+      await saveStepAction({
+        step: "partner",
+        skip: false,
+        email,
+        mode: "email",
+        inviteAtEnd: true,
+      });
+      const first = await finishOnboardingAction({ skipTheme: false });
+      expect(first.ok && first.summary.invite.kind).toBe("not_sent");
+      expect(state.sent).toHaveLength(1);
+      const again = await finishOnboardingAction({ skipTheme: false });
+      expect(again.ok && again.summary.invite).toEqual({ kind: "email_pending" });
+      expect(state.sent).toHaveLength(1);
+    });
+
+    it("'Non lo so ancora' on the theme does not mark a saved theme as unknown", async () => {
+      await serviceClient()
+        .from("weddings")
+        .update({ theme_id: "oliveto" })
+        .eq("id", wedding.weddingId);
+      const done = await finishOnboardingAction({ skipTheme: true });
+      expect(done.ok && done.summary.state.unknown).not.toContain("theme");
+    });
   });
 });

@@ -169,6 +169,8 @@ function Form({
       });
       if (result.ok) {
         toast.success("Budget salvato.");
+        // The saved total is now the stored one: the draft keeps no stale text of it.
+        change({ budgetText: formatCents(parsed.cents) });
         router.refresh();
       } else {
         setBudgetError(result.message);

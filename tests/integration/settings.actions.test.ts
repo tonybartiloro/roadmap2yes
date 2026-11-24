@@ -99,6 +99,27 @@ describe("settings server actions", () => {
     expect((await loadSettings(db, wedding.founder.id)).comune).toBe("Padova");
   });
 
+  it("your own first name is required; the partner's may be empty (REV-7)", async () => {
+    const profiles = await loadProfiles(wedding.founderClient as unknown as Db, wedding.founder.id);
+    const blankMe = await savePersonAction({
+      partnerId: profiles.me.id,
+      version: profiles.me.version,
+      firstName: "  ",
+      lastName: null,
+      label: null,
+    });
+    expect(blankMe).toMatchObject({ ok: false, code: "invalid" });
+    const other = profiles.other!;
+    const blankOther = await savePersonAction({
+      partnerId: other.id,
+      version: other.version,
+      firstName: null,
+      lastName: null,
+      label: "sposo",
+    });
+    expect(blankOther).toMatchObject({ ok: true });
+  });
+
   it("a person is saved with an email ignored and the people pages revalidated", async () => {
     const profiles = await loadProfiles(wedding.founderClient as unknown as Db, wedding.founder.id);
     const result = await savePersonAction({
