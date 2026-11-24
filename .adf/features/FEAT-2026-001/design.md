@@ -26,11 +26,15 @@ Da 768 px: sidebar sinistra con le stesse voci (rail icone + etichette da 1024 p
 ## 3. Flussi principali
 
 ### 3.1 Accesso e invito (DES-1)
-1. **Login** (`/accesso`): campo email (`autocomplete="email"`, `inputmode="email"`) → "Mandami il link" → schermata "Controlla la posta" con campo codice a 6 cifre (`autocomplete="one-time-code"`, `inputmode="numeric"`, incollabile, nessun test cognitivo) e "Rimanda il link (tra 30 s)" con conto alla rovescia testuale. Il messaggio è **identico** per email note e sconosciute (AC2): "Se questo indirizzo può entrare, ti abbiamo mandato un link e un codice."
-2. **Link dall'email** (`/auth/conferma`): pagina con il pulsante "Entra" (il token si consuma solo al clic, AC8). Funziona in un browser diverso da quello della richiesta. Errore: "Il link è scaduto o è già stato usato. Chiedine uno nuovo" + pulsante "Torna al login".
-3. **Dopo l'accesso** (server, nell'ordine): ha uno spazio → home (o ripresa onboarding); ha un invito pendente → entra nello spazio invitante, mai "crea spazio" (BR13); è il primo partner autorizzato → onboarding; altrimenti "Questo spazio è su invito".
-4. **Invito** (`/invito/[token]`, pagina pubblica che mostra solo il nome di chi ha invitato): stati e azioni in §7.2.
-5. **Altro > Invito partner**: stato (In attesa / Accettato / Scaduto / Revocato), data di scadenza, "Copia link" (per WhatsApp e simili), "Invia di nuovo", "Revoca" (con conferma). Se l'invito non è mai partito (passo saltato): modulo "Invita {nome}" con email precompilata.
+> **Aggiornamento Gate B (plan.md §4).** Il flusso F2 con magic link e codice a 6 cifre via email è **superato**: l'accesso è con **email + codice d'accesso** (la password di Supabase Auth, 10+ caratteri, lettere e cifre), senza alcun fornitore email. Il ragionamento F2 resta valido per la parte che sopravvive: un solo messaggio neutro per email note e sconosciute (AC2), nessun test cognitivo, link monouso che si consuma solo al clic (AC8). Le parti sostituite sono marcate "(F2, superato)".
+
+1. **Login** (`/accesso`): campi "La tua email" (`autocomplete="email"`, `inputmode="email"`) e "Il tuo codice d'accesso" (`type="password"`, `autocomplete="current-password"`, pulsante "Mostra il codice"), pulsante "Entra". Errori neutri e identici per email note e sconosciute: "Email o codice non corretti." e, dopo troppi tentativi, "Troppi tentativi. Riprova tra 15 minuti.". Sotto, il riquadro comprimibile **"Hai dimenticato il codice?"**: con le email attive (Resend) campo email + "Mandami il link" e messaggio neutro "Se questo indirizzo può entrare, ti abbiamo mandato un link per scegliere un nuovo codice."; con le email spente il link non c'è e il testo dice di chiedere al partner un codice temporaneo. (F2, superato: "Mandami il link" come unico accesso, schermata "Controlla la posta", codice a 6 cifre, "Rimanda il link (tra 30 s)".)
+2. **Recupero via email** (`/auth/conferma`, solo con email attive): pagina con il pulsante "Entra" (il token si consuma solo al clic, AC8), poi scelta del **nuovo codice**. Errore: "Il link è scaduto o è già stato usato. Chiedine uno nuovo" + "Torna al login".
+3. **Dopo l'accesso** (server, nell'ordine): codice temporaneo da cambiare → `/altro/account?obbligatorio=1`; ha uno spazio → home (o ripresa onboarding); ha un invito pendente → entra nello spazio invitante, mai "crea spazio" (BR13); è il primo partner autorizzato → onboarding; altrimenti "Questo spazio è su invito".
+4. **Invito** (`/invito/[token]`, pagina pubblica che mostra solo il nome di chi ha invitato): solo per l'invito **via email** (email attive): "Continua con la tua email", poi **B sceglie il proprio codice** ("Scegli il tuo codice: da ora entri con quello") ed entra. Stati e azioni in §7.2.
+5. **Partner B, due modi** (onboarding passo 2 e Altro > Invito al partner): **con codice** (sempre disponibile: A inserisce email di B e un codice iniziale, con "Genera", e lo consegna di persona; la UI non lo mostra più dopo la conferma; B è invitato a cambiarlo, senza obbligo) oppure **con invito via email** (solo con email attive: B riceve il link e sceglie lui il codice). Con le email spente il passo spiega "Le email sono disattivate: l'invito per email non c'è. Dai tu il codice di persona."
+6. **Altro > Invito al partner** (`/altro/invito`): stato (In attesa / Accettato / Scaduto / Revocato), scadenza, "Copia link" e "Invia di nuovo" (ruota il link: "Il link di prima smette di funzionare."), "Revoca" (con conferma). Per B già dentro: **"Codice dimenticato?"** con "Imposta il codice temporaneo" (A lo consegna di persona; al prossimo accesso B deve sceglierne uno suo). Se l'invito non è mai partito: modulo "Invita {nome}" con email precompilata.
+7. **Altro > Il tuo accesso** (`/altro/account`): cambio del proprio codice ("Il tuo codice di adesso", "Il tuo nuovo codice", diverso dall'attuale) e della propria email di accesso (due volte + codice attuale). Dopo un codice temporaneo la pagina è obbligatoria e non lascia uscire finché il codice non è cambiato.
 
 ### 3.2 Onboarding (DES-2, 8 passi, nessuna data di nascita)
 Un solo partner (chi entra per primo) compila per entrambi; l'altro riceve l'invito, entra e può correggere tutto da Altro. Una domanda per schermata; indicatore testuale "Passo 3 di 8" più barra (`role="progressbar"` con `aria-valuenow`, il testo è la fonte primaria); salvataggio a ogni conferma; ripresa dall'ultimo passo non completato ("Bentornato, riprendiamo dal passo 4 di 8"); "Indietro" sempre disponibile; ogni passo valido anche con "Non lo so ancora" (tranne nome ed email di chi compila, AC13). Al cambio passo il focus va al titolo (`h1`, `tabindex=-1`) e il numero di passo è annunciato.
@@ -38,7 +42,7 @@ Un solo partner (chi entra per primo) compila per entrambi; l'altro riceve l'inv
 | # | Passo | Contenuto |
 |---|---|---|
 | 1 | **Tu** | Etichetta (Sposo / Sposa / Altro: scrivi tu / nessuna), nome, cognome. L'email è quella del login, mostrata e non modificabile. |
-| 2 | **Il tuo partner** | Stessa scheda con **email**. Sotto: "Gli mandiamo un invito per entrare con te" con interruttore "Invia l'invito alla fine" (attivo; si può rimandare e fare da Altro). Email uguale alla tua o non valida: errore inline. "Non lo so ancora" valido: l'invito si fa dopo. |
+| 2 | **Il tuo partner** | Stessa scheda con **email**. Sotto, "Come gli diamo l'accesso?" a tre carte: **"Con un codice che gli dai di persona"** (sempre disponibile, con "Genera"), **"Con un invito via email"** (solo con email attive) e **"Più tardi"** (si fa da Altro > Invito al partner); l'interruttore "Invia l'invito alla fine" vale per l'invito via email (F2: interruttore unico, superato). Email uguale alla tua o non valida: errore inline. "Non lo so ancora" valido: l'invito si fa dopo. |
 | 3 | **Rito** | Civile / Religioso cattolico con effetti civili / Simbolico / Non lo so ancora. Nota: "Cambia le tappe che ti proponiamo." |
 | 4 | **Data (scenari)** | Lista di scenari (vedi §3.8), ognuno **data fissa** o **periodo** (da mese/anno a mese/anno), etichetta facoltativa; il primo precompilato 3 settembre 2027; "Aggiungi un altro scenario"; si può restare senza. Avviso non bloccante per date prima del 3/9/2027. |
 | 5 | **Invitati** | Fasce: fino a 50 · 50–80 · 80–120 · oltre · non lo so (radio a carte). |
@@ -123,8 +127,11 @@ Legenda: C=caricamento, V=vuoto, E=errore, S=successo, P=permesso negato. "—" 
 
 | Schermata | C | V | E | S | P |
 |---|---|---|---|---|---|
-| Login / codice | spinner sul pulsante | — | link scaduto, codice errato o scaduto, invio fallito, limite email (429), attesa 30 s | "Controlla la posta" | — |
-| Conferma accesso (`/auth/conferma`) | spinner sul pulsante | — | link scaduto o usato | accesso e reindirizzamento | — |
+| Login (email + codice) | spinner sul pulsante | — | "Email o codice non corretti.", troppi tentativi (15 min), "Adesso non riesco a collegarmi. Riprova tra poco." | reindirizzamento (home, onboarding, cambio codice obbligatorio) | — |
+| Recupero codice via email (`/auth/conferma`, solo con email attive) | spinner sul pulsante | — | link scaduto o usato | scelta del nuovo codice e accesso | — |
+| Il tuo accesso (`/altro/account`) | spinner sul pulsante | — | "Il codice attuale non è corretto.", "Il nuovo codice deve essere diverso da quello attuale.", email non valida o già in uso | "Fatto: da ora entri con il nuovo codice." | solo il proprio account |
+| Codice temporaneo imposto dall'altro partner | — | — | — | al login `/altro/account?obbligatorio=1` | — |
+(F2, superato: righe "Login / codice" con attesa 30 s e "Controlla la posta", e "Conferma accesso" come passaggio normale di ogni accesso.)
 | "Questo spazio è su invito" | — | — | — | — | è la schermata di permesso negato: nessun dato, nessuna creazione |
 | Invito (`/invito/[token]`) | skeleton | — | scaduto, già usato, revocato, altro account (email mascherata), spazio completo (§7.2) | "{Nome} ti ha invitato" + Entra | — |
 | Altro > Invito partner | skeleton | "Nessun invito: invita {nome}" | email non valida / già invitata / invio fallito (con "Copia link") | stato "In attesa" + toast | solo partner |
@@ -680,18 +687,19 @@ Vocabolario fisso: Previsto, Concordato, Pagato, Ancora da pagare, Assegnato; Sc
 **Login e accesso**
 | Dove | Testo |
 |---|---|
-| Login, titolo | "Entra in roadmap2yes" · campo "La tua email" · pulsante "Mandami il link" |
-| Controlla la posta | "Controlla la posta. Se questo indirizzo può entrare, ti abbiamo mandato un link e un codice a 6 cifre." · "Rimanda il link (tra 30 s)" |
-| Codice errato o scaduto | "Il codice non è giusto o è scaduto. Controlla le cifre o chiedine uno nuovo." |
-| Limite email | "Hai chiesto troppe email. Riprova tra qualche minuto." |
-| Conferma accesso | "Sei quasi dentro." · pulsante "Entra" |
+| Login, titolo | "Entra in roadmap2yes" · campi "La tua email" e "Il tuo codice d'accesso" · pulsante "Entra" |
+| Codice errato | "Email o codice non corretti." (identico per email sconosciuta) |
+| Troppi tentativi | "Troppi tentativi. Riprova tra 15 minuti." |
+| Hai dimenticato il codice? | con email attive: "Se questo indirizzo può entrare, ti abbiamo mandato un link per scegliere un nuovo codice." · senza email: "Chiedi a {partner} di impostarti un codice temporaneo." |
+| Conferma recupero (`/auth/conferma`) | "Sei quasi dentro." · pulsante "Entra" · poi "Il tuo nuovo codice" |
 | Link scaduto/usato | "Il link è scaduto o è già stato usato. Chiedine uno nuovo." · "Torna al login" |
+(F2, superato: "Controlla la posta… codice a 6 cifre", "Rimanda il link (tra 30 s)", "Il codice non è giusto o è scaduto", "Hai chiesto troppe email", pulsante "Mandami il link" come accesso principale.)
 | Su invito | "Questo spazio è su invito. Chiedi a chi te l'ha condiviso di mandarti un invito." |
 
 **Invito** (`/invito/[token]`, la pagina mostra solo il nome di chi invita)
 | Stato | Titolo e azione |
 |---|---|
-| Valido | "Tony ti ha invitato a organizzare il matrimonio insieme." · "Continua con la tua email" (email precompilata) |
+| Valido | "Tony ti ha invitato a organizzare il matrimonio insieme." · "Continua con la tua email" (email precompilata) · poi "Scegli il tuo codice: da ora entri con quello." (solo invito via email) |
 | Scaduto | "Questo invito è scaduto (valeva 7 giorni)." · "Chiedi a Tony di mandarne uno nuovo." |
 | Già usato | "Questo invito è già stato usato." · "Se eri tu, entra dal login." |
 | Revocato | "Questo invito è stato annullato." · "Chiedi a Tony di mandarne uno nuovo." |
@@ -709,7 +717,7 @@ Vocabolario fisso: Previsto, Concordato, Pagato, Ancora da pagare, Assegnato; Sc
 
 | Email | Oggetto | Corpo (tu) | Pulsante · piè di pagina |
 |---|---|---|---|
-| **Codice/link di accesso** (template Supabase) | "Il tuo accesso a roadmap2yes" | "Ciao, ecco il tuo accesso. **123456** (codice grande, a cifre separate da spazio sottile, selezionabile). Apri il link oppure scrivi il codice nell'app. Valgono un'ora. Se non l'hai chiesto tu, ignora questa email: senza il codice nessuno può entrare." | "Entra" · nessun link di disattivazione (non disattivabile) |
+| **Recupero del codice** (template Supabase, solo con email attive; F2 superato: era l'email di accesso con codice a 6 cifre) | "Scegli un nuovo codice per roadmap2yes" | "Ciao, hai chiesto di scegliere un nuovo codice d'accesso. Apri il link e scegline uno: vale un'ora e una volta sola. Se non l'hai chiesto tu, ignora questa email: il tuo codice attuale resta valido." (nessun codice nel testo) | "Scegli il nuovo codice" · nessun link di disattivazione (non disattivabile) |
 | **Invito al partner** | "Tony ti ha invitato su roadmap2yes" | "Ciao Jessica, Tony ha iniziato a organizzare il vostro matrimonio e vuole farlo insieme a te. Entra per vedere cosa ha già preparato e dire la tua. Il link vale 7 giorni (fino al 30 novembre) ed è solo per questo indirizzo. Se non te l'aspettavi, ignora questa email: non succede niente." | "Entra nello spazio" · "Questa email non si può disattivare perché è un invito." |
 | **Promemoria, 7 giorni prima** | "Tra 7 giorni: Prenotare la location" (più compiti: "Tra 7 giorni: 3 cose da fare") | "Ciao Tony, tra una settimana (lunedì 30 novembre) scade: **Prenotare la location**. Se è già fatto, segnalo nell'app con un tocco." Più compiti: elenco (max 5, poi "e altri 2"). | "Apri il Percorso" · "Non vuoi più questi promemoria? Disattivali con un tocco." |
 | **Promemoria, giorno stesso** | "Oggi: Prenotare la location" | "Ciao Tony, oggi è il giorno per: **Prenotare la location**. Non ce la fai? Nessun problema: puoi spostare la scadenza dal compito." | come sopra |
@@ -735,7 +743,7 @@ La pagina è renderizzata senza leggere il database (tema da cookie o Giardino, 
 - Toast in `aria-live="polite"`; Annulla ≥8 s e, per le eliminazioni, sempre raggiungibile anche da "Eliminati di recente" (il toast è l'ultimo elemento del DOM e può non essere a portata di tastiera).
 - Onboarding: titolo del passo con il focus a ogni cambio, progresso in testo; galleria temi come `radiogroup` con frecce.
 - Banner di anteprima: `role="status"`, azioni in ordine di lettura; selettore scenario come gruppo radio.
-- Nessuna azione solo-trascinamento; niente slider per importi; autenticazione senza test cognitivi (codice copiabile, `autocomplete="one-time-code"`).
+- Nessuna azione solo-trascinamento; niente slider per importi; autenticazione senza test cognitivi (codice d'accesso incollabile, mostra/nascondi, `autocomplete="current-password"` / `new-password` per i gestori di password; F2 superato: `one-time-code`).
 - `lang="it"`, zoom al 200% senza scroll orizzontale, testo ridimensionabile, `prefers-reduced-motion`, `prefers-color-scheme`.
 - Email: struttura a tabella con ruoli di presentazione, testo alternativo assente perché nessuna immagine informativa, contrasto del pulsante ≥4,5:1, versione solo testo.
 
@@ -806,7 +814,7 @@ Email: promemoria
 **Stati e pagine pubbliche**
 - [ ] Ogni stato di §4 raggiungibile e verificato (vuoto, caricamento, errore, offline, conflitto, permesso negato).
 - [ ] **Servizio in pausa e non raggiungibile**: le due pagine con testi diversi, nessun "si sta svegliando", visibili anche con il database spento (stack locale fermo) e senza lampo di tema.
-- [ ] Invito: i 6 stati di §7.2 con azione; login con messaggio identico per email nota e sconosciuta; `/auth/conferma` e `/email/disattiva` (conferma, fatto, non valido).
+- [ ] Invito: i 6 stati di §7.2 con azione; login con codice e messaggio identico per email nota e sconosciuta; "Hai dimenticato il codice?" con e senza email; codice temporaneo con cambio obbligatorio; `/altro/account`; `/auth/conferma` (solo email attive) e `/email/disattiva` (conferma, fatto, non valido).
 **Email** (lette dal mail catcher locale)
 - [ ] Le 5 email (accesso, invito, promemoria 7 giorni e giorno stesso, riepilogo) a 320 e 560 px, con immagini disattivate e in versione solo testo; contrasto del pulsante; link funzionanti; nessun contenuto utente non escapato (prova con nome contenente `<b>` e a-capo).
 - [ ] Email di accesso e invito senza link di disattivazione; promemoria e riepilogo con link e intestazioni `List-Unsubscribe`; un solo promemoria al giorno per utente.
