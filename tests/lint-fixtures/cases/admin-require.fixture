@@ -1,0 +1,3 @@
+const { createAdminClient } = require("@/lib/supabase/admin");
+
+module.exports = createAdminClient();

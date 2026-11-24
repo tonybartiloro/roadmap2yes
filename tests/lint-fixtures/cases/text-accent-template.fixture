@@ -1,0 +1,3 @@
+export function A({ size }: { size: string }) {
+  return <p className={`${size} text-accent`}>x</p>;
+}

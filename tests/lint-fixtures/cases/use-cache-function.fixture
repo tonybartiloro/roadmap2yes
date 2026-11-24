@@ -1,0 +1,4 @@
+export async function getData() {
+  "use cache: private";
+  return 1;
+}
