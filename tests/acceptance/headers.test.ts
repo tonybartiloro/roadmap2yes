@@ -27,6 +27,11 @@ const PORT = Number(process.env["HEADERS_PORT"] ?? 3310);
 const BUILT = existsSync(resolve(APP_DIR, ".next/BUILD_ID"));
 const runnable = Boolean(EXTERNAL) || BUILT;
 
+// CI sets HEADERS_REQUIRED=1: a missing build must FAIL the run, never skip silently.
+if (process.env["HEADERS_REQUIRED"] === "1" && !runnable) {
+  throw new Error("HEADERS_REQUIRED=1 but there is no .next/BUILD_ID and no HEADERS_BASE_URL");
+}
+
 let base = EXTERNAL ?? `http://127.0.0.1:${PORT}`;
 let server: ChildProcess | undefined;
 

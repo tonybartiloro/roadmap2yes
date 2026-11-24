@@ -160,8 +160,14 @@ jobs:
           key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - run: npx playwright install --with-deps chromium
       - run: npm run build
+      # Needs the build above and the local stack env exported above. HEADERS_REQUIRED makes a
+      # missing build a failure instead of a (green) skip.
+      - name: Headers of the built app
+        run: npx vitest run --project integration tests/acceptance/headers.test.ts
+        env:
+          HEADERS_REQUIRED: "1"
       - name: e2e (project mobile)
-        run: npx playwright test --project=mobile --pass-with-no-tests
+        run: npx playwright test --project=mobile
       - name: Report flaky tests (passed only on retry)
         if: ${{ always() && hashFiles('test-results/report.json') != '' }}
         run: |
@@ -255,8 +261,12 @@ jobs:
           key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - run: npx playwright install --with-deps chromium webkit
       - run: npm run build
+      - name: Headers of the built app
+        run: npx vitest run --project integration tests/acceptance/headers.test.ts
+        env:
+          HEADERS_REQUIRED: "1"
       - name: e2e (all projects)
-        run: npx playwright test --pass-with-no-tests
+        run: npx playwright test
       - name: Report flaky tests (passed only on retry)
         if: ${{ always() && hashFiles('test-results/report.json') != '' }}
         run: |
