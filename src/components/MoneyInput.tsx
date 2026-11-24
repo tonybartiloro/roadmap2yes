@@ -3,11 +3,8 @@
 import { useId, useState, type ComponentProps } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { formatCents, parseEuroToCents } from "@/lib/money";
 import { cn } from "@/lib/utils";
-
-/** Result of parsing an amount typed by a person. T5 (`lib/money.ts`) provides the real parser. */
-export type MoneyParseResult = { ok: true; cents: number } | { ok: false };
-export type MoneyParser = (text: string) => MoneyParseResult;
 
 export interface MoneyInputProps extends Omit<
   ComponentProps<"input">,
@@ -17,30 +14,23 @@ export interface MoneyInputProps extends Omit<
   /** Text as typed (the field is controlled so partial input like "1.5" is never rewritten). */
   value: string;
   onValueChange: (text: string, cents: number | null) => void;
-  /** Turns the text into integer cents. Never `parseFloat * 100`. */
-  parse: MoneyParser;
   /** Error from outside (server). The field shows its own invalid-format error after blur. */
   error?: string;
   hint?: string;
   id?: string;
-  invalidMessage?: string;
 }
-
-export const MONEY_INVALID_MESSAGE = "Inserisci un importo in euro, ad esempio 1.500,00.";
 
 /**
  * Euro amount field (it-IT): `inputmode="decimal"`, 16 px text, visible label, error tied with
- * `aria-describedby`. UI only: parsing rules and caps live in `lib/money.ts`.
+ * `aria-describedby`. Parsing rules and caps live in `lib/money.ts`.
  */
 export function MoneyInput({
   label,
   value,
   onValueChange,
-  parse,
   error,
   hint,
   id,
-  invalidMessage = MONEY_INVALID_MESSAGE,
   className,
   onBlur,
   ...rest
@@ -48,8 +38,8 @@ export function MoneyInput({
   const generated = useId();
   const inputId = id ?? generated;
   const [touched, setTouched] = useState(false);
-  const parsed = value.trim() === "" ? null : parse(value);
-  const formatError = touched && parsed !== null && !parsed.ok ? invalidMessage : undefined;
+  const parsed = value.trim() === "" ? null : parseEuroToCents(value);
+  const formatError = touched && parsed !== null && !parsed.ok ? parsed.message : undefined;
   const message = error ?? formatError;
   const describedBy =
     [message ? `${inputId}-error` : null, hint ? `${inputId}-hint` : null]
@@ -78,11 +68,16 @@ export function MoneyInput({
           aria-describedby={describedBy}
           onChange={(event) => {
             const text = event.target.value;
-            const result = text.trim() === "" ? null : parse(text);
+            const result = text.trim() === "" ? null : parseEuroToCents(text);
             onValueChange(text, result && result.ok ? result.cents : null);
           }}
           onBlur={(event) => {
             setTouched(true);
+            // A valid amount is shown in its canonical form ("1.5" becomes "1,50").
+            if (parsed?.ok) {
+              const canonical = formatCents(parsed.cents);
+              if (canonical !== value) onValueChange(canonical, parsed.cents);
+            }
             onBlur?.(event);
           }}
         />

@@ -5,6 +5,7 @@ import { Check, Copy, Dices, Eye, EyeOff, Circle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { generateAccessCode, validateAccessCode, type AccessCodeSubject } from "@/lib/access-code";
 import { cn } from "@/lib/utils";
 
 export interface PolicyCheck {
@@ -23,35 +24,6 @@ export const DEFAULT_POLICY_CHECKS: readonly PolicyCheck[] = [
   },
 ];
 
-// No look-alike characters (0/O, 1/l/I) so a generated code can be read aloud or retyped.
-const GENERATED_ALPHABET = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-
-/** Uniform integer in [0, max) from `crypto` (rejection sampling, no modulo bias). */
-function randomInt(max: number): number {
-  const limit = 2 ** 32 - (2 ** 32 % max);
-  const buffer = new Uint32Array(1);
-  for (;;) {
-    crypto.getRandomValues(buffer);
-    const value = buffer[0] ?? 0;
-    if (value < limit) return value % max;
-  }
-}
-
-/** 16 random characters with at least one letter and one digit, from `crypto`. */
-export function generateAccessCode(length = 16): string {
-  const letters = GENERATED_ALPHABET.replace(/[0-9]/g, "");
-  const digits = GENERATED_ALPHABET.replace(/[^0-9]/g, "");
-  const pick = (alphabet: string) => alphabet.charAt(randomInt(alphabet.length));
-  const chars = [pick(letters), pick(digits)];
-  while (chars.length < length) chars.push(pick(GENERATED_ALPHABET));
-  // Fisher-Yates, so the guaranteed characters are not always first.
-  for (let i = chars.length - 1; i > 0; i -= 1) {
-    const j = randomInt(i + 1);
-    [chars[i], chars[j]] = [chars[j] as string, chars[i] as string];
-  }
-  return chars.join("");
-}
-
 export interface AccessCodeFieldProps {
   label: string;
   value: string;
@@ -61,10 +33,8 @@ export interface AccessCodeFieldProps {
   id?: string;
   name?: string;
   error?: string;
-  /** Replaces the default policy hints (T5 `lib/access-code.ts`). */
-  policyChecks?: readonly PolicyCheck[];
-  /** Replaces the default random generator. */
-  generate?: () => string;
+  /** Whom the code is for: codes containing their name or email are refused (`lib/access-code.ts`). */
+  subject?: AccessCodeSubject;
   disabled?: boolean;
   className?: string;
 }
@@ -73,7 +43,7 @@ export interface AccessCodeFieldProps {
  * Access code input. Password-manager friendly (`type=password`, `autocomplete` new-password /
  * current-password, a real `name`); paste is allowed; show/hide toggle; hints tell, with icon AND
  * text, which rule is met. "Genera" fills a strong code, reveals it and offers "Copia" (the code is
- * never stored by this component, nor in form drafts).
+ * shown once and never stored by this component, nor in form drafts).
  */
 export function AccessCodeField({
   label,
@@ -83,8 +53,7 @@ export function AccessCodeField({
   id,
   name = "accessCode",
   error,
-  policyChecks = DEFAULT_POLICY_CHECKS,
-  generate = generateAccessCode,
+  subject,
   disabled,
   className,
 }: AccessCodeFieldProps) {
@@ -93,6 +62,13 @@ export function AccessCodeField({
   const [visible, setVisible] = useState(false);
   const [copied, setCopied] = useState(false);
   const isNew = mode === "new";
+  // Length and letters+digits are shown as ticks; the weak-list / personal-data rules only speak
+  // once the basic ones hold, with the message of `lib/access-code.ts`.
+  const verdict = isNew && value ? validateAccessCode(value, subject) : null;
+  const extraHint =
+    verdict && !verdict.ok && (verdict.code === "weak" || verdict.code === "personal")
+      ? verdict.message
+      : null;
   const describedBy =
     [error ? `${inputId}-error` : null, isNew ? `${inputId}-policy` : null]
       .filter(Boolean)
@@ -148,7 +124,7 @@ export function AccessCodeField({
             id={`${inputId}-policy`}
             className="text-muted-foreground flex flex-col gap-1 text-sm"
           >
-            {policyChecks.map((check) => {
+            {DEFAULT_POLICY_CHECKS.map((check) => {
               const met = check.test(value);
               return (
                 <li
@@ -168,13 +144,18 @@ export function AccessCodeField({
               );
             })}
           </ul>
+          {extraHint ? (
+            <p role="status" className="text-warning text-sm">
+              {extraHint}
+            </p>
+          ) : null}
           <div className="flex flex-wrap gap-2">
             <Button
               type="button"
               variant="outline"
               disabled={disabled}
               onClick={() => {
-                onChange(generate());
+                onChange(generateAccessCode());
                 setVisible(true);
                 setCopied(false);
               }}

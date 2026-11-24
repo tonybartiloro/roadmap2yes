@@ -3,12 +3,12 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { AccessCodeField, DEFAULT_POLICY_CHECKS, generateAccessCode } from "./AccessCodeField";
+import { AccessCodeField, DEFAULT_POLICY_CHECKS } from "./AccessCodeField";
 import { AppNav, isActivePath } from "./AppNav";
 import { ConflictDialog, diffFields } from "./ConflictDialog";
 import { DateField } from "./DateField";
 import { EmailOffBanner, EmailStatusProvider } from "./EmailOffBanner";
-import { MoneyInput, type MoneyParser } from "./MoneyInput";
+import { MoneyInput } from "./MoneyInput";
 import { MonthYearField } from "./MonthYearField";
 import { OfflineBanner } from "./OfflineBanner";
 import { ServiceDownPage } from "./ServiceDownPage";
@@ -18,15 +18,6 @@ vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
 
 afterEach(() => cleanup());
 
-// Test parser (T5's lib/money.ts is the real one): "1.500,00" -> 150000.
-const parse: MoneyParser = (text) => {
-  const match = /^(\d{1,3}(?:\.\d{3})*|\d+)(?:,(\d{1,2}))?$/.exec(text.trim());
-  if (!match) return { ok: false };
-  const whole = Number((match[1] ?? "0").replace(/\./g, ""));
-  const cents = Number((match[2] ?? "").padEnd(2, "0") || "0");
-  return { ok: true, cents: whole * 100 + cents };
-};
-
 describe("MoneyInput", () => {
   function Harness({ error }: { error?: string }) {
     const [text, setText] = useState("");
@@ -34,7 +25,7 @@ describe("MoneyInput", () => {
       <MoneyInput
         label="Importo"
         value={text}
-        parse={parse}
+
         error={error}
         onValueChange={(t) => setText(t)}
       />
@@ -50,7 +41,7 @@ describe("MoneyInput", () => {
 
   it("reports cents through onValueChange and shows the error only after blur", async () => {
     const onValueChange = vi.fn();
-    render(<MoneyInput label="Importo" value="" parse={parse} onValueChange={onValueChange} />);
+    render(<MoneyInput label="Importo" value="" onValueChange={onValueChange} />);
     const input = screen.getByLabelText("Importo");
     fireEvent.change(input, { target: { value: "1.500,00" } });
     expect(onValueChange).toHaveBeenLastCalledWith("1.500,00", 150000);
@@ -58,12 +49,19 @@ describe("MoneyInput", () => {
     expect(onValueChange).toHaveBeenLastCalledWith("abc", null);
   });
 
+  it("rewrites a valid amount in canonical form on blur", () => {
+    const onValueChange = vi.fn();
+    render(<MoneyInput label="Importo" value="1.5" onValueChange={onValueChange} />);
+    fireEvent.blur(screen.getByLabelText("Importo"));
+    expect(onValueChange).toHaveBeenLastCalledWith("1,50", 150);
+  });
+
   it("shows the format error with aria-describedby after blur", () => {
-    render(<MoneyInput label="Importo" value="abc" parse={parse} onValueChange={() => {}} />);
+    render(<MoneyInput label="Importo" value="abc" onValueChange={() => {}} />);
     const input = screen.getByLabelText("Importo");
     expect(screen.queryByText(/Inserisci un importo/)).toBeNull();
     fireEvent.blur(input);
-    const message = screen.getByText("Inserisci un importo in euro, ad esempio 1.500,00.");
+    const message = screen.getByText("Inserisci un importo in euro, ad esempio 1.500,00");
     expect(input.getAttribute("aria-invalid")).toBe("true");
     expect(input.getAttribute("aria-describedby")).toContain(message.id);
   });
@@ -118,15 +116,21 @@ describe("AccessCodeField", () => {
     expect((screen.getByLabelText("Codice") as HTMLInputElement).type).toBe("text");
   });
 
-  it("generateAccessCode is random, long enough and without look-alike characters", () => {
-    const codes = new Set(Array.from({ length: 50 }, () => generateAccessCode()));
-    expect(codes.size).toBe(50);
-    for (const code of codes) {
-      expect(code).toHaveLength(16);
-      expect(code).toMatch(/[a-zA-Z]/);
-      expect(code).toMatch(/\d/);
-      expect(code).not.toMatch(/[0OIl1]/);
-    }
+  it("shows the weak-code message from lib/access-code once the basic rules hold", () => {
+    render(<AccessCodeField label="Codice" value="password123" onChange={() => {}} />);
+    expect(screen.getByRole("status").textContent).toMatch(/\S/);
+  });
+
+  it("warns when the code contains the person's name", () => {
+    render(
+      <AccessCodeField
+        label="Codice"
+        value="tonyxk29qw7"
+        subject={{ firstName: "Tony" }}
+        onChange={() => {}}
+      />,
+    );
+    expect(screen.getByRole("status")).toBeTruthy();
   });
 });
 

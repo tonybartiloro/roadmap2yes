@@ -1,28 +1,7 @@
 import { describe, expect, it } from "vitest";
-import {
-  formatCents,
-  formatCentsCompact,
-  formatDayMonth,
-  formatElapsed,
-  formatLongDate,
-  formatShortDate,
-  plural,
-} from "./format";
+import { formatDayMonth, formatElapsed, formatLongDate, formatShortDate, plural } from "./format";
 
 describe("format helpers (Italian, no floating point)", () => {
-  it("formats cents", () => {
-    expect(formatCents(150000)).toBe("€ 1.500,00");
-    expect(formatCents(5)).toBe("€ 0,05");
-    expect(formatCents(123456789)).toBe("€ 1.234.567,89");
-    expect(formatCents(0)).toBe("€ 0,00");
-    expect(formatCentsCompact(120000)).toBe("€ 1.200");
-    expect(formatCentsCompact(120050)).toBe("€ 1.200,50");
-  });
-
-  it("rejects non-integer cents", () => {
-    expect(() => formatCents(10.5)).toThrow(RangeError);
-  });
-
   it("formats dates", () => {
     expect(formatLongDate("2027-09-03")).toBe("3 settembre 2027");
     expect(formatShortDate("2028-05-14")).toBe("14 mag 2028");

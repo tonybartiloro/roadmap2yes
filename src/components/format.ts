@@ -48,25 +48,6 @@ export function formatDayMonth(date: PlainDate): string {
   return `${day} ${MONTHS_SHORT[month - 1]}`;
 }
 
-/**
- * "€ 1.500,00" from integer cents, without going through floating point. Negative amounts keep
- * the sign in front of the euro sign ("-€ 12,00"); callers should avoid showing negatives.
- */
-export function formatCents(cents: number): string {
-  if (!Number.isSafeInteger(cents)) throw new RangeError("Amount must be an integer of cents");
-  const abs = Math.abs(cents);
-  const whole = Math.floor(abs / 100)
-    .toString()
-    .replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-  const decimals = (abs % 100).toString().padStart(2, "0");
-  return `${cents < 0 ? "-" : ""}€ ${whole},${decimals}`;
-}
-
-/** Whole euros when the amount has no cents ("€ 1.200"), else with cents. */
-export function formatCentsCompact(cents: number): string {
-  return cents % 100 === 0 ? formatCents(cents).replace(/,00$/, "") : formatCents(cents);
-}
-
 /** "meno di un minuto", "2 minuti", "1 ora", "3 ore", "1 giorno", "4 giorni". */
 export function formatElapsed(from: Date, now: Date): string {
   const minutes = Math.max(0, Math.floor((now.getTime() - from.getTime()) / 60_000));

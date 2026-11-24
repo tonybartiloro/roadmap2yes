@@ -1,7 +1,7 @@
 import { TriangleAlert } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
-import { formatCentsCompact } from "./format";
+import { formatEuro } from "@/lib/money";
 
 /**
  * Bar with its text equivalent (design §8: bars never carry meaning alone). `value` and `total`
@@ -25,8 +25,8 @@ export function BudgetBar({
   const percent = total > 0 ? Math.min(100, Math.round((value / total) * 100)) : 0;
   const text =
     total > 0
-      ? `${valueLabel} ${formatCentsCompact(value)} di ${formatCentsCompact(total)}`
-      : `${valueLabel} ${formatCentsCompact(value)}`;
+      ? `${valueLabel} ${formatEuro(value)} di ${formatEuro(total)}`
+      : `${valueLabel} ${formatEuro(value)}`;
   return (
     <div data-slot="budget-bar" className={cn("flex flex-col gap-1.5", className)}>
       <div className="flex items-baseline justify-between gap-3">
@@ -41,7 +41,7 @@ export function BudgetBar({
       {over > 0 ? (
         <p className="text-warning flex items-center gap-1.5 text-sm">
           <TriangleAlert aria-hidden className="size-4 shrink-0" />
-          <span className="tabular-nums">Sei oltre di {formatCentsCompact(over)}.</span>
+          <span className="tabular-nums">Sei oltre di {formatEuro(over)}.</span>
         </p>
       ) : null}
     </div>
