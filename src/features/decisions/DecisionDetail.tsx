@@ -77,7 +77,13 @@ export function DecisionDetail({ view }: { view: DecisionDetailView }) {
 
   const refresh = () => router.refresh();
   const guardStale = <T,>(result: ActionResult<T>): ActionResult<T> => {
-    if (!result.ok && STALE_CODES.has(result.code)) refresh();
+    if (!result.ok && STALE_CODES.has(result.code)) {
+      // The choice changed under us: close the sheets, say so, and show the fresh page.
+      toast.error(result.message);
+      setChooseFor(null);
+      setReopening(false);
+      refresh();
+    }
     return result;
   };
 
@@ -118,9 +124,9 @@ export function DecisionDetail({ view }: { view: DecisionDetailView }) {
   }
 
   async function setReference(option: OptionView): Promise<ActionResult<unknown>> {
-    const previous = view.manualReferenceId;
     const result = await setReferenceAction({ optionId: option.id });
     if (result.ok) {
+      const previous = result.data.previousOptionId;
       const when = result.data.referenceDate
         ? formatShortDate(result.data.referenceDate)
         : "questa data";
@@ -132,7 +138,7 @@ export function DecisionDetail({ view }: { view: DecisionDetailView }) {
     return result;
   }
 
-  async function backToAutomatic(option: OptionView) {
+  async function backToAutomatic() {
     const result = await setReferenceAction({ optionId: null });
     if (!result.ok) {
       toast.error(result.message);
@@ -143,7 +149,7 @@ export function DecisionDetail({ view }: { view: DecisionDetailView }) {
       : "la data più vicina";
     toast(`Il riferimento ora è il ${when} (il più vicino).`, {
       duration: UNDO_MS,
-      action: { label: "Annulla", onClick: () => undoReference(option.id) },
+      action: { label: "Annulla", onClick: () => undoReference(result.data.previousOptionId) },
     });
   }
 
@@ -223,7 +229,7 @@ export function DecisionDetail({ view }: { view: DecisionDetailView }) {
             </>
           ) : null}
           {canSetReference && isReference && view.reference?.source === "manual" ? (
-            <Button type="button" variant="outline" onClick={() => backToAutomatic(option)}>
+            <Button type="button" variant="outline" onClick={() => backToAutomatic()}>
               Torna automatico (il più vicino)
             </Button>
           ) : null}

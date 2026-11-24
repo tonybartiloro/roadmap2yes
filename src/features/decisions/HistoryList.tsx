@@ -14,7 +14,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { describeEvent, formatEventTime } from "./model";
+import { describeEvent, formatEventTime, NOTE_MAX } from "./model";
 import { Textarea } from "./form-bits";
 import type { ActionResult, DecisionEventKind, EventView } from "./types";
 
@@ -28,8 +28,6 @@ const ICONS: Record<DecisionEventKind, LucideIcon> = {
   reference_set: Pin,
   reference_auto: Undo2,
 };
-
-export const NOTE_MAX = 1000;
 
 function AddNoteForm({ onAddNote }: { onAddNote: (note: string) => Promise<ActionResult> }) {
   const [note, setNote] = useState("");

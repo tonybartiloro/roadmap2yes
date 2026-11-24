@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { isPlainDate } from "@/lib/dates/plain-date";
+import { NOTE_MAX, REASON_MAX } from "./model";
 
 /**
  * Shape of what the client sends to the server actions. The database checks stay the real
@@ -37,8 +38,12 @@ export const schemas = {
     expectedVersion: version,
     exactDate: plainDate.nullable().optional(),
   }),
-  reopen: z.object({ decisionId: uuid, reason: z.string().max(5000), expectedVersion: version }),
-  note: z.object({ decisionId: uuid, note: z.string().max(5000) }),
+  reopen: z.object({
+    decisionId: uuid,
+    reason: z.string().max(REASON_MAX),
+    expectedVersion: version,
+  }),
+  note: z.object({ decisionId: uuid, note: z.string().max(NOTE_MAX) }),
   reference: z.object({ optionId: uuid.nullable() }),
   addOption: z.object({
     decisionId: uuid,

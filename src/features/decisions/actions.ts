@@ -27,8 +27,19 @@ async function session(): Promise<{ db: Db; userId: string } | null> {
 const expired = { ok: false, code: "session", message: SESSION_EXPIRED } as const;
 const invalid = { ok: false, code: "invalid", message: GENERIC_ERROR } as const;
 
-function refreshed<T extends { ok: boolean }>(result: T): T {
-  if (result.ok) revalidatePath("/", "layout");
+/**
+ * Only on success. `scelte`: what only Scelte shows (reactions, notes, option text).
+ * `wide`: also Percorso and Home, because the reference or the date options changed.
+ */
+function refreshed<T extends { ok: boolean }>(result: T, scope: "scelte" | "wide" = "scelte"): T {
+  if (result.ok) {
+    revalidatePath("/scelte");
+    revalidatePath("/scelte/[key]", "page");
+    if (scope === "wide") {
+      revalidatePath("/percorso");
+      revalidatePath("/");
+    }
+  }
   return result;
 }
 
@@ -39,7 +50,7 @@ export async function chooseOptionAction(
   if (!parsed.success) return invalid;
   const ctx = await session();
   if (!ctx) return expired;
-  return refreshed(await data.chooseOption(ctx.db, ctx.userId, parsed.data));
+  return refreshed(await data.chooseOption(ctx.db, ctx.userId, parsed.data), "wide");
 }
 
 export async function reopenDecisionAction(input: unknown): Promise<ActionResult> {
@@ -47,7 +58,7 @@ export async function reopenDecisionAction(input: unknown): Promise<ActionResult
   if (!parsed.success) return invalid;
   const ctx = await session();
   if (!ctx) return expired;
-  return refreshed(await data.reopenDecision(ctx.db, ctx.userId, parsed.data));
+  return refreshed(await data.reopenDecision(ctx.db, ctx.userId, parsed.data), "wide");
 }
 
 export async function addNoteAction(input: unknown): Promise<ActionResult> {
@@ -63,7 +74,7 @@ export async function setReferenceAction(input: unknown): Promise<ActionResult<R
   if (!parsed.success) return invalid;
   const ctx = await session();
   if (!ctx) return expired;
-  return refreshed(await data.setReference(ctx.db, parsed.data.optionId));
+  return refreshed(await data.setReference(ctx.db, parsed.data.optionId), "wide");
 }
 
 export async function addOptionAction(input: unknown): Promise<ActionResult<{ optionId: string }>> {
@@ -71,7 +82,7 @@ export async function addOptionAction(input: unknown): Promise<ActionResult<{ op
   if (!parsed.success) return invalid;
   const ctx = await session();
   if (!ctx) return expired;
-  return refreshed(await data.addOption(ctx.db, parsed.data));
+  return refreshed(await data.addOption(ctx.db, parsed.data), "wide");
 }
 
 export async function updateOptionAction(input: unknown): Promise<VersionedResult> {
@@ -87,7 +98,7 @@ export async function updateScenarioAction(input: unknown): Promise<VersionedRes
   if (!parsed.success) return invalid;
   const ctx = await session();
   if (!ctx) return expired;
-  return refreshed(await data.updateScenario(ctx.db, ctx.userId, parsed.data));
+  return refreshed(await data.updateScenario(ctx.db, ctx.userId, parsed.data), "wide");
 }
 
 export async function removeOptionAction(input: unknown): Promise<VersionedResult> {
@@ -95,7 +106,7 @@ export async function removeOptionAction(input: unknown): Promise<VersionedResul
   if (!parsed.success) return invalid;
   const ctx = await session();
   if (!ctx) return expired;
-  return refreshed(await data.removeOption(ctx.db, ctx.userId, parsed.data));
+  return refreshed(await data.removeOption(ctx.db, ctx.userId, parsed.data), "wide");
 }
 
 export async function restoreOptionAction(input: unknown): Promise<VersionedResult> {
@@ -103,7 +114,7 @@ export async function restoreOptionAction(input: unknown): Promise<VersionedResu
   if (!parsed.success) return invalid;
   const ctx = await session();
   if (!ctx) return expired;
-  return refreshed(await data.restoreOption(ctx.db, ctx.userId, parsed.data));
+  return refreshed(await data.restoreOption(ctx.db, ctx.userId, parsed.data), "wide");
 }
 
 export async function setReactionAction(input: unknown): Promise<ActionResult> {

@@ -11,10 +11,8 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Textarea } from "./form-bits";
-import { mapDbError } from "./model";
+import { mapDbError, REASON_MAX } from "./model";
 import type { ActionResult } from "./types";
-
-export const REASON_MAX = 500;
 
 /**
  * Reopening a taken decision with a mandatory reason (AC19): counter, inline error tied to the

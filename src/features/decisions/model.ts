@@ -34,6 +34,10 @@ export const EARLIER_THAN_DESIRED =
 
 export const SYSTEM_ACTOR = "Il sistema";
 
+/** Limits of the RPCs (`reopen_decision`, `add_decision_note`), shared by forms and zod. */
+export const REASON_MAX = 500;
+export const NOTE_MAX = 1000;
+
 // ---------------------------------------------------------------------------------------------
 // Database error codes (T8 contracts) to Italian messages
 // ---------------------------------------------------------------------------------------------
@@ -483,7 +487,10 @@ export function buildDetailView(raw: RawDecisionDetail): DecisionDetailView {
     raw.locationOptions.filter((o) => !o.deleted_at).map((o) => [o.id, o.title]),
   );
   const scenarioByOption = new Map(raw.scenarios.map((s) => [s.option_id, s]));
-  const live = raw.options.filter((o) => !o.deleted_at);
+  // A date option without its scenario is a leftover of a failed creation: never counted.
+  const live = raw.options.filter(
+    (o) => !o.deleted_at && (decision.type !== "date" || scenarioByOption.has(o.id)),
+  );
 
   const options: OptionView[] = live
     .map((row): OptionView => {
@@ -644,7 +651,12 @@ export function buildListItems(raw: {
   return [...raw.decisions]
     .sort((a, b) => order(a.key) - order(b.key) || a.created_at.localeCompare(b.created_at))
     .map((decision) => {
-      const options = raw.options.filter((o) => o.decision_id === decision.id && !o.deleted_at);
+      const options = raw.options.filter(
+        (o) =>
+          o.decision_id === decision.id &&
+          !o.deleted_at &&
+          (decision.type !== "date" || raw.scenarios.some((s) => s.option_id === o.id)),
+      );
       const chosen = decision.chosen_option_id
         ? options.find((o) => o.id === decision.chosen_option_id)
         : undefined;

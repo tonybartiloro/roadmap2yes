@@ -401,6 +401,16 @@ describe("buildDetailView: reference (AC24, D28)", () => {
     expect(view.locationChoices).toEqual([{ id: "loc", title: "Mamma Rosa" }]);
   });
 
+  it("ignores a date option left without scenario by a failed creation", () => {
+    const view = buildDetailView(
+      raw({
+        options: [option({ id: "a" }), option({ id: "orphan" })],
+        scenarios: [scenario("a", "2027-09-03")],
+      }),
+    );
+    expect(view.options.map((o) => o.id)).toEqual(["a"]);
+  });
+
   it("shows both partners' reactions, flagging mine", () => {
     const view = buildDetailView(
       raw({
@@ -541,7 +551,10 @@ describe("buildListItems", () => {
         { id: "l1", decision_id: "d-loc", title: "L1", deleted_at: null },
         { id: "l2", decision_id: "d-loc", title: "L2", deleted_at: stamp },
       ],
-      scenarios: [{ option_id: "b", kind: "fixed", date_from: "2028-05-14", date_to: null }],
+      scenarios: [
+        { option_id: "a", kind: "fixed", date_from: "2027-09-03", date_to: null },
+        { option_id: "b", kind: "fixed", date_from: "2028-05-14", date_to: null },
+      ],
       events: [],
     });
     expect(items.map((i) => i.key)).toEqual(["date", "location"]);

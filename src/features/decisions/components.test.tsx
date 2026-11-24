@@ -482,7 +482,14 @@ describe("DecisionDetail: date decision and reference actions (AC24, D28)", () =
   it("sets the reference after confirmation and offers Annulla for at least 8 s that restores the previous one", async () => {
     mocks.actions.setReferenceAction.mockResolvedValue({
       ok: true,
-      data: { optionId: "b", referenceDate: "2028-05-01", status: "provisional", source: "manual" },
+      data: {
+        optionId: "b",
+        referenceDate: "2028-05-01",
+        status: "provisional",
+        source: "manual",
+        // what the server saw just before writing (the partner's manual choice), not the render
+        previousOptionId: "c",
+      },
     });
     render(<DecisionDetail view={dateView()} />);
     await userEvent.click(screen.getByRole("button", { name: "Imposta come riferimento" }));
@@ -502,7 +509,7 @@ describe("DecisionDetail: date decision and reference actions (AC24, D28)", () =
 
     mocks.actions.setReferenceAction.mockResolvedValue({ ok: true, data: {} });
     await options.action.onClick();
-    expect(mocks.actions.setReferenceAction).toHaveBeenLastCalledWith({ optionId: null });
+    expect(mocks.actions.setReferenceAction).toHaveBeenLastCalledWith({ optionId: "c" });
   });
 
   it("a manual reference offers 'Torna automatico' and Annulla goes back to it", async () => {
@@ -513,6 +520,7 @@ describe("DecisionDetail: date decision and reference actions (AC24, D28)", () =
         referenceDate: "2027-09-03",
         status: "provisional",
         source: "automatic",
+        previousOptionId: "b",
       },
     });
     const view = dateView({
@@ -621,7 +629,9 @@ describe("DecisionDetail: date decision and reference actions (AC24, D28)", () =
       within(screen.getByRole("dialog")).getByRole("button", { name: "Conferma la scelta" }),
     );
     await waitFor(() => expect(mocks.refresh).toHaveBeenCalled());
-    expect(screen.getByText("Questa scelta è già stata presa.")).toBeTruthy();
+    // the sheet for a choice that no longer applies is gone; the message is toasted
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(mocks.toast.error).toHaveBeenCalledWith("Questa scelta è già stata presa.");
   });
 
   it("'Confronta 2' needs two ticked options and then shows the comparison", async () => {

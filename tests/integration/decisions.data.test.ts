@@ -222,6 +222,10 @@ describe("Scelte data layer", () => {
     const set = await setReference(wedding.founderClient, bId);
     expect(set).toMatchObject({
       ok: true,
+      data: { previousOptionId: null },
+    });
+    expect(set).toMatchObject({
+      ok: true,
       data: { optionId: bId, status: "provisional", source: "manual", referenceDate: "2028-05-01" },
     });
     let view = await detail("date");

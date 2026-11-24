@@ -272,6 +272,8 @@ export interface ReferenceChange {
   referenceDate: PlainDate | null;
   status: "provisional" | "definitive" | null;
   source: "chosen" | "manual" | "automatic" | null;
+  /** The manual reference this call replaced (null = it was automatic): what Annulla restores. */
+  previousOptionId: string | null;
 }
 
 /** `null` returns to the automatic reference (the nearest). */
@@ -279,6 +281,12 @@ export async function setReference(
   db: Db,
   optionId: string | null,
 ): Promise<ActionResult<ReferenceChange>> {
+  // Read just before the write so Annulla restores what THIS call replaced, not a stale render.
+  const before = await db
+    .from("weddings")
+    .select("manual_reference_option_id")
+    .limit(1)
+    .maybeSingle();
   const { data, error } = await db.rpc(
     "set_reference_scenario",
     optionId ? { p_option_id: optionId } : {},
@@ -300,6 +308,7 @@ export async function setReference(
         row.source === "chosen" || row.source === "manual" || row.source === "automatic"
           ? row.source
           : null,
+      previousOptionId: before.data?.manual_reference_option_id ?? null,
     },
   };
 }
@@ -368,10 +377,23 @@ export async function addOption(
       location_option_id: input.scenario.locationOptionId,
     });
     if (scenario.error) {
-      await db
+      const undo = await db
         .from("decision_options")
         .update({ deleted_at: new Date().toISOString() })
         .eq("id", optionId);
+      if (undo.error) {
+        // No data in the log: only the codes. The half date stays invisible (the views skip a
+        // date without scenario) but the user is told to retry.
+        console.error("decisions.addOption: compensation failed", {
+          insert: scenario.error.code,
+          undo: undo.error.code,
+        });
+        return {
+          ok: false,
+          code: "compensation_failed",
+          message: "Non sono riuscito a completare la data. Riprova tra un attimo.",
+        };
+      }
       return failure(scenario.error);
     }
   }
@@ -559,5 +581,14 @@ export async function setReaction(
     user_id: userId,
     reaction: input.reaction,
   });
+  if (inserted.error?.code === "23505") {
+    // A concurrent tap inserted first: the row exists now, update it.
+    const retry = await db
+      .from("option_reactions")
+      .update({ reaction: input.reaction })
+      .eq("option_id", input.optionId)
+      .eq("user_id", userId);
+    return retry.error ? failure(retry.error) : { ok: true, data: undefined };
+  }
   return inserted.error ? failure(inserted.error) : { ok: true, data: undefined };
 }
