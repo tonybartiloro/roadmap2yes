@@ -480,3 +480,11 @@ Developer's answers to the 4 remaining questions: 1. OK (min 10 characters, lett
   - Non-blocking: a direct visit to /servizio still tries the DB theme lookup, capped at 1.5 s.
 - Integrated: 529 unit tests, build and check:fonts green.
 - In progress: T2 (blocked on a permission prompt the developer must answer) and T6.
+
+## F3 — T6 done and reviewed — 2026-11-24
+- T6 (6c7793b, fixes d1085f3): email layer, NullSender when off, SMTP (local/CI only), Resend via fetch, HMAC unsubscribe (secret ≥32 chars), Italian templates, link-only recovery template, mailbox helper. 577 unit tests green.
+- code-5: round 1 had 4 should and 5 could, round 2 approved.
+- Routed:
+  - T7a: wire `[auth.email.template.recovery]` + `site_url` in config.toml;
+  - T16: `Referrer-Policy: no-referrer` on `/email/disattiva` and no query logging; route reads `tipo` and `t`, GET confirms, POST changes.
+- `.env.example`: fake EMAIL_LINK_SECRET lengthened (local `.env.local` copies need updating).

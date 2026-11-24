@@ -29,3 +29,22 @@ AC9 ✅ (`senders.test.ts`: NullSender, transport selection) · AC52 ✅ at laye
 ## Questions for the developer
 1. Was the OTP in the recovery template intentional (REV-1)? If so, which screen consumes it?
 2. Does `RESEND_API_KEY`/`EMAIL_LINK_SECRET` have a documented rotation story in `.env.example`/runbook?
+
+## Round 2
+
+Verdict: approved. Checked d1085f3 and ran `npx vitest run src/lib/email`: 5 files, 48 tests pass.
+
+| ID | Status | Note |
+|---|---|---|
+| REV-1 | closed ✅ | OTP removed; link-only copy; `recovery-template.test.ts` pins `TokenHash`, `type=recovery`, no `.Token`, no `ConfirmationURL`. |
+| REV-2 | closed ✅ | 32-char minimum in sign and verify; tests for both. |
+| REV-3 | closed ✅ | `safeUrl` on footer links; header omitted for invalid or `<>`/whitespace URLs; test with `javascript:` and CRLF. |
+| REV-4 | closed ✅ | Status table (400/401/422/429/500/503), timeout signal, malformed 2xx body. |
+| REV-5 | closed ✅ | 409 retryable only for `concurrent_idempotent_requests`; tested. |
+| REV-6 | closed ✅ | `smtp` refused on `VERCEL_ENV=production`; tested. |
+| REV-7 | closed ✅ | `isSingleAddress` in both senders; tested. |
+| REV-8 | closed (routed to T16) | Referrer-Policy and no query logging belong to that route. |
+| REV-9 | closed (template test done; `config.toml` wiring routed to T7a) | |
+| Rotation note | closed ✅ | Documented in `unsubscribe-token.ts`. |
+
+Answers to the questions: the OTP was removed, and the rotation story is documented in code.
