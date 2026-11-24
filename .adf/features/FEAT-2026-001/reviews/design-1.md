@@ -100,3 +100,12 @@ Totals: 0 blocking, 5 should, 9 nit. Everything else checked is OK.
 | DES-36 | Onboarding summary and Impostazioni use `DateScenarioList`, so the T3 `scenarioTitle` fallback applies; the summary no longer builds its own raw-date title. |
 | DES-40 | Soft warning with icon is the T3 `DateField` fix; the period variant in `ScenarioEditor.tsx` now has the same warning icon plus text (test `ScenarioEditor.test.tsx`). Closed. |
 | DES-42 | Fixed: "Scegli l'aspetto della tua app" (and "Quando vorresti sposarti?"); links and texts now say "Altro > Invito al partner". |
+
+## Responses (T11, developer)
+| ID | Response |
+|---|---|
+| DES-31 | Fixed: banner compacted (tighter padding and lines, Esci + Imposta come riferimento on one row, third action behind an icon button labelled "Più azioni" instead of "Altro"). The banner carries `data-preview-banner`; T3 CSS (14rem, 8rem from md) is above the new height. |
+| DES-36 | Fixed in the Percorso picker: `scenarioTitle` fallback ("Data fissa"/"Periodo") with the date always on the line below. |
+| DES-37 | Partly: the "Il più vicino…" hint moved into the "Cos'è?" popover; "Filtri" and "Miei/Di/Tutti" already share one row. The picker keeps its own row at 360 (full-width button). |
+| DES-41 | Fixed: assignee radios sorted by slot (Entrambi, A, B). |
+| DES-43 | Not changed (optional): dashed corners kept; revisit in the polish pass. |

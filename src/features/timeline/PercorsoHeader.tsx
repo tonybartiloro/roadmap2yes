@@ -14,7 +14,7 @@ import { ScenarioPicker } from "./ScenarioPicker";
 import type { PercorsoView } from "./view";
 
 /** The "Cos'è?" help next to the badge (design §3.8): four concepts in plain words. */
-function ReferenceHelp() {
+function ReferenceHelp({ nearest }: { nearest: boolean }) {
   return (
     <Popover.Root>
       <Popover.Trigger asChild>
@@ -49,6 +49,9 @@ function ReferenceHelp() {
               </dd>
             </div>
           </dl>
+          {nearest ? (
+            <p className="text-muted-foreground mt-2 text-sm">{COPY.nearestExplanation}</p>
+          ) : null}
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>
@@ -102,12 +105,10 @@ export function PercorsoHeader({
               setBy={reference.source === "manual" ? reference.setByName : null}
               locationName={reference.scenario.locationText}
             />
-            <ReferenceHelp />
+            <ReferenceHelp nearest={reference.source === "automatic" && view.pickerAvailable} />
           </div>
           {view.decisionTaken ? (
             <p className="text-muted-foreground text-sm">{COPY.decisionTakenExplanation}</p>
-          ) : reference.source === "automatic" && view.pickerAvailable ? (
-            <p className="text-muted-foreground text-sm">{COPY.nearestExplanation}</p>
           ) : null}
         </div>
       ) : (

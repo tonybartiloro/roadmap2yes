@@ -484,6 +484,8 @@ describe("scenario selector and preview (AC32)", () => {
     renderScreen(withTasks, { previewId: "s-far" });
     const banner = screen.getByTestId("preview-banner");
     expect(banner.getAttribute("role")).toBe("status");
+    // globals.css keys the scroll padding on this attribute (WCAG 2.4.11).
+    expect(banner.hasAttribute("data-preview-banner")).toBe(true);
     expect(banner.textContent).toContain("Anteprima: 3 set 2027 — nulla è salvato");
     expect(banner.textContent).toContain("Villa Rossi");
     expect(screen.getByTestId("preview-changed").textContent).toBe(

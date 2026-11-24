@@ -24,7 +24,9 @@ export function AssigneeField({
   const labelId = `${groupId}-label`;
   const options: { value: Assignee; label: string }[] = [
     { value: "both", label: "Entrambi" },
-    ...partners.map((p) => ({ value: p.slot as Assignee, label: assigneeName(partners, p.slot) })),
+    ...[...partners]
+      .sort((x, y) => x.slot.localeCompare(y.slot))
+      .map((p) => ({ value: p.slot as Assignee, label: assigneeName(partners, p.slot) })),
   ];
   return (
     <div className="flex flex-col gap-2" data-testid="assignee-field">

@@ -4,6 +4,7 @@ import { useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Popover } from "radix-ui";
 import { CalendarDays, ChevronDown, MapPin } from "lucide-react";
+import { scenarioTitle } from "@/components/DateScenarioList";
 import { ReferenceBadge } from "@/components/ReferenceBadge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -65,8 +66,15 @@ function PickerList({
             htmlFor={`${groupId}-${scenario.optionId}`}
             className="flex flex-1 flex-col gap-1 py-1 text-base font-normal"
           >
-            <span className="font-semibold">{scenario.label || scenario.dateText}</span>
-            {scenario.label ? <span className="tabular-nums">{scenario.dateText}</span> : null}
+            <span className="font-semibold">
+              {scenarioTitle({
+                id: scenario.optionId,
+                label: scenario.label,
+                kind: scenario.kind,
+                dateFrom: scenario.dateFrom,
+              })}
+            </span>
+            <span className="tabular-nums">{scenario.dateText}</span>
             {scenario.locationText ? (
               <span className="text-muted-foreground inline-flex items-center gap-1 text-sm">
                 <MapPin aria-hidden className="size-4" />
