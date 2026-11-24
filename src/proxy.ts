@@ -20,6 +20,9 @@ import {
 /** Request header set on the outage rewrite to `/servizio` (read by `themes/server.ts`). */
 const BACKEND_HEADER = "x-r2y-backend";
 
+/** Total time allowed to the backend per proxied request (claims, refresh, guard lookups each). */
+const BACKEND_TIMEOUT_MS = 3000;
+
 const NO_REFERRER_PREFIXES = ["/invito", "/auth", "/email"];
 
 function referrerPolicyFor(pathname: string): string {
@@ -73,13 +76,30 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   const forwarded = new Headers(request.headers);
   // `x-r2y-backend` is proxy-owned (tells the root layout to skip the DB theme lookup on the
   // service page): never trust one sent by a client.
-  forwarded.delete(BACKEND_HEADER);
+  // EXCEPT on /servizio itself: the outage rewrite runs the proxy a second time on that path and the
+  // header set by the first pass must survive (it only skips a DB theme lookup: harmless if forged).
+  const isServicePage = pathname === "/servizio";
+  if (!isServicePage) forwarded.delete(BACKEND_HEADER);
 
   let claims: GuardClaims | null = null;
   let backend: BackendStatus = "ok";
 
   const { url, publishableKey } = readSupabasePublicConfig();
+  const originalCookie = forwarded.get("cookie");
+  // Every Supabase call of this request (claims, refresh, guard lookups) is bounded: a Vercel
+  // function dies at 10 s, and auth-js retries a refused connection for ~50 s on its own.
+  const abort = new AbortController();
+  const boundedFetch: typeof fetch = (input, init) =>
+    fetch(input, {
+      ...init,
+      signal: AbortSignal.any(
+        [abort.signal, AbortSignal.timeout(BACKEND_TIMEOUT_MS), init?.signal].filter(
+          (s): s is AbortSignal => Boolean(s),
+        ),
+      ),
+    });
   const supabase = createServerClient(url, publishableKey, {
+    global: { fetch: boundedFetch },
     cookieOptions: authCookieOptions(),
     cookies: {
       getAll() {
@@ -96,19 +116,40 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
     },
   });
 
-  try {
-    const { data, error } = await supabase.auth.getClaims();
-    if (error) {
+  // The service page needs no session: asking the (down) backend again would cost the timeout twice.
+  if (!isServicePage) {
+    try {
+      // Total cap on top of the per-call timeout: the retries inside auth-js cannot outlive it.
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const capped = new Promise<never>((_, reject) => {
+        timer = setTimeout(() => {
+          abort.abort();
+          reject(Object.assign(new Error("timeout"), { name: "TimeoutError" }));
+        }, BACKEND_TIMEOUT_MS);
+      });
+      const { data, error } = await Promise.race([supabase.auth.getClaims(), capped]).finally(() =>
+        clearTimeout(timer),
+      );
+      if (error) {
+        const kind = classifyDbError(error);
+        if (kind) backend = kind;
+        // Any other auth error (missing/invalid session) means "not signed in".
+      } else if (data?.claims) {
+        claims = data.claims as GuardClaims;
+      }
+    } catch (error) {
       const kind = classifyDbError(error);
       if (kind) backend = kind;
-      // Any other auth error (missing/invalid session) means "not signed in".
-    } else if (data?.claims) {
-      claims = data.claims as GuardClaims;
+      // Unknown failure: fail closed as "not signed in" (never expose private pages).
     }
-  } catch (error) {
-    const kind = classifyDbError(error);
-    if (kind) backend = kind;
-    // Unknown failure: fail closed as "not signed in" (never expose private pages).
+  }
+
+  if (backend !== "ok") {
+    // An outage is not a logout: a failed refresh makes auth-js drop the session (e.g. on a 540),
+    // and those cookie deletions must never reach the browser (the person is still signed in).
+    cookiesToSet.length = 0;
+    if (originalCookie === null) forwarded.delete("cookie");
+    else forwarded.set("cookie", originalCookie);
   }
 
   const decision = await evaluateGuards({ pathname, searchParams, claims, backend, supabase });

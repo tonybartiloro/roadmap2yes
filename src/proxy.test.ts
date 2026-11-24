@@ -38,6 +38,85 @@ describe("proxy: session cookies", () => {
   });
 });
 
+describe("proxy: outages (QA-7, QA-8, AC39)", () => {
+  type Opts = {
+    cookies: { setAll(list: { name: string; value: string; options?: object }[]): void };
+  };
+
+  it("a backend that never answers is cut at the timeout and reported as unreachable", async () => {
+    vi.useFakeTimers();
+    try {
+      getClaims.mockImplementation(() => new Promise(() => undefined));
+      const pending = proxy(request("/percorso"));
+      await vi.advanceTimersByTimeAsync(3100);
+      await pending;
+      expect(evaluateGuards).toHaveBeenCalledWith(
+        expect.objectContaining({ claims: null, backend: "unreachable" }),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("the service page does not ask the backend again, and keeps the proxy-owned backend header", async () => {
+    await proxy(request("/servizio?motivo=unreachable"));
+    expect(getClaims).not.toHaveBeenCalled();
+    const outage = new NextRequest(new URL("/servizio?motivo=paused", "http://localhost:3000"), {
+      headers: { "x-r2y-backend": "paused" },
+    });
+    evaluateGuards.mockResolvedValue({ action: "next" });
+    const response = await proxy(outage);
+    expect(response.headers.get("x-middleware-request-x-r2y-backend")).toBe("paused");
+  });
+
+  it("a client-sent backend header is still stripped on every other page", async () => {
+    const forged = new NextRequest(new URL("/percorso", "http://localhost:3000"), {
+      headers: { "x-r2y-backend": "paused" },
+    });
+    const response = await proxy(forged);
+    expect(response.headers.get("x-middleware-request-x-r2y-backend")).toBeNull();
+  });
+
+  it("hands the client a fetch with a timeout, so no single call can hang", async () => {
+    const { createServerClient } = await import("@supabase/ssr");
+    vi.mocked(createServerClient).mockClear();
+    await proxy(request("/percorso"));
+    const options = vi.mocked(createServerClient).mock.calls[0]?.[2] as {
+      global?: { fetch?: unknown };
+    };
+    expect(typeof options.global?.fetch).toBe("function");
+  });
+
+  it("never sends cookie deletions to the browser when the failure is an outage", async () => {
+    const { createServerClient } = await import("@supabase/ssr");
+    vi.mocked(createServerClient).mockClear();
+    getClaims.mockImplementation(async () => {
+      // what auth-js does after a refused refresh (e.g. a 540): it drops the session
+      const options = vi.mocked(createServerClient).mock.calls[0]?.[2] as unknown as Opts;
+      options.cookies.setAll([{ name: "sb-127-auth-token", value: "", options: { maxAge: 0 } }]);
+      return { data: null, error: { name: "AuthApiError", message: "", status: 540 } };
+    });
+    evaluateGuards.mockResolvedValue({ action: "rewrite", to: "/servizio?motivo=paused" });
+    const response = await proxy(request("/percorso"));
+    expect(response.headers.get("set-cookie")).toBeNull();
+  });
+
+  it("still sends the cookie changes of a real rejection (not an outage)", async () => {
+    const { createServerClient } = await import("@supabase/ssr");
+    vi.mocked(createServerClient).mockClear();
+    getClaims.mockImplementation(async () => {
+      const options = vi.mocked(createServerClient).mock.calls[0]?.[2] as unknown as Opts;
+      options.cookies.setAll([{ name: "sb-127-auth-token", value: "", options: { maxAge: 0 } }]);
+      return {
+        data: null,
+        error: { name: "AuthApiError", message: "Invalid Refresh Token", status: 400 },
+      };
+    });
+    const response = await proxy(request("/percorso"));
+    expect(response.headers.get("set-cookie")).toContain("sb-127-auth-token");
+  });
+});
+
 describe("proxy: session resolution", () => {
   it("passes verified claims to the guards", async () => {
     getClaims.mockResolvedValue({ data: { claims: { sub: "u1" } }, error: null });
