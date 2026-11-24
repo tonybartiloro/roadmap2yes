@@ -133,11 +133,13 @@ Regole:
 
 Il repository è pubblico. Le CI di pull request non usano alcun segreto (il workflow `ci.yml` non ne ha). I segreti esistono solo negli **environment** e sono usati solo dai workflow su `main`.
 
-| Environment | Usato da | Nomi dei segreti | Reviewer richiesti |
-|---|---|---|---|
-| `production` | `migrate.yml` (push su `main`, solo se ci sono migrazioni) | `SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_PASSWORD`, `SUPABASE_PROJECT_REF` | **Sì**: l'approvazione è il Gate C |
-| `staging` | `migrate.yml` (avvio manuale), `keepalive.yml` (ping settimanale) | `SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_PASSWORD`, `SUPABASE_PROJECT_REF`, `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SECRET_KEY` | No |
-| `production-keepalive` | `keepalive.yml` (controllo settimanale) | `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SECRET_KEY` | No, di proposito: il controllo settimanale non deve aspettare un'approvazione |
+| Environment | Usato da | Segreti (Secrets) | Variabili (Variables, non segrete) | Reviewer richiesti |
+|---|---|---|---|---|
+| `production` | `migrate.yml` (push su `main`, solo se ci sono migrazioni) | `SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_PASSWORD` | `SUPABASE_PROJECT_REF` | **Sì**: l'approvazione è il Gate C |
+| `staging` | `migrate.yml` (avvio manuale), `keepalive.yml` (ping settimanale) | `SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_PASSWORD`, `SUPABASE_SECRET_KEY` | `SUPABASE_PROJECT_REF`, `NEXT_PUBLIC_SUPABASE_URL` | No |
+| `production-keepalive` | `keepalive.yml` (controllo settimanale) | `SUPABASE_SECRET_KEY` | `NEXT_PUBLIC_SUPABASE_URL` | No, di proposito: il controllo settimanale non deve aspettare un'approvazione |
+
+I workflow leggono `SUPABASE_PROJECT_REF` e `NEXT_PUBLIC_SUPABASE_URL` da `vars.*`, gli altri da `secrets.*`.
 
 Il segreto `SUPABASE_SECRET_KEY` di `production-keepalive` è quello di **produzione**. Per questo l'environment non ha reviewer, e per questo deve avere la regola sui branch qui sotto.
 
