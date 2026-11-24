@@ -31,39 +31,45 @@ export function HomeScreen({ data }: { data: HomeData }) {
 
       <EmailOffBanner />
 
+      {/* Two stacked columns from 768 px (no shared rows, so no holes); one column below, in the
+          same reading order: countdown, next step, payments, news. */}
       <div className="grid gap-6 md:grid-cols-2 md:items-start">
-        {data.reference.ok ? (
-          <ReferenceBlock reference={data.reference.data} />
-        ) : (
-          <SectionError title="Non riesco a mostrarti il conto alla rovescia" />
-        )}
+        <div className="flex flex-col gap-6">
+          {data.reference.ok ? (
+            <ReferenceBlock reference={data.reference.data} />
+          ) : (
+            <SectionError title="Non riesco a mostrarti il conto alla rovescia" />
+          )}
 
-        {data.steps.ok ? (
-          <NextStepCard
-            steps={data.steps.data}
-            partnerName={data.partnerName}
-            noDate={noDate}
-            today={data.today}
-          />
-        ) : (
-          <SectionError title="Non riesco a mostrarti il prossimo passo" />
-        )}
+          {data.steps.ok ? (
+            <NextStepCard
+              steps={data.steps.data}
+              partnerName={data.partnerName}
+              noDate={noDate}
+              today={data.today}
+            />
+          ) : (
+            <SectionError title="Non riesco a mostrarti il prossimo passo" />
+          )}
+        </div>
 
-        {data.payments.ok ? (
-          <PaymentsBlock payments={data.payments.data} />
-        ) : (
-          <SectionError title="Non riesco a mostrarti i pagamenti" />
-        )}
+        <div className="flex flex-col gap-6">
+          {data.payments.ok ? (
+            <PaymentsBlock payments={data.payments.data} />
+          ) : (
+            <SectionError title="Non riesco a mostrarti i pagamenti" />
+          )}
 
-        {welcome ? (
-          <WelcomeCard userId={data.userId} name={data.myName} partnerName={data.partnerName} />
-        ) : data.news.ok ? (
-          data.news.data === null ? null : (
-            <NewsBlock items={data.news.data} />
-          )
-        ) : (
-          <SectionError title="Non riesco a mostrarti le novità" />
-        )}
+          {welcome ? (
+            <WelcomeCard userId={data.userId} name={data.myName} partnerName={data.partnerName} />
+          ) : data.news.ok ? (
+            data.news.data === null ? null : (
+              <NewsBlock items={data.news.data} />
+            )
+          ) : (
+            <SectionError title="Non riesco a mostrarti le novità" />
+          )}
+        </div>
 
         <p className="text-muted-foreground flex flex-wrap items-center gap-x-3 text-sm md:col-span-2">
           <span>{data.lastExport.label}</span>
@@ -89,12 +95,12 @@ function ReferenceBlock({ reference }: { reference: ReferenceData }) {
   const { value } = reference;
   return (
     <div className="flex flex-col gap-3">
-      <Countdown value={value} setBy={reference.setBy} locationName={reference.locationName} />
-      {value.kind === "provisional" ? (
-        <Button asChild variant="link" className="h-11 self-start px-0">
-          <Link href="/scelte/date">Cambia riferimento</Link>
-        </Button>
-      ) : null}
+      <Countdown
+        value={value}
+        setBy={reference.setBy}
+        locationName={reference.locationName}
+        changeReferenceHref="/scelte/date"
+      />
       {value.kind === "none" ? (
         <Button asChild className="self-start">
           <Link href="/scelte/date">Scegli la data</Link>

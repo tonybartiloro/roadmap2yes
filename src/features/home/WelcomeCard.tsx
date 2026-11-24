@@ -35,7 +35,7 @@ export function WelcomeCard({
   return (
     <section
       aria-labelledby="home-welcome"
-      className="border-border bg-card flex flex-col gap-3 rounded-lg border p-4 md:col-span-2"
+      className="border-border bg-card flex flex-col gap-3 rounded-lg border p-4"
     >
       <h2 id="home-welcome" className="text-[22px] leading-7 font-semibold">
         {name ? `Ciao ${name}, ti stavamo aspettando` : "Ciao, ti stavamo aspettando"}

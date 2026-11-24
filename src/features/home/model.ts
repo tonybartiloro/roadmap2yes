@@ -141,7 +141,7 @@ export function stepView(step: NextStep, today: PlainDate): StepView {
       return {
         key,
         title: step.title,
-        detail: `Scaduto il ${formatShortDate(step.dueDate)}. Hai ancora tempo per recuperare.`,
+        detail: `Previsto per il ${formatShortDate(step.dueDate)}. Hai ancora tempo per recuperare.`,
         href: "/percorso",
         cta: "Apri il Percorso",
       };

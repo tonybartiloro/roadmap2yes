@@ -112,10 +112,24 @@ describe("Home screen", () => {
     );
   });
 
-  it("a definitive date shows days and weeks, with no 'Cambia riferimento'", () => {
+  it("a definitive date shows days and weeks, and a single 'Cambia riferimento' link (from Countdown)", () => {
     render(<HomeScreen data={makeHome({ reference: reference("definitive") })} />);
     expect(screen.getByText("Mancano 283 giorni (40 settimane)")).toBeTruthy();
     expect(screen.getByText(/Riferimento · definitivo/)).toBeTruthy();
+    expect(screen.getAllByRole("link", { name: "Cambia riferimento" })).toHaveLength(1);
+  });
+
+  it("with no date there is no 'Cambia riferimento'", () => {
+    render(
+      <HomeScreen
+        data={makeHome({
+          reference: {
+            ok: true,
+            data: { value: { kind: "none" }, setBy: null, locationName: null },
+          },
+        })}
+      />,
+    );
     expect(screen.queryByRole("link", { name: "Cambia riferimento" })).toBeNull();
   });
 
