@@ -42,5 +42,16 @@ Commits: 8ffff11, 41702e8, 3785e27, da5261c. Verdict: **changes requested** (0 b
 - Q1: is the partner's email in `wedding_partners` meant to be exported (AC42 "tutti i dati")? If yes, state it in plan §10; if no, remove it.
 - Q2: should `exportedAt` and the file day both come from the same `getNow()` call? They do now; keep it that way.
 
+## Response (developer, round 1)
+
+| Finding | Response |
+|---|---|
+| S1 | Fixed. `actor_id` is no longer exported: each `decision_events` row gets `actor: { slot, name }` (or `null`), mapped from the partners' `user_id`, which is read only for the mapping and not exported. New test: the whole output (JSON + both CSVs) contains neither the founder's nor partner B's user id, nor `actor_id`, and an event shows `A` / `Tony`. |
+| S2 | Fixed. AC59: `promemoria/page.test.tsx` (email off: explanation, no switches, no DB read; email on: switches, no explanation). Actions glue: `actions.test.ts` in each of `appearance`, `notifications`, `export` (zod rejection before session/DB, missing claims, `revalidatePath` only on success). `describeCheck` moved to `info/describe-check.ts` with `describe-check.test.ts` (today, yesterday, Rome day around midnight, long date, no heartbeat). |
+| C1 / Q1 | Kept on purpose: AC42 asks for "impostazioni" and the export is the couple's own data. Stated in the header comment of `export/data.ts`; plan §10 to be updated by the coordinator. |
+| C2 | Comment added in `ExportPanel.tsx`: the percentages are stage markers, not measured progress. |
+| C3 | Accepted; noted in the header comment of `export/data.ts`. |
+| Q2 | Yes, one `getNow()` call feeds both `exportedAt` and the file day; unchanged. |
+
 ## AC coverage
 AC42 covered at data level (tests); AC44 Info shows the heartbeat (untested, S2); AC49 covered; AC52 covered; AC59 implemented, not tested (S2); AC62 implemented via `SignOutButton`.

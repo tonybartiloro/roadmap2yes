@@ -45,6 +45,9 @@ export function ExportPanel({ fileNames }: { fileNames: ExportFileNames }) {
   const [phase, setPhase] = useState<Phase>({ kind: "idle" });
   const busy = phase.kind === "working";
 
+  // NOTE: the percentages (15, 70, 100) are NOT measured. There is one awaited call, so the bar
+  // only marks the stages (asking, got the data, saved) and "Preparo il file…" is shown once the
+  // data is already back. Do not treat them as real progress.
   async function run(which: Which, mime: string) {
     setPhase({ kind: "working", percent: 15, text: "Raccolgo i dati del matrimonio…" });
     try {

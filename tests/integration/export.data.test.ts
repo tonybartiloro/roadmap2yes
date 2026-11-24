@@ -160,6 +160,20 @@ describe("Esportazione (T15) on the local stack", () => {
     expect(all).not.toContain(other.weddingId);
   });
 
+  it("carries no account user id anywhere: authors are partner slot and name", async () => {
+    const result = await prepareExport(wedding.founderClient, NOW);
+    if (!result.ok) throw new Error(result.message);
+    const all = [result.bundle.json, result.bundle.tasksCsv, result.bundle.budgetCsv].join("\n");
+    for (const id of [wedding.founder.id, partnerB.user.id]) expect(all).not.toContain(id);
+    expect(all).not.toContain("actor_id");
+    const doc = JSON.parse(result.bundle.json) as {
+      decisionEvents: { actor: { slot: string; name: string } | null }[];
+    };
+    expect(doc.decisionEvents.some((e) => e.actor?.slot === "A" && e.actor.name === "Tony")).toBe(
+      true,
+    );
+  });
+
   it("never carries the token hash of a pending email invitation", async () => {
     // Not vacuous: the secret really is stored for this wedding.
     const stored = await serviceClient()

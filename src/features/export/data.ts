@@ -27,6 +27,10 @@ import { classifyDbError } from "@/lib/supabase/errors";
  * and hands it to the pure `buildExport`. Columns are listed on purpose: nothing secret is ever
  * selected (no `invitations`, no user ids of accounts), and `buildExport` strips forbidden keys
  * again. Nothing here imports Next.js, so the integration tests drive it directly.
+ *
+ * The partners' emails ARE exported on purpose: AC42 asks for the settings and this is the couple's
+ * own data. Ten tables are read in parallel, each paged, with no common snapshot: a write between
+ * two pages could repeat or skip a row (negligible for two people).
  */
 export type Db = SupabaseClient<Database>;
 
@@ -87,7 +91,7 @@ export async function gatherExportInput(db: Db): Promise<ExportInput> {
     allRows("partner", (from, to) =>
       db
         .from("wedding_partners")
-        .select("id, slot, label, first_name, last_name, email, created_at")
+        .select("id, slot, label, first_name, last_name, email, created_at, user_id")
         .order("slot")
         .range(from, to),
     ),
@@ -172,6 +176,28 @@ export async function gatherExportInput(db: Db): Promise<ExportInput> {
       displayName({ firstName: p.first_name, label: p.label }, `Partner ${p.slot}`),
     ]),
   );
+  // Account ids never leave: an event's author becomes the partner slot plus the display name.
+  const partnerOfUser = new Map(
+    partners.flatMap((p) => (p.user_id ? [[p.user_id, p] as const] : [])),
+  );
+  const exportPartners = partners.map((p) => ({
+    id: p.id,
+    slot: p.slot,
+    label: p.label,
+    first_name: p.first_name,
+    last_name: p.last_name,
+    email: p.email,
+    created_at: p.created_at,
+  }));
+  const exportEvents = events.map(({ actor_id, ...rest }) => {
+    const author = actor_id ? partnerOfUser.get(actor_id) : undefined;
+    return {
+      ...rest,
+      actor: author
+        ? { slot: author.slot, name: nameOfSlot.get(author.slot) ?? `Partner ${author.slot}` }
+        : null,
+    };
+  });
   const assigneeLabel = (assignee: string): string =>
     assignee === "A" || assignee === "B" ? (nameOfSlot.get(assignee) ?? assignee) : "Entrambi";
 
@@ -265,10 +291,10 @@ export async function gatherExportInput(db: Db): Promise<ExportInput> {
 
   return {
     wedding,
-    partners,
+    partners: exportPartners,
     decisions,
     decisionOptions: exportOptions,
-    decisionEvents: events,
+    decisionEvents: exportEvents,
     dateScenarios,
     tasks: exportTasks,
     budgetVersions,

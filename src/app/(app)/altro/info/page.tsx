@@ -2,28 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { connection } from "next/server";
 import { APP_NAME } from "@/components/app-name";
-import { formatLongDate } from "@/components/format";
 import { getNow } from "@/lib/clock";
-import { diffDays, todayInRome, type PlainDate } from "@/lib/dates/plain-date";
 import { createClient } from "@/lib/supabase/server";
 import pkg from "../../../../../package.json";
+import { checkLabel } from "./describe-check";
 
 export const metadata: Metadata = { title: "Info" };
-
-const ROME = "Europe/Rome";
-
-/** "oggi alle 06:12", "ieri alle 06:12" or "3 dicembre alle 06:12", in Rome time. */
-function describeCheck(at: Date, now: Date): string {
-  const time = new Intl.DateTimeFormat("it-IT", {
-    timeZone: ROME,
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(at);
-  const day: PlainDate = todayInRome(at);
-  const gap = diffDays(day, todayInRome(now));
-  const when = gap === 0 ? "oggi" : gap === 1 ? "ieri" : formatLongDate(day);
-  return `${when} alle ${time}`;
-}
 
 /** The newest run of the daily job, or `null` when there is none or it cannot be read. */
 async function lastCheck(): Promise<Date | null> {
@@ -56,9 +40,7 @@ export default async function InfoPage() {
         </div>
         <div className="flex justify-between gap-4 px-4 py-3">
           <dt className="text-muted-foreground">Ultimo controllo del servizio</dt>
-          <dd data-testid="info-heartbeat">
-            {check ? describeCheck(check, now) : "ancora nessuno"}
-          </dd>
+          <dd data-testid="info-heartbeat">{checkLabel(check, now)}</dd>
         </div>
       </dl>
       <p className="text-muted-foreground text-sm">
