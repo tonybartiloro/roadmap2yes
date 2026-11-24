@@ -22,8 +22,10 @@ export interface GroupedTasks {
   readonly piuAvanti: readonly TimelineTask[];
   /** Completed. */
   readonly fatti: readonly TimelineTask[];
-  /** Date-dependent generated tasks without a date (no reference, AC15) and deleted ones. */
+  /** Date-dependent generated tasks without a date because there is no reference (AC15). */
   readonly hidden: readonly TimelineTask[];
+  /** Logically deleted tasks ("Eliminati di recente", restorable). */
+  readonly deleted: readonly TimelineTask[];
 }
 
 function info(task: TimelineTask): {
@@ -79,10 +81,11 @@ export function groupTasks(tasks: readonly TimelineTask[], today: PlainDate): Gr
   const avantiDated: TimelineTask[] = [];
   const fatti: TimelineTask[] = [];
   const hidden: TimelineTask[] = [];
+  const deleted: TimelineTask[] = [];
 
   for (const task of tasks) {
     if (task.deleted) {
-      hidden.push(task);
+      deleted.push(task);
       continue;
     }
     if (task.status === "done") {
@@ -91,7 +94,7 @@ export function groupTasks(tasks: readonly TimelineTask[], today: PlainDate): Gr
     }
     const { highlight, dateDependent } = info(task);
     if (task.dueDate === null) {
-      if (dateDependent && task.source === "template") hidden.push(task);
+      if (dateDependent && task.source === "template" && !task.dueOverridden) hidden.push(task);
       else if (highlight) adessoUndated.push(task);
       else avantiUndated.push(task);
       continue;
@@ -122,6 +125,7 @@ export function groupTasks(tasks: readonly TimelineTask[], today: PlainDate): Gr
     ],
     fatti,
     hidden,
+    deleted: deleted.sort(byKey),
   };
 }
 

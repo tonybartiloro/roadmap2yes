@@ -35,7 +35,7 @@ export function isPlainDate(value: unknown): value is PlainDate {
   const m = PLAIN_DATE_RE.exec(value);
   if (!m) return false;
   const [year, month, day] = [Number(m[1]), Number(m[2]), Number(m[3])];
-  return month >= 1 && month <= 12 && day >= 1 && day <= daysInMonth(year, month);
+  return year >= 1900 && month >= 1 && month <= 12 && day >= 1 && day <= daysInMonth(year, month);
 }
 
 export function parsePlainDate(value: PlainDate): Ymd {

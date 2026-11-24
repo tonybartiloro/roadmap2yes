@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { addDays } from "@/lib/dates/plain-date";
-import { groupTasks } from "./group-tasks";
+import { ADESSO_VISIBLE_ROWS, groupTasks } from "./group-tasks";
 import { tasksFor, userTask } from "./test-helpers";
 
 const TODAY = "2026-11-24";
@@ -30,10 +30,14 @@ describe("groupTasks: spec §5.1 reference scenario (civile, 2027-09-03, today 2
   });
 
   it("Prossimi 3 mesi: +31..+90 days", () => {
-    expect(new Set(ids(g.prossimi3Mesi))).toEqual(
-      new Set(["scegli-testimoni", "save-the-date", "prenota-viaggio-nozze", "apri-lista-nozze"]),
-    );
-    expect(g.prossimi3Mesi.map((t) => t.dueDate).sort()[0]).toBe("2027-01-03");
+    // by due date, then model priority (55, 70, 85 share 2027-01-03)
+    expect(ids(g.prossimi3Mesi)).toEqual([
+      "scegli-testimoni",
+      "prenota-viaggio-nozze",
+      "save-the-date",
+      "apri-lista-nozze",
+    ]);
+    expect(g.prossimi3Mesi[0]!.dueDate).toBe("2027-01-03");
   });
 
   it("Più avanti has the rest (30), including the date-independent non-highlighted one; Fatti empty", () => {
@@ -41,6 +45,11 @@ describe("groupTasks: spec §5.1 reference scenario (civile, 2027-09-03, today 2
     expect(ids(g.piuAvanti)[0]).toBe("decidi-stile-e-priorita");
     expect(g.fatti).toHaveLength(0);
     expect(g.hidden).toHaveLength(0);
+    expect(g.deleted).toHaveLength(0);
+  });
+
+  it("Adesso has exactly ADESSO_VISIBLE_ROWS rows here (spec §5.1)", () => {
+    expect(g.adesso).toHaveLength(ADESSO_VISIBLE_ROWS);
   });
 });
 
@@ -126,8 +135,16 @@ describe("groupTasks: rules (a)-(c) and ordering", () => {
       TODAY,
     );
     expect(ids(g.fatti)).toEqual(["done"]);
-    expect(ids(g.hidden)).toEqual(["gone"]);
+    expect(ids(g.deleted)).toEqual(["gone"]);
+    expect(g.hidden).toHaveLength(0);
     expect(g.adesso).toHaveLength(0);
+  });
+
+  it("a generated dependent task whose date was cleared by hand stays visible, as 'senza scadenza'", () => {
+    const [t] = tasksFor("civile", null).filter((x) => x.id === "scegli-catering");
+    const g = groupTasks([{ ...t!, dueDate: null, dueOverridden: true }], TODAY);
+    expect(ids(g.piuAvanti)).toEqual(["scegli-catering"]);
+    expect(g.hidden).toHaveLength(0);
   });
 
   it("an overridden date on a dependent task keeps it visible", () => {

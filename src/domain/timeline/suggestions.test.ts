@@ -67,11 +67,7 @@ describe("diffSuggestions (AC16, AC48, AC63, spec §5.6)", () => {
 
   it("never re-suggests tasks the user deleted (BR6)", () => {
     const tasks = tasksFor("civile", "2027-09-03", { "regime-patrimoniale": { deleted: true } });
-    const d = diffSuggestions(
-      "religioso",
-      tasks.filter((t) => t.id !== "documenti-pubblicazioni").concat(),
-      [],
-    );
+    const d = diffSuggestions("religioso", tasks, []);
     expect(keys(d.additions)).not.toContain("regime-patrimoniale");
     // a deleted task that stays out of the rite is not a removal either
     const del = tasksFor("unknown", null, { "scegli-il-rito": { deleted: true } });
@@ -86,6 +82,14 @@ describe("diffSuggestions (AC16, AC48, AC63, spec §5.6)", () => {
     expect(keys(d.additions)).not.toContain("richiedi-pubblicazioni");
     expect(d.additions).toHaveLength(5);
     expect(d.removals).toHaveLength(0);
+  });
+
+  it("a dismissal is not scoped to a rite: it survives a round-trip civile -> simbolico -> civile", () => {
+    const dismissals = [{ templateKey: "richiedi-pubblicazioni", kind: "add" as const }];
+    const viaSimbolico = diffSuggestions("simbolico", unknownTasks, dismissals);
+    expect(keys(viaSimbolico.additions)).not.toContain("richiedi-pubblicazioni");
+    const backToCivile = diffSuggestions("civile", unknownTasks, dismissals);
+    expect(keys(backToCivile.additions)).not.toContain("richiedi-pubblicazioni");
   });
 
   it("completed tasks are never proposed for removal", () => {

@@ -6,7 +6,7 @@ import { countdown, countdownAt } from "./countdown";
 import { nextSteps } from "./next-step";
 
 const ref = (date: string, state: "open" | "chosen" = "open") =>
-  resolveReference({ scenarios: [{ id: "s", dateFrom: date, state }] });
+  resolveReference({ scenarios: [{ id: "s", dateFrom: date, state }], today: "2026-11-24" });
 
 describe("countdown (AC26)", () => {
   it("none without a reference", () => {
@@ -107,6 +107,23 @@ describe("nextSteps (AC27)", () => {
       ],
     });
     expect([r.primary?.id, ...r.secondary.map((s) => s.id)]).toEqual(["p14", "t30"]);
+  });
+
+  it("only the location decision open: it is the primary step", () => {
+    const r = nextSteps({
+      ...base,
+      openDecisions: [{ id: "loc", kind: "location", title: "Location" }],
+      tasks: [],
+    });
+    expect(r.primary).toMatchObject({ kind: "decision", decisionKind: "location" });
+    expect(r.secondary).toEqual([]);
+  });
+
+  it("never more than 1 primary + 2 secondary, however many candidates", () => {
+    const tasks = Array.from({ length: 6 }, (_, i) => userTask(`t${i}`, "2026-11-01"));
+    const r = nextSteps({ ...base, tasks });
+    expect(r.primary).not.toBeNull();
+    expect(r.secondary).toHaveLength(2);
   });
 
   it("empty, completed, deleted and dateless tasks are ignored", () => {

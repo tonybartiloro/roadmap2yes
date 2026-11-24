@@ -1,9 +1,12 @@
-import { milestonesForRite } from "@/content/milestones";
-import { getMilestone } from "@/content/milestones";
+import { getMilestone, milestonesForRite } from "@/content/milestones";
 import type { Milestone, Rite } from "@/content/milestones/types";
 import type { TimelineTask } from "./types";
 
-/** A suggestion the couple dismissed ("Ignora"): never shown again (AC16, AC48). */
+/**
+ * A suggestion the couple dismissed ("Ignora"): never shown again (AC16, AC48). Deliberately NOT
+ * scoped to a rite: it survives rite round-trips (civile → simbolico → civile), following the
+ * PO's intent "never re-suggest what the couple dismissed".
+ */
 export interface SuggestionDismissal {
   readonly templateKey: string;
   readonly kind: "add" | "remove";

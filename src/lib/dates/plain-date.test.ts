@@ -38,6 +38,7 @@ describe("plain date helpers", () => {
     expect(isPlainDate("2027-02-29")).toBe(false);
     expect(isPlainDate("2027-13-01")).toBe(false);
     expect(isPlainDate("2027-1-1")).toBe(false);
+    expect(isPlainDate("0050-01-01")).toBe(false);
     expect(isPlainDate(20270101)).toBe(false);
     expect(() => parsePlainDate("nope")).toThrow(RangeError);
   });

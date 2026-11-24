@@ -14,6 +14,8 @@ export interface ReferenceInput {
   readonly scenarios: readonly ScenarioInput[];
   /** `weddings.manual_reference_option_id`, or null for the automatic reference. */
   readonly manualReferenceId?: string | null;
+  /** Calendar date in Europe/Rome: an open scenario already past is not the automatic default. */
+  readonly today: PlainDate;
 }
 
 export type ReferenceSource = "chosen" | "manual" | "automatic";
@@ -41,13 +43,14 @@ function build(s: ScenarioInput, source: ReferenceSource): ResolvedReference {
  * Single reference scenario (AC24, D28):
  * 1. decision taken → the chosen scenario, "definitive";
  * 2. else the manual reference, if it is still an open scenario → "provisional" (manual);
- * 3. else the open scenario with the nearest (earliest) `dateFrom` → "provisional" (automatic);
+ * 3. else the open scenario with the earliest `dateFrom` that is not in the past (`>= today`);
+ *    if every open scenario is in the past, the earliest of them → "provisional" (automatic);
  * 4. no scenarios → null.
  * A reopened decision no longer has a chosen scenario: the previous one is kept by the DB as
  * `manualReferenceId`, so it stays the reference but provisional.
  */
 export function resolveReference(input: ReferenceInput): ResolvedReference | null {
-  const { scenarios, manualReferenceId = null } = input;
+  const { scenarios, manualReferenceId = null, today } = input;
   const chosen = scenarios.find((s) => s.state === "chosen");
   if (chosen) return build(chosen, "chosen");
 
@@ -55,8 +58,9 @@ export function resolveReference(input: ReferenceInput): ResolvedReference | nul
   const manual = manualReferenceId ? open.find((s) => s.id === manualReferenceId) : undefined;
   if (manual) return build(manual, "manual");
 
-  const nearest = [...open].sort(
-    (a, b) => comparePlainDates(a.dateFrom, b.dateFrom) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
-  )[0];
+  const byDate = (a: ScenarioInput, b: ScenarioInput) =>
+    comparePlainDates(a.dateFrom, b.dateFrom) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+  const upcoming = open.filter((s) => comparePlainDates(s.dateFrom, today) >= 0);
+  const nearest = [...(upcoming.length > 0 ? upcoming : open)].sort(byDate)[0];
   return nearest ? build(nearest, "automatic") : null;
 }
