@@ -356,7 +356,18 @@ describe("Home (T14) on the local stack", () => {
     expect(home?.news.ok).toBe(true);
   });
 
-  it("a space without date, budget or tasks: 'Data da decidere', 'Budget da definire' (AC26)", async () => {
+  it("partner B's very first visit to a fresh space with no names loads without errors (e2e onboarding)", async () => {
+    const fresh = await createWedding();
+    const invited = await addPartnerB(fresh);
+    const home = await loadHomeData(invited.client, invited.user.id, { today: TODAY });
+    expect(home).toMatchObject({ mySlot: "B", myName: "" });
+    expect(home?.partnerName).toBeTruthy(); // label or "il tuo partner", never empty
+    expect(home?.visit.previousSeenAt).toBeNull();
+    expect(home?.news).toEqual({ ok: true, data: null });
+    expect(showWelcome(home!.visit, home!.mySlot)).toBe(true);
+  });
+
+  it("a space without date, budget or tasks:'Data da decidere', 'Budget da definire' (AC26)", async () => {
     const other = await createWedding();
     const home = await loadHomeData(other.founderClient, other.founder.id, { today: TODAY });
     expect(home?.reference).toMatchObject({ ok: true, data: { value: { kind: "none" } } });
