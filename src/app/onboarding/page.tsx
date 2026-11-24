@@ -17,7 +17,9 @@ export default async function OnboardingPage() {
   const { db, userId, today } = await pageContext();
   const state = await loadOnboarding(db, userId);
   if (!state) redirect("/auth/avanti");
-  if (state.completed || state.selfSlot !== "A") redirect("/");
+  if (state.selfSlot !== "A") redirect("/");
+  // A completed onboarding is NOT redirected here: the revalidation after "finish" re-renders this
+  // page and a server redirect would tear down the summary. The wizard sends a fresh visit Home.
   return (
     <PublicShell>
       <OnboardingWizard

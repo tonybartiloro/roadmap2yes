@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import type { PlainDate } from "@/lib/dates/plain-date";
 import { finishOnboardingAction, saveStepAction } from "./actions";
@@ -56,6 +57,15 @@ export function OnboardingWizard({
   const [failure, setFailure] = useState<Failure | null>(null);
   const [summary, setSummary] = useState<OnboardingSummary | null>(null);
   const heading = useRef<HTMLHeadingElement>(null);
+  const router = useRouter();
+
+  // Opening /onboarding when it is already completed goes Home. This is decided ONCE, on mount: the
+  // page is re-rendered by the revalidation after "finish" (with `completed` true) and must NOT
+  // throw the person out of the summary, which holds the one-time invite link and the code reminder.
+  const [openedCompleted] = useState(initial.completed);
+  useEffect(() => {
+    if (openedCompleted) router.replace("/");
+  }, [openedCompleted, router]);
 
   const number = stepNumber(step);
   useEffect(() => {

@@ -31,9 +31,9 @@ describe("/onboarding guard", () => {
     await expect(OnboardingPage()).rejects.toThrow("REDIRECT:/");
   });
 
-  it("a completed onboarding goes Home", async () => {
+  it("a completed onboarding still renders (the summary survives the revalidation); the wizard goes Home", async () => {
     mocks.loadOnboarding.mockResolvedValue({ ...open, completed: true });
-    await expect(OnboardingPage()).rejects.toThrow("REDIRECT:/");
+    await expect(OnboardingPage()).resolves.toBeTruthy();
   });
 
   it("no membership goes through the post-login steps", async () => {

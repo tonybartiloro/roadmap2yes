@@ -7,6 +7,7 @@ import { EMPTY_ANSWERS } from "./model";
 const mocks = vi.hoisted(() => ({
   saveStepAction: vi.fn(),
   finishOnboardingAction: vi.fn(),
+  replace: vi.fn(),
 }));
 
 vi.mock("./actions", () => mocks);
@@ -24,6 +25,7 @@ vi.mock("@/features/invitations/actions", () => ({
   revokeInviteAction: vi.fn(),
   setTemporaryCodeAction: vi.fn(),
 }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ replace: mocks.replace }) }));
 vi.mock("next/link", () => ({
   default: ({ href, children, ...rest }: { href: string; children: React.ReactNode }) => (
     <a href={href} {...rest}>
@@ -87,6 +89,7 @@ beforeEach(() => {
   window.localStorage.clear();
   mocks.saveStepAction.mockReset();
   mocks.finishOnboardingAction.mockReset();
+  mocks.replace.mockReset();
 });
 afterEach(() => cleanup());
 
@@ -230,5 +233,35 @@ describe("OnboardingWizard (AC12, AC13)", () => {
     expect(screen.getByTestId("summary-style-tip").textContent).toContain("Lascia spazio");
     expect(screen.getByTestId("summary-invite").textContent).toContain("consegnagli il codice");
     expect(screen.getByTestId("summary-home").getAttribute("href")).toBe("/");
+  });
+
+  it("the summary stays when the page is re-rendered as completed (QA-2) and nothing sends the person Home", async () => {
+    const finished = state({ completed: true, answers: { ...EMPTY_ANSWERS, lastStep: 8 } });
+    mocks.finishOnboardingAction.mockResolvedValue({
+      ok: true,
+      summary: {
+        state: finished,
+        tasksCreated: 12,
+        referenceDate: null,
+        referenceStatus: null,
+        warnings: [],
+        invite: { kind: "sent", link: "https://app.example.test/invito/abc" },
+      },
+    });
+    const view = wizard(state({ answers: { ...EMPTY_ANSWERS, lastStep: 7 } }));
+    fireEvent.click(await screen.findByTestId("step-finish"));
+    expect(await screen.findByText("Ecco il tuo percorso")).toBeTruthy();
+    // The revalidation after "finish" hands the wizard a completed state.
+    view.rerender(
+      <OnboardingWizard initial={finished} scope="u1:w1" emailOn={false} today="2026-11-24" />,
+    );
+    expect(screen.getByText("Ecco il tuo percorso")).toBeTruthy();
+    expect(screen.getByTestId("invite-link-box")).toBeTruthy();
+    expect(mocks.replace).not.toHaveBeenCalled();
+  });
+
+  it("opening /onboarding when it is already completed goes Home", async () => {
+    wizard(state({ completed: true, answers: { ...EMPTY_ANSWERS, lastStep: 8 } }));
+    await waitFor(() => expect(mocks.replace).toHaveBeenCalledWith("/"));
   });
 });
