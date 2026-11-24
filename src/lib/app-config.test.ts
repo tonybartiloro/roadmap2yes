@@ -1,0 +1,217 @@
+import { describe, expect, it } from "vitest";
+import {
+  normalizeEmail,
+  readBootstrapConfig,
+  readEmailCaps,
+  readEmailConfig,
+  readLoginLimits,
+  readSiteUrl,
+  readSupabasePublicConfig,
+  readSupabaseSecretKey,
+} from "./app-config";
+
+describe("readEmailConfig (inputs of emailEnabled)", () => {
+  it.each([
+    ["absent", {}],
+    ["empty", { EMAIL_TRANSPORT: "  " }],
+    ["none", { EMAIL_TRANSPORT: "none" }],
+    ["NONE (case)", { EMAIL_TRANSPORT: "NONE" }],
+  ])("%s means no email", (_n, env) => {
+    expect(readEmailConfig(env)).toEqual({ transport: "none", enabled: false });
+  });
+
+  it("resend without key is disabled, with a reason that names variables only", () => {
+    const config = readEmailConfig({ EMAIL_TRANSPORT: "resend", EMAIL_FROM: "a@example.test" });
+    expect(config).toMatchObject({
+      transport: "none",
+      enabled: false,
+      reason: "RESEND_API_KEY missing",
+    });
+  });
+
+  it("resend without EMAIL_FROM is disabled", () => {
+    expect(readEmailConfig({ EMAIL_TRANSPORT: "resend", RESEND_API_KEY: "re_fake" })).toMatchObject(
+      { enabled: false, reason: "EMAIL_FROM missing" },
+    );
+  });
+
+  it("resend complete is enabled", () => {
+    expect(
+      readEmailConfig({
+        EMAIL_TRANSPORT: "resend",
+        RESEND_API_KEY: "re_fake",
+        EMAIL_FROM: "x@example.test",
+      }),
+    ).toEqual({ transport: "resend", enabled: true, apiKey: "re_fake", from: "x@example.test" });
+  });
+
+  it("smtp with host is enabled (default port 1025)", () => {
+    expect(readEmailConfig({ EMAIL_TRANSPORT: "smtp", SMTP_HOST: "127.0.0.1" })).toEqual({
+      transport: "smtp",
+      enabled: true,
+      host: "127.0.0.1",
+      port: 1025,
+    });
+  });
+
+  it("smtp honours SMTP_PORT and rejects an invalid one", () => {
+    expect(
+      readEmailConfig({ EMAIL_TRANSPORT: "smtp", SMTP_HOST: "h", SMTP_PORT: "54425" }),
+    ).toMatchObject({ enabled: true, port: 54425 });
+    for (const port of ["0", "70000", "abc", "1.5"]) {
+      expect(
+        readEmailConfig({ EMAIL_TRANSPORT: "smtp", SMTP_HOST: "h", SMTP_PORT: port }),
+      ).toMatchObject({ enabled: false, reason: "SMTP_PORT invalid" });
+    }
+  });
+
+  it("smtp without host is disabled", () => {
+    expect(readEmailConfig({ EMAIL_TRANSPORT: "smtp" })).toMatchObject({ enabled: false });
+  });
+
+  it("an unknown transport is disabled", () => {
+    expect(readEmailConfig({ EMAIL_TRANSPORT: "sendgrid" })).toMatchObject({
+      enabled: false,
+      reason: "EMAIL_TRANSPORT unknown",
+    });
+  });
+});
+
+describe("readEmailCaps", () => {
+  it("defaults to 50/1500", () => {
+    expect(readEmailCaps({})).toEqual({ daily: 50, monthly: 1500 });
+  });
+  it("reads valid values and ignores invalid ones", () => {
+    expect(readEmailCaps({ EMAIL_DAILY_CAP: "10", EMAIL_MONTHLY_CAP: "200" })).toEqual({
+      daily: 10,
+      monthly: 200,
+    });
+    expect(readEmailCaps({ EMAIL_DAILY_CAP: "0", EMAIL_MONTHLY_CAP: "-5" })).toEqual({
+      daily: 50,
+      monthly: 1500,
+    });
+    expect(readEmailCaps({ EMAIL_DAILY_CAP: "x", EMAIL_MONTHLY_CAP: "1e3" })).toEqual({
+      daily: 50,
+      monthly: 1500,
+    });
+  });
+});
+
+describe("readBootstrapConfig", () => {
+  const full = {
+    R2Y_BOOTSTRAP_EMAIL: "  Tony@Example.test ",
+    R2Y_BOOTSTRAP_ACCESS_CODE: "fake-code-0123",
+    R2Y_BOOTSTRAP_ROLE: "sposo",
+  };
+
+  it("is absent when no variable is set", () => {
+    expect(readBootstrapConfig({})).toEqual({ status: "absent" });
+  });
+
+  it.each(["R2Y_BOOTSTRAP_EMAIL", "R2Y_BOOTSTRAP_ACCESS_CODE", "R2Y_BOOTSTRAP_ROLE"])(
+    "is absent when %s is missing",
+    (name) => {
+      const env: Record<string, string | undefined> = { ...full };
+      delete env[name];
+      expect(readBootstrapConfig(env)).toEqual({ status: "absent" });
+    },
+  );
+
+  it("normalises the email and returns the code untouched", () => {
+    expect(readBootstrapConfig(full)).toEqual({
+      status: "ok",
+      email: "tony@example.test",
+      accessCode: "fake-code-0123",
+      role: "sposo",
+    });
+  });
+
+  it("accepts sposa", () => {
+    expect(readBootstrapConfig({ ...full, R2Y_BOOTSTRAP_ROLE: "sposa" })).toMatchObject({
+      status: "ok",
+      role: "sposa",
+    });
+  });
+
+  it("flags invalid role and email by variable name only (no values)", () => {
+    const result = readBootstrapConfig({
+      ...full,
+      R2Y_BOOTSTRAP_EMAIL: "not-an-email",
+      R2Y_BOOTSTRAP_ROLE: "marito",
+    });
+    expect(result).toEqual({
+      status: "invalid",
+      issues: ["R2Y_BOOTSTRAP_EMAIL", "R2Y_BOOTSTRAP_ROLE"],
+    });
+    expect(JSON.stringify(result)).not.toContain("fake-code-0123");
+  });
+});
+
+describe("normalizeEmail", () => {
+  it("trims and lowercases", () => {
+    expect(normalizeEmail("  A@Example.Test ")).toBe("a@example.test");
+  });
+});
+
+describe("readLoginLimits", () => {
+  it("defaults to 5 / 20 / 15", () => {
+    expect(readLoginLimits({})).toEqual({
+      maxFailuresPerEmail: 5,
+      maxFailuresPerIp: 20,
+      lockMinutes: 15,
+      windowMinutes: 15,
+    });
+  });
+  it("is configurable", () => {
+    expect(
+      readLoginLimits({
+        R2Y_LOGIN_MAX_FAILURES_EMAIL: "3",
+        R2Y_LOGIN_MAX_FAILURES_IP: "10",
+        R2Y_LOGIN_LOCK_MINUTES: "30",
+      }),
+    ).toEqual({ maxFailuresPerEmail: 3, maxFailuresPerIp: 10, lockMinutes: 30, windowMinutes: 30 });
+  });
+  it("falls back to defaults on invalid values", () => {
+    expect(
+      readLoginLimits({
+        R2Y_LOGIN_MAX_FAILURES_EMAIL: "0",
+        R2Y_LOGIN_MAX_FAILURES_IP: "abc",
+        R2Y_LOGIN_LOCK_MINUTES: "-1",
+      }),
+    ).toMatchObject({ maxFailuresPerEmail: 5, maxFailuresPerIp: 20, lockMinutes: 15 });
+  });
+});
+
+describe("Supabase config", () => {
+  it("reads url and publishable key", () => {
+    expect(
+      readSupabasePublicConfig({
+        NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54421",
+        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "pk",
+      }),
+    ).toEqual({ url: "http://127.0.0.1:54421", publishableKey: "pk" });
+  });
+  it("names the missing variables without values", () => {
+    expect(() => readSupabasePublicConfig({})).toThrow(
+      "NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+    );
+    expect(() => readSupabaseSecretKey({})).toThrow("SUPABASE_SECRET_KEY");
+  });
+  it("reads the secret key", () => {
+    expect(readSupabaseSecretKey({ SUPABASE_SECRET_KEY: "sk" })).toBe("sk");
+  });
+});
+
+describe("readSiteUrl", () => {
+  it("prefers NEXT_PUBLIC_SITE_URL, strips trailing slashes", () => {
+    expect(
+      readSiteUrl({ NEXT_PUBLIC_SITE_URL: "https://x.example.test//", VERCEL_BRANCH_URL: "b" }),
+    ).toBe("https://x.example.test");
+  });
+  it("falls back to the Vercel branch URL, then localhost", () => {
+    expect(readSiteUrl({ VERCEL_BRANCH_URL: "branch.example.test" })).toBe(
+      "https://branch.example.test",
+    );
+    expect(readSiteUrl({})).toBe("http://localhost:3000");
+  });
+});
