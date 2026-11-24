@@ -50,6 +50,7 @@ function ThemeCard({
         type="button"
         role="radio"
         aria-checked={checked}
+        aria-label={`${theme.name}: ${theme.mood}`}
         tabIndex={focusable ? 0 : -1}
         onClick={onSelect}
         onKeyDown={onKeyDown}
@@ -80,9 +81,7 @@ function ThemeCard({
             <span className="bg-muted block h-2 flex-1 rounded-full" />
             <span className="bg-accent block h-2 w-6 rounded-full" />
           </span>
-          <span className="bg-primary text-primary-foreground inline-flex h-8 items-center self-start rounded-md px-3 text-sm font-semibold">
-            Pulsante
-          </span>
+          <span className="bg-primary text-primary-foreground inline-flex h-8 w-20 items-center self-start rounded-md"></span>
         </span>
         {checked ? (
           <span className="text-primary mt-3 flex items-center gap-1 text-sm font-semibold">

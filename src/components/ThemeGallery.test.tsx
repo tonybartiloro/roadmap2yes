@@ -44,6 +44,15 @@ describe("ThemeGallery", () => {
     expect(radios.filter((r) => r.tabIndex === 0)).toHaveLength(1);
   });
 
+  it("each card has a clean accessible name and no stray decorative text", () => {
+    setup();
+    for (const theme of THEMES) {
+      const radio = screen.getByRole("radio", { name: `${theme.name}: ${theme.mood}` });
+      expect(radio.textContent).not.toContain("Pulsante");
+    }
+    expect(screen.getByRole("radiogroup").textContent).not.toContain("Pulsante");
+  });
+
   it("each card carries its own theme and mode", () => {
     setup();
     const sera = screen.getByRole("radio", { name: /Sera/ });
