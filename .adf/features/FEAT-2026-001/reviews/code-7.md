@@ -1,0 +1,37 @@
+# FEAT-2026-001 — code review (T9, DB budget + notifications), round 1
+
+Verdict: changes requested
+Scope reviewed: commit 9dea6b5 (migration 20261201300000, seed 03_budget, 4 pgTAP files, core_schema.test.sql edits, database.types.ts). Static review; the suite was not run.
+
+Security summary: no blocking findings. RLS and column grants follow §3.1. Composite FKs block cross-wedding links. `notification_log` has RLS with no policy and no grant (the T2 default-privileges revoke also applies). All `job_*` functions revoke from public/anon/authenticated and grant to service_role only, and the allowlist test in core_schema covers this. Every SECURITY DEFINER function sets `search_path`. `budget_versions` is append-only through a trigger that also covers TRUNCATE. The remaining findings are about quota exactness and robustness of the claim logic.
+
+| ID | Severity | Evidence | Finding | Why it matters | Proposal | Response (author) | Closed |
+|---|---|---|---|---|---|---|---|
+| REV-1 | should | `20261201300000_budget_notifications.sql:469-483` | The cap is checked only for brand-new claims. Resuming an expired `claimed` row or a `failed` row skips the cap check. `failed` rows are not counted (the count uses `claimed,sent`), and the resume sets `claimed_at = p_now`, so the row moves into the current day. At the cap, 50 claimed or sent plus a resumed failure gives 51, and a claim from yesterday resumed today adds to today's count with no check. | The plan promises exact caps (50/day, 1500/month) to stay under the Resend free tier, and the lock is there precisely for exactness. | Run the cap computation before the resume branches. If the resumed row would be counted anew (failed, or the claim's day or month changed), return `skipped_quota`. Add pgTAP tests for resume at the cap. | | ❌ |
+| REV-2 | should | `…sql:468-474` | An expired `claimed` row resumes with no attempts limit. Only `failed` rows reach `failed_final`. A batch that crashes the job every time (a poison batch) is resent forever, once per run. | AC53 and the 5-attempt limit in the plan. It also repeats a possible duplicate send. | Apply `attempts >= 5` to the expired-claim branch too. Return `failed_final` and set the status to `failed`. Test it, since `failed_final` is not tested anywhere today. | | ❌ |
+| REV-3 | should | `…sql:537-538` | `job_mark_notification_sent` raises `invalid_state` when the row is `failed`. A stale sender can call `job_fail_notification` on a row that another run has freshly claimed. When the real send then succeeds, mark-sent raises and the ledger stays `failed`. The next run resumes it and sends again, and provider idempotency keys expire. | "A send never happens twice for the same batch_key." The ledger must record the sent state once the email has actually left. | Accept `claimed` and `failed` in mark-sent (an email that was sent is sent). Optionally let `job_fail_notification` ignore stale claims. Add a test. | | ❌ |
+| REV-4 | note | `…sql:136-146`, `seeds/03_budget.sql:17-19` | The stamp trigger overwrites `created_at := now()`, so the seed's `now() - interval '10 days'` is ignored. The two seeded versions get identical timestamps, and "latest" depends on the index tie-break `id desc`. In production each insert is its own transaction, so this is fine. | Misleading seed. Ordering is fragile if two versions are ever written in the same transaction. | Drop the dates from the seed or fix the comment. If it matters, use `clock_timestamp()` in the trigger. | | ❌ |
+| REV-5 | note | `…sql:75-93`, `:361` | Soft-deleting an item leaves its live payments. A payment can still be live and unpaid under a deleted item, and Home (T14) may show it as upcoming. `status='agreed'` does not require `agreed_cents`. No migration rule covers either case. | These are product rules that are not in the plan, so I have not added them. They must be decided before T13 and T14 so the UI does not diverge. | See the questions below. | | ❌ |
+
+## Declared deviations
+- `category_id` not updatable, with moves only through `move_budget_items`: accepted. It guarantees D37, and the test covers the denied path. The RPC checks permission (42501), locks both rows in id order, requires the same wedding, and refuses deleted categories. It correctly leaves Assegnato untouched when 0 items move.
+- AC61 left to T8's `tasks`: accepted, as the plan says (the §3.1 row for `tasks`). T16 must read it. This migration only provides the user-level switches.
+- D44 and opt-out inside `job_claim_notification`: accepted. This is defence in depth. The member check runs before the lock and the opt-out check runs under it.
+- Edit to T2's `core_schema.test.sql`: accepted. Only allowlists and grant lists were extended, and the plan counts match. The `collate "C"` sort is a sensible fix.
+- UTC day and month for the caps: accepted. The plan does not say Europe/Rome, the cron runs at 05:00 UTC, and Resend counts in UTC. The job's `batch_key` date convention (Rome) is independent. T16 must keep both consistent.
+
+## Verified OK
+- `job_recipients` returns members with role `partner` only, so B appears only after the first login (tested). It lowercases the email, skips deleted users, and defaults the switches to on.
+- `job_unsubscribe` is idempotent: the upsert can only turn a switch off, and the kind is validated. The tests cover repeat calls, unknown kinds and an unknown user. Token verification belongs to T16.
+- Concurrency of P5: the delete trigger takes `FOR UPDATE` on the category and the item guard takes `FOR SHARE`, so the two paths serialize. The restore-into-deleted-category and move-into-deleted-category paths are also guarded.
+- Amount checks (>= 0 and the cap) are on every cents column and tested on insert for versions, categories, items and payments.
+- The seed uses fake data only (Villa Esempio, example dates), is idempotent, and is guarded when the demo wedding is missing.
+
+## AC coverage
+AC33 ✅ (budget_versions) · AC34 ✅ (budget_categories: P5, move, Annulla) · AC35 ✅ (items: columns and updates) · AC36 ✅ (payments, paid_on check) · AC37 not in T9 (domain) · AC38 ✅ (cents checks on every table) · AC44 ✅ (schema side) · AC50 / AC61 deferred (T16 / T8) · AC51 not in T9 (job code) · AC52 ✅ (preferences, unsubscribe, opt-out) · AC53 ⚠ (claim, resume and caps tested, but REV-1, REV-2 and REV-3 are open, and concurrent exactness via the advisory lock is not exercised by any test).
+
+Test gaps: `failed_final` (5 attempts), resume under cap pressure, mark-sent after failed, and a monthly cap crossing at a month boundary. A concurrency test of the advisory lock is not possible in a single-transaction pgTAP file, so it needs a justified manual or integration check by T16.
+
+## Questions for the developer
+1. Should soft-deleting an item also hide or deactivate its payments (here or in the UI), and should `agreed` require `agreed_cents` (REV-5)?
+2. Is the global advisory lock acceptable given that the job runs once a day? I think so. Please note the load assumption in the code comment.
