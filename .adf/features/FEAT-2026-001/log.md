@@ -423,3 +423,10 @@ Coordinator interpretation (to be confirmed at the combined Gate A-change + Gate
 - PO: brief.md → 62 active AC (AC1–AC64, AC8 and AC47 removed); new AC54–AC64; D29–D48; open C1–C4.
 - Architect: plan.md + ADR → email+access-code auth, env bootstrap inside the login server action (create-only, also `npm run bootstrap`), partner accounts via authorised admin calls, account_events, EmailOffBanner, date→location link; 24 tasks + T0; risks R20–R25; no new dependencies. Open Q-A (min length 10), Q-B (Turnstile, not in R1), Q-C (force change only after temporary reset).
 - Coordinator: C1 (PO min 8) vs Q-A (architect 10, Supabase-enforced) merged into one question for the developer. Security-focused review round in F3 covers the auth change.
+
+## Gate B — approved — 2026-11-24
+Developer's answers to the 4 remaining questions: 1. OK (min 10 characters, letters + digits, enforced by Supabase Auth) 2. No CAPTCHA 3. OK (temporary reset code forces a change; initial code only suggests one) 4. OK (A edits B's email until B's first login; then each edits only their own).
+- Requirement change (Gate A re-confirmation) and Gate B approved by tonybartiloro: plan (24 tasks + T0), services (Vercel Hobby, Supabase free ×2, Resend later, GitHub Actions), no new dependencies beyond the plan, access-code auth model, 12 themes, single Gate C.
+- Recorded as D49–D54 in brief.md; Q-A/Q-B/Q-C marked approved in plan.md; ADR 0001 → accepted.
+- Project memory updated: docker: true, npm commands, stack/tests/environments sections.
+- Next: F3, group G0 = T1 scaffolding + CI (developer) ‖ T0 milestone spec (product-owner), then QA T17a.

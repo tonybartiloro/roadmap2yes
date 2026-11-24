@@ -9,15 +9,15 @@ git:
   branch_pattern: "{type}/{ticket}-{slug}"
   commit_convention: conventional
   merge_strategy: squash
-docker: false
+docker: true
 commands:
-  setup: ""
-  start: ""
-  lint: ""
-  typecheck: ""
-  test: ""
-  build: ""
-  e2e: ""
+  setup: "npm ci && npm run db:start && npm run db:reset"
+  start: "npm run dev"
+  lint: "npm run lint"
+  typecheck: "npm run typecheck"
+  test: "npm run test"
+  build: "npm run build"
+  e2e: "npm run e2e"
 deploy:
   staging: "Vercel preview deployment per ogni PR"
   production: "automatico al merge su main (Vercel Hobby); per ora la produzione fa anche da staging"
@@ -41,21 +41,22 @@ Web app personale per organizzare e tracciare il matrimonio di Tony e Jessica: g
 Data desiderata: 3 settembre 2027 (non prima); alternative maggio-giugno o settembre 2028 in base alla disponibilità della location. Nulla è ancora deciso.
 
 ## Stack and architecture
-Greenfield (nessun codice al 2026-11-23). Direzione approvata: frontend React (Next.js + TypeScript proposto), Tailwind + shadcn/ui, Supabase (Postgres, Auth, RLS) su piano free, hosting Vercel Hobby. Tutto deve restare **gratuito**. Media pesanti (foto/video giorno del matrimonio) su object storage gratuito esterno (da decidere nel piano: candidato Backblaze B2 10 GB free).
+Approvato al Gate B di FEAT-2026-001 (2026-11-24), ADR `docs/adr/0001-stack-auth-ambienti.md`: Next.js 16 App Router + TypeScript su Vercel Hobby (fra1); Supabase free eu-central-1 (Postgres, Auth email + codice d'accesso, RLS come unico livello di autorizzazione; Storage solo più avanti, nessun object storage esterno); Tailwind v4 + shadcn/ui; Resend come unico provider email, acceso solo quando esiste il dominio (senza Resend nessuna email e avviso in app). Primo utente creato da variabili d'ambiente `R2Y_BOOTSTRAP_*` (solo creazione). Tutto deve restare **gratuito**; il dominio è l'unica spesa, a carico dello sviluppatore.
 
 ## Conventions
 Conventional commits, squash merge, branch `{type}/{ID}-{slug}`. Da definire con la prima feature.
 
 ## UI and design system
-Da definire nella prima feature: mobile-first, "cool", elegante; shadcn/ui.
+Mobile-first, shadcn/ui; 12 temi runtime (variabili CSS su `[data-theme]`, predefinito "Giardino", chiaro e scuro), scelti per matrimonio in onboarding. Tono informale ("tu"). Dettagli in `.adf/features/FEAT-2026-001/design.md`.
 
 ## Tests
-Da definire nella prima feature.
+Vitest (unit), pgTAP (DB/RLS), Playwright e2e sullo stack Supabase locale in Docker, axe per l'accessibilità. Orologio iniettabile: funzioni pure con `today`/`now`; cookie e2e `r2y-test-now` solo con `E2E_CLOCK=1` e senza `VERCEL`.
 
 ## Environments and delivery
-Repo pubblico GitHub tonybartiloro/roadmap2yes (CI con minuti illimitati). Vercel preview per PR = staging; merge su main = produzione (oggi produzione = staging di fatto).
+Repo pubblico GitHub tonybartiloro/roadmap2yes (CI GitHub Actions, minuti illimitati). Un solo progetto Vercel: Preview per PR = staging, collegato a un secondo progetto Supabase free con soli dati finti; merge su main = produzione (oggi fa anche da staging della coppia). Sviluppo locale tutto in Docker (stack Supabase CLI con mail catcher).
 
 ## Gotchas
 - Repo **pubblico**: mai committare dati reali di invitati, segreti, `.env`; seed solo con dati finti.
-- Supabase free mette in pausa i progetti dopo ~7 giorni di inattività del DB: serve un keep-alive.
+- Supabase free mette in pausa i progetti dopo ~7 giorni di inattività del DB (ripristino manuale): keep-alive con cron giornaliero Vercel + workflow GitHub settimanale.
+- Codice d'accesso: minimo 10 caratteri con lettere e cifre, imposto da Supabase Auth; nessun CAPTCHA in R1.
 - Utenti: Tony e Jessica (pari permessi); previsti ruoli futuri famiglia e wedding planner (opzionale).

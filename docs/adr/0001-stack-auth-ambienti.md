@@ -2,7 +2,7 @@
 
 | Status | Date | Deciders | Related feature | Supersedes |
 |---|---|---|---|---|
-| proposed | 2026-11-23 | architect (proposta); sviluppatore (approvazione al Gate B) | FEAT-2026-001 (`.adf/features/FEAT-2026-001/plan.md`) | — |
+| accepted | 2026-11-24 | architect (proposta); tonybartiloro (approvato al Gate B, 2026-11-24) | FEAT-2026-001 (`.adf/features/FEAT-2026-001/plan.md`) | — |
 
 ## Context
 - **App**: web app privata per due persone (i partner), con ruoli futuri "famiglia" e "wedding planner". Frontend React, mobile-first, interfaccia in italiano.

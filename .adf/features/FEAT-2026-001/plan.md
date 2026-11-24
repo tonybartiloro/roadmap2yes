@@ -247,7 +247,7 @@ Il codice d'accesso è la password di Supabase Auth: hashata da Supabase (bcrypt
    - al login successivo il bersaglio deve cambiare il codice;
    - **(b) solo con le email attive**: "Hai dimenticato il codice?" → `resetPasswordForEmail` → template di recupero Supabase con link `token_hash` → `/auth/conferma` (POST) → scelta del nuovo codice. Senza email il link non è mostrato; la pagina spiega "Chiedi a {partner} di impostarti un codice temporaneo".
    - Se nessuno dei due partner ricorda il codice e le email non sono attive, resta il runbook: lo sviluppatore lo reimposta dal pannello Supabase.
-   - **Proposta (Q-C)**: il codice iniziale scelto da A è solo *suggerito* da cambiare (banner non bloccante); il codice **temporaneo** di ripristino *obbliga* al cambio.
+   - **Approvato (Q-C, D51)**: il codice iniziale scelto da A è solo *suggerito* da cambiare (banner non bloccante); il codice **temporaneo** di ripristino *obbliga* al cambio.
 
 #### 4.6 Regole sulle email
 - **A modifica l'email di B finché B non è mai entrato**: `update_partner_email` + `admin.updateUserById(email)` + aggiornamento dell'invito. Con invito via email, nuovo invio.
@@ -639,19 +639,20 @@ Totale: 24 task (19 developer, 4 qa, 1 technical-writer) più T0 del product-own
 - **Q13**: account di smoke e bootstrap da variabili d'ambiente.
 - **Q14, Q15, Q16**: approvate.
 
-### Open questions (question-for-developer, con risposta proposta)
-| # | Question | Proposta |
+### Domande Q-A/Q-B/Q-C — risposte dello sviluppatore (Gate B, 2026-11-24)
+| # | Question | Risposta |
 |---|---|---|
-| Q-A | Lunghezza minima del codice d'accesso: 10 caratteri con lettere e cifre (imposta dal server Supabase), invece degli 8 ipotizzati, perché l'endpoint di login è raggiungibile direttamente da Internet e il piano free non blocca gli account | 10 + lettere e cifre |
-| Q-B | CAPTCHA (Cloudflare Turnstile, gratuito ma un servizio nuovo) sul login, per fermare anche i tentativi diretti a Supabase | No in R1; da riconsiderare se i log mostrano tentativi |
-| Q-C | Il codice iniziale scelto da A per B: cambio solo *suggerito* al primo accesso; il codice *temporaneo* di ripristino: cambio *obbligatorio* | Sì |
+| Q-A | Lunghezza minima del codice d'accesso: 10 caratteri con lettere e cifre (imposta dal server Supabase), invece degli 8 ipotizzati, perché l'endpoint di login è raggiungibile direttamente da Internet e il piano free non blocca gli account | **Approvato**: 10 + lettere e cifre (D49) |
+| Q-B | CAPTCHA (Cloudflare Turnstile, gratuito ma un servizio nuovo) sul login, per fermare anche i tentativi diretti a Supabase | **Approvato**: nessun CAPTCHA in R1 (D50) |
+| Q-C | Il codice iniziale scelto da A per B: cambio solo *suggerito* al primo accesso; il codice *temporaneo* di ripristino: cambio *obbligatorio* | **Approvato** (D51) |
 
 ## Change log
 | Date | Change | Why | Approved by |
 |---|---|---|---|
 | 2026-11-23 | Prima stesura del piano (F2) | — | — |
 | 2026-11-23 | Round 1 F2 (matrice delle scritture, orologio, `/servizio`, raggruppamento email, temi, divisione dei task QA, …) | Obiezioni PO/QA/DES | — |
-| 2026-11-23 | **Cambio di requisiti al Gate B**:<br>- accesso con email + codice d'accesso al posto di magic link/OTP;<br>- bootstrap del primo utente da variabili d'ambiente (create-only, al primo login + script) al posto dell'allowlist SQL;<br>- partner creato da A con codice o invitato via email;<br>- cambio e ripristino dei codici; regole sulle email;<br>- limitatore con messaggi neutri;<br>- email opzionali con avviso in app;<br>- promemoria a B dopo il primo accesso;<br>- data collegabile a una location;<br>- 12 temi approvati;<br>- rilascio unico;<br>- T7 diviso in T7a/T7b e gruppi riordinati;<br>- nuove righe di test, rischi R20–R25, domande Q-A/Q-B/Q-C | Decisione dello sviluppatore (`log.md`, "Gate B round") | — |
+| 2026-11-23 | **Cambio di requisiti al Gate B**:<br>- accesso con email + codice d'accesso al posto di magic link/OTP;<br>- bootstrap del primo utente da variabili d'ambiente (create-only, al primo login + script) al posto dell'allowlist SQL;<br>- partner creato da A con codice o invitato via email;<br>- cambio e ripristino dei codici; regole sulle email;<br>- limitatore con messaggi neutri;<br>- email opzionali con avviso in app;<br>- promemoria a B dopo il primo accesso;<br>- data collegabile a una location;<br>- 12 temi approvati;<br>- rilascio unico;<br>- T7 diviso in T7a/T7b e gruppi riordinati;<br>- nuove righe di test, rischi R20–R25, domande Q-A/Q-B/Q-C | Decisione dello sviluppatore (`log.md`, "Gate B round") | tonybartiloro, 2026-11-24 (Gate B) |
+| 2026-11-24 | Risposte Q-A (10 caratteri, lettere e cifre), Q-B (nessun CAPTCHA), Q-C (cambio obbligatorio solo dopo codice temporaneo) | Gate B | tonybartiloro, 2026-11-24 |
 
 ## Outcome
 <!-- Filled at the end of F5: what shipped, where, when, deviations from the plan, follow-ups. -->
