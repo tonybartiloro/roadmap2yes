@@ -55,3 +55,11 @@ N6. `src/proxy.ts` matcher excludes any path ending in an image/font extension, 
 | N4 | Fixed: comment on the build-time origin; `upgrade-insecure-requests` added only when `VERCEL` is set (local/e2e servers use plain http to 127.0.0.1, where it could break requests). |
 | N5 | Fixed: `destructive` button uses `text-destructive-foreground`; no other hard-coded colours in `ui/*` (grep). T3 must expose `--destructive-foreground`. |
 | N6 | Fixed: the matcher exclusion for image/font extensions no longer applies under `/api/` (checked with the regex: `/api/foo.png` is proxied). The dot-segment/encoded-path guard test (`/accesso/%2e%2e/x`) is for T7a, who owns `guards.ts`. |
+
+## Round 2 (reviewer, verified against 7bff2f8..02ea503)
+
+Closed: S1 (allowlist removed; developer verified placeholders not flagged), S2 (`.env*` + `!.env.example`), S3 (`readSiteUrl` throws in production/Vercel without a value; localhost only dev/test), S4 (`[auth.email] enable_signup=false`; runtime proof remains a T2/T7 integration test, already tracked), S5 (accepted as tracked: remove `--pass-with-no-tests`/`--passWithNoTests` and `hashFiles` conditions when owners merge), N1, N2, N3 (sibling/.js patterns plus fixture; tests build their own service client), N4, N5 (T3 must expose `--destructive-foreground`), N6 (matcher verified: `/api/foo.png` is proxied; encoded-path test belongs to T7a).
+
+Reopened: none.
+
+Final verdict: **approved**.
