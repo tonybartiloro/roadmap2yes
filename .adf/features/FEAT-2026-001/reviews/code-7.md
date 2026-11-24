@@ -35,3 +35,18 @@ Test gaps: `failed_final` (5 attempts), resume under cap pressure, mark-sent aft
 ## Questions for the developer
 1. Should soft-deleting an item also hide or deactivate its payments (here or in the UI), and should `agreed` require `agreed_cents` (REV-5)?
 2. Is the global advisory lock acceptable given that the job runs once a day? I think so. Please note the load assumption in the code comment.
+
+## Round 2 (commit 5ad24ae)
+
+Verdict: approved
+
+| ID | Status | Note |
+|---|---|---|
+| REV-1 | Closed | The cap check now runs for resumed rows too (the row itself is excluded from the count). At the cap a resume returns `skipped_quota`, and the row stays retryable. Tests added. |
+| REV-2 | Closed | `attempts >= 5` applies to expired claims too and returns `failed_final`, marking the row `failed`. Tested. |
+| REV-3 | Closed | mark-sent accepts `claimed` and `failed`. Tested. |
+| REV-4 | Closed | `clock_timestamp()` in the stamp trigger, and the seed no longer passes dates. |
+| REV-5 | Closed | Coordinator decision: no DB change. Payments of deleted items are kept (undo works), the aggregates exclude them (T13/T14), and `agreed` does not require `agreed_cents`. The rule is documented in the migration comment. |
+
+T9 pgTAP run (budget_versions, budget_categories, notifications_job, notifications_prefs, core_schema): 176 tests, all pass. One earlier run hit a pgTAP-enable race (pg_extension duplicate key), probably from T8 running at the same time. The retry passed.
+AC53 is now ✅ at the DB level. Concurrency of the advisory lock stays a T16 integration check.
