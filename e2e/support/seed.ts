@@ -40,6 +40,74 @@ export function romeDate(offsetDays = 0, now: Date = new Date()): string {
   return base.toISOString().slice(0, 10);
 }
 
+/** The id of the standard decision of a wedding (`date` or `location`). */
+export async function decisionId(w: SeededWedding, type: "date" | "location"): Promise<string> {
+  const row = await w.wedding.founderClient
+    .from("decisions")
+    .select("id")
+    .eq("wedding_id", w.weddingId)
+    .eq("type", type)
+    .single();
+  if (row.error || !row.data) throw new Error(`seed: decision ${type}: ${row.error?.message}`);
+  return row.data.id;
+}
+
+/** A candidate location (name, comune, pros/cons, rough cost) as the Scelte UI would add it. */
+export async function addLocation(
+  w: SeededWedding,
+  title: string,
+  extra: { comune?: string; pros?: string[]; cons?: string[]; costCents?: number } = {},
+): Promise<string> {
+  const inserted = await w.wedding.founderClient
+    .from("decision_options")
+    .insert({
+      wedding_id: w.weddingId,
+      decision_id: await decisionId(w, "location"),
+      title,
+      comune: extra.comune ?? null,
+      pros: extra.pros ?? [],
+      cons: extra.cons ?? [],
+      cost_cents: extra.costCents ?? null,
+    })
+    .select("id")
+    .single();
+  if (inserted.error) throw new Error(`seed: location: ${inserted.error.message}`);
+  return inserted.data.id;
+}
+
+/** A user task (title, optional due date in YYYY-MM-DD, assignee `both` | `A` | `B`). */
+export async function addTask(
+  w: SeededWedding,
+  task: {
+    title: string;
+    due?: string | null;
+    assignee?: string;
+    category?: string | null;
+    done?: boolean;
+  },
+): Promise<string> {
+  const inserted = await w.wedding.founderClient
+    .from("tasks")
+    .insert({
+      wedding_id: w.weddingId,
+      title: task.title,
+      due_date: task.due ?? null,
+      assignee: task.assignee ?? "both",
+      category: task.category ?? null,
+    })
+    .select("id")
+    .single();
+  if (inserted.error) throw new Error(`seed: task: ${inserted.error.message}`);
+  if (task.done) {
+    const done = await w.wedding.founderClient
+      .from("tasks")
+      .update({ status: "done" })
+      .eq("id", inserted.data.id);
+    if (done.error) throw new Error(`seed: task done: ${done.error.message}`);
+  }
+  return inserted.data.id;
+}
+
 export async function seedWedding(
   options: {
     rite?: Rite;
@@ -48,6 +116,8 @@ export async function seedWedding(
     names?: { a: string; b: string };
     withPartnerB?: boolean;
     role?: "sposo" | "sposa";
+    /** `false`: no milestone tasks (only what the test adds), to test phases deterministically. */
+    templateTasks?: boolean;
   } = {},
 ): Promise<SeededWedding> {
   const wedding = await createWedding(options.role ?? "sposo");
@@ -62,7 +132,7 @@ export async function seedWedding(
   await a.from("wedding_partners").update({ first_name: names.a }).eq("slot", "A");
   if (withB) await a.from("wedding_partners").update({ first_name: names.b }).eq("slot", "B");
 
-  const tasks = generateTasks(rite, null).map((task) => {
+  const tasks = (options.templateTasks === false ? [] : generateTasks(rite, null)).map((task) => {
     const offset = getMilestone(task.templateKey)?.offset ?? null;
     return {
       template_key: task.templateKey,
