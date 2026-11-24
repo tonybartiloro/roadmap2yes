@@ -137,6 +137,7 @@ export function PercorsoScreen({
     mine: TaskFields,
     run: (version: number) => Promise<ActionResult<TaskSaved>>,
     version: number = task.version,
+    fromSheet = false,
   ): Promise<TaskSaved | null> {
     const result = await run(version);
     if (result.ok) return result.data;
@@ -145,8 +146,23 @@ export function PercorsoScreen({
       return null;
     }
     toast.error(result.message);
-    setSheetError(result.message);
+    if (fromSheet) setSheetError(result.message);
     return null;
+  }
+
+  /** Runs an "Annulla": a failure is shown and the real state is reloaded (AC31). */
+  function undoWrite(run: () => Promise<ActionResult<unknown>>) {
+    startTransition(async () => {
+      const result = await run();
+      if (!result.ok) {
+        toast.error(
+          result.conflict
+            ? "Nel frattempo qualcosa è cambiato: ho ricaricato la versione attuale."
+            : result.message,
+        );
+        router.refresh();
+      }
+    });
   }
 
   function undoToast(message: string, onUndo: () => void) {
@@ -165,9 +181,9 @@ export function PercorsoScreen({
       const saved = await write(task, mine, run);
       if (saved && done) {
         undoToast("Compito completato.", () =>
-          startTransition(async () => {
-            await setTaskStatusAction({ id: taskId, expectedVersion: saved.version, done: false });
-          }),
+          undoWrite(() =>
+            setTaskStatusAction({ id: taskId, expectedVersion: saved.version, done: false }),
+          ),
         );
       }
     });
@@ -180,9 +196,9 @@ export function PercorsoScreen({
       const saved = await write(task, taskToFields(task), run);
       if (saved) {
         undoToast(`«${task.title}» eliminato.`, () =>
-          startTransition(async () => {
+          undoWrite(async () => {
             applyOptimistic({ type: "restore", id: task.id });
-            await restoreTaskAction({ id: task.id, expectedVersion: saved.version });
+            return restoreTaskAction({ id: task.id, expectedVersion: saved.version });
           }),
         );
       }
@@ -221,8 +237,12 @@ export function PercorsoScreen({
         return true;
       }
       const mine = { ...fields, status: task.status };
-      const saved = await write(task, mine, (version) =>
-        updateTaskAction({ id: task.id, expectedVersion: version, fields }),
+      const saved = await write(
+        task,
+        mine,
+        (version) => updateTaskAction({ id: task.id, expectedVersion: version, fields }),
+        task.version,
+        true,
       );
       if (saved) toast("Modifiche salvate.");
       return saved !== null;
@@ -259,9 +279,9 @@ export function PercorsoScreen({
       );
       if (saved) {
         undoToast(`«${task.title}» tolta dal Percorso.`, () =>
-          startTransition(async () => {
+          undoWrite(async () => {
             applyOptimistic({ type: "restore", id: task.id });
-            await restoreTaskAction({ id: task.id, expectedVersion: saved.version });
+            return restoreTaskAction({ id: task.id, expectedVersion: saved.version });
           }),
         );
       }
@@ -293,10 +313,7 @@ export function PercorsoScreen({
     const previous = result.data.previousOptionId;
     router.replace(PERCORSO_HREF);
     undoToast(`Il riferimento ora è il ${formatShortDate(target.dateFrom)}.`, () =>
-      startTransition(async () => {
-        const undone = await setReferenceAction({ optionId: previous });
-        if (!undone.ok) toast.error(undone.message);
-      }),
+      undoWrite(() => setReferenceAction({ optionId: previous })),
     );
   }
 
@@ -358,7 +375,7 @@ export function PercorsoScreen({
       <EmailOffBanner emailEnabled={emailEnabled} />
       {view.reopened ? (
         <ReopenedBanner
-          reviewCount={view.reviewCount}
+          reviewCount={previewing ? 0 : view.reviewCount}
           busy={busy === "all"}
           onAcknowledgeAll={() => acknowledge(null)}
         />
@@ -367,14 +384,16 @@ export function PercorsoScreen({
         <RecalculatedStrip byName={view.recalculated.byName} reference={view.reference} />
       ) : null}
 
-      <SuggestionsCard
-        additions={view.suggestions.additions}
-        removals={view.suggestions.removals}
-        busyKey={busy}
-        onAcceptAdd={acceptAddition}
-        onAcceptRemove={acceptRemoval}
-        onDismiss={dismiss}
-      />
+      {previewing ? null : (
+        <SuggestionsCard
+          additions={view.suggestions.additions}
+          removals={view.suggestions.removals}
+          busyKey={busy}
+          onAcceptAdd={acceptAddition}
+          onAcceptRemove={acceptRemoval}
+          onDismiss={dismiss}
+        />
+      )}
 
       {noTasksAtAll ? (
         <EmptyState
@@ -466,22 +485,26 @@ export function PercorsoScreen({
         </>
       )}
 
-      <RecentlyDeleted tasks={view.deleted} busyId={busy} onRestore={restore} />
+      {previewing ? null : (
+        <RecentlyDeleted tasks={view.deleted} busyId={busy} onRestore={restore} />
+      )}
 
       <p role="status" aria-live="polite" className="sr-only" data-testid="live-region">
         {announcement}
       </p>
 
-      <Button
-        type="button"
-        size="icon"
-        aria-label="Aggiungi un compito"
-        data-testid="task-add"
-        onClick={() => setSheet({ kind: "new" })}
-        className="fixed right-4 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-30 size-14 rounded-full shadow-lg md:right-8 md:bottom-8"
-      >
-        <Plus aria-hidden className="size-6!" />
-      </Button>
+      {previewing ? null : (
+        <Button
+          type="button"
+          size="icon"
+          aria-label="Aggiungi un compito"
+          data-testid="task-add"
+          onClick={() => setSheet({ kind: "new" })}
+          className="fixed right-4 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-30 size-14 rounded-full shadow-lg md:right-8 md:bottom-8"
+        >
+          <Plus aria-hidden className="size-6!" />
+        </Button>
+      )}
 
       <TaskSheet
         target={sheetTarget}
@@ -498,6 +521,7 @@ export function PercorsoScreen({
         onSave={save}
         onDelete={remove}
         onAcknowledge={(task) => acknowledge(task.id)}
+        readOnly={previewing}
       />
 
       <ReferenceConfirmSheet

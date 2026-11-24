@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getMilestone, MILESTONE_CATEGORIES } from "@/content/milestones";
+import { getNow } from "@/lib/clock";
 import { isPlainDate } from "@/lib/dates/plain-date";
 import { createClient } from "@/lib/supabase/server";
 import { classifyDbError } from "@/lib/supabase/errors";
@@ -173,7 +174,8 @@ export async function deleteTaskAction(input: unknown): Promise<ActionResult<Tas
   const parsed = z.object({ id: idSchema, expectedVersion: versionSchema }).safeParse(input);
   if (!parsed.success) return fail("invalid");
   return writeTask(await userClient(), parsed.data.id, parsed.data.expectedVersion, {
-    deleted_at: new Date().toISOString(),
+    // The DB trigger stamps the real `deleted_at`; this only marks the change (injectable clock).
+    deleted_at: (await getNow()).toISOString(),
   });
 }
 

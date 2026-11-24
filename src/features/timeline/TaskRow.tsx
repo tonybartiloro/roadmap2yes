@@ -56,6 +56,7 @@ export function TaskRow({
           checked={done}
           aria-label={done ? `Riapri: ${task.title}` : `Segna come fatto: ${task.title}`}
           data-testid="task-checkbox"
+          disabled={preview}
           onCheckedChange={(next) => onToggle(task.id, next === true)}
         />
       </div>

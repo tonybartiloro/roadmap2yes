@@ -2,6 +2,7 @@
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { BUREAUCRATIC_DISCLAIMER } from "@/content/milestones";
 import { addDays } from "@/lib/dates/plain-date";
 import { generateTasks } from "@/domain/timeline";
 import type { PercorsoData } from "./model";
@@ -356,7 +357,7 @@ describe("task actions (AC31, AC40)", () => {
     await userEvent.click(screen.getByTestId("task-title"));
     expect(await screen.findByTestId("task-advice")).toBeTruthy();
     expect(screen.getByTestId("task-bureaucratic-note").textContent).toContain(
-      "Indicativo: verifica sempre con il comune o la parrocchia",
+      BUREAUCRATIC_DISCLAIMER,
     );
     await userEvent.click(screen.getByRole("button", { name: "Va bene così" }));
     await waitFor(() =>
@@ -537,6 +538,64 @@ describe("scenario selector and preview (AC32)", () => {
     await userEvent.click(await screen.findByTestId("reference-confirm-ok"));
     expect(await screen.findByText(/non è più disponibile/)).toBeTruthy();
     expect(nav.replace).not.toHaveBeenCalled();
+  });
+
+  it("in preview every write control is off: checkboxes, +, sheet actions, suggestions (AC32)", async () => {
+    renderScreen(
+      {
+        ...withTasks,
+        rite: "civile",
+        tasks: [
+          ...withTasks.tasks,
+          task("gone", { deleted: true, deletedAt: "2026-11-23T10:00:00Z" }),
+        ],
+      },
+      { previewId: "s-far" },
+    );
+    const box = screen.getByRole("checkbox", { name: /Scegliere i testimoni/ });
+    expect(box.hasAttribute("disabled")).toBe(true);
+    await userEvent.click(box);
+    expect(screen.queryByTestId("task-add")).toBeNull();
+    expect(screen.queryByTestId("suggestions-card")).toBeNull();
+    expect(screen.queryByTestId("recently-deleted")).toBeNull();
+    await userEvent.click(screen.getByTestId("task-title"));
+    const sheet = await screen.findByTestId("task-sheet");
+    expect(within(sheet).getByTestId("task-delete").closest("[hidden]")).not.toBeNull();
+    for (const fn of Object.values(actions)) expect(fn).not.toHaveBeenCalled();
+  });
+
+  it("a failed undo shows an error and reloads (AC31)", async () => {
+    actions.setTaskStatusAction.mockResolvedValueOnce(ok({ id: "a", version: 2 }));
+    renderScreen({ tasks: [task("a", { title: "Scegliere il menù", dueDate: at(2) })] });
+    await userEvent.click(screen.getByRole("checkbox", { name: /Segna come fatto/ }));
+    await waitFor(() => expect(toastMock).toHaveBeenCalled());
+    const [, options] = toastMock.mock.calls[0]!;
+    actions.setTaskStatusAction.mockResolvedValueOnce({
+      ok: false,
+      code: "unavailable",
+      message: "Non riesco a raggiungere il servizio. Riprova tra poco.",
+    });
+    options.action.onClick();
+    await waitFor(() =>
+      expect(toastMock.error).toHaveBeenCalledWith(
+        "Non riesco a raggiungere il servizio. Riprova tra poco.",
+      ),
+    );
+    expect(nav.refresh).toHaveBeenCalled();
+  });
+
+  it("a checkbox failure does not leak an error into the next sheet (REV-5)", async () => {
+    actions.setTaskStatusAction.mockResolvedValueOnce({
+      ok: false,
+      code: "unknown",
+      message: "Non sono riuscito a salvare. Riprova.",
+    });
+    renderScreen({ tasks: [task("a", { title: "A", dueDate: at(2) })] });
+    await userEvent.click(screen.getByRole("checkbox", { name: /Segna come fatto/ }));
+    await waitFor(() => expect(toastMock.error).toHaveBeenCalled());
+    await userEvent.click(screen.getByTestId("task-title"));
+    const sheet = await screen.findByTestId("task-sheet");
+    expect(within(sheet).queryByRole("alert")).toBeNull();
   });
 
   it("a preview of a scenario that is gone closes with a notice", () => {

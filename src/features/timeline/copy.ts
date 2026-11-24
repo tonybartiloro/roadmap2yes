@@ -7,8 +7,6 @@ export const COPY = {
   emptyTasksTitle: "Ancora nessun compito. Aggiungi il primo.",
   adessoEmpty: "Per ora niente di urgente.",
   recoverTone: "Di solito si fa prima, ma hai ancora tempo.",
-  /** Design §7.1 "Avviso tappe burocratiche" (second person singular, unlike the catalogue constant). */
-  bureaucratic: "Indicativo: verifica sempre con il comune o la parrocchia.",
   noDeadline: "Senza scadenza",
   reviewBadge: "Da rivedere",
   reviewOk: "Va bene così",

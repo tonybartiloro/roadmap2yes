@@ -7,7 +7,7 @@ import { formatShortDate } from "@/components/format";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { CATEGORY_LABELS } from "@/content/milestones/categories";
-import { getMilestone } from "@/content/milestones";
+import { BUREAUCRATIC_DISCLAIMER, getMilestone } from "@/content/milestones";
 import type { MilestoneCategory } from "@/content/milestones/types";
 import type { PlainDate } from "@/lib/dates/plain-date";
 import { COPY, dueExactText } from "./copy";
@@ -37,6 +37,7 @@ export function TaskSheet({
   onSave,
   onDelete,
   onAcknowledge,
+  readOnly = false,
 }: {
   target: SheetTarget;
   today: PlainDate;
@@ -50,6 +51,8 @@ export function TaskSheet({
   onSave: (task: TaskView | null, fields: TaskFields) => Promise<boolean>;
   onDelete: (task: TaskView) => void;
   onAcknowledge: (task: TaskView) => void;
+  /** Preview: nothing can be written (AC32); the sheet only shows the task. */
+  readOnly?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const open = target.kind !== "none";
@@ -142,7 +145,7 @@ export function TaskSheet({
                     data-testid="task-bureaucratic-note"
                   >
                     <Info aria-hidden className="mt-0.5 size-4 shrink-0" />
-                    <span>{COPY.bureaucratic}</span>
+                    <span>{BUREAUCRATIC_DISCLAIMER}</span>
                   </p>
                 ) : null}
                 {task.notes ? (
@@ -152,7 +155,7 @@ export function TaskSheet({
                   </div>
                 ) : null}
 
-                {task.needsReview && task.status === "todo" ? (
+                {!readOnly && task.needsReview && task.status === "todo" ? (
                   <div className="border-border flex flex-col gap-2 rounded-md border p-3">
                     <p className="flex items-center gap-2 text-base">
                       <Eye aria-hidden className="size-5 shrink-0" />
@@ -177,7 +180,7 @@ export function TaskSheet({
                   </p>
                 ) : null}
 
-                <div className="flex flex-col gap-2 sm:flex-row-reverse">
+                <div hidden={readOnly} className="flex flex-col gap-2 sm:flex-row-reverse">
                   <Button type="button" onClick={() => setEditing(true)} data-testid="task-edit">
                     <Pencil aria-hidden /> Modifica
                   </Button>
