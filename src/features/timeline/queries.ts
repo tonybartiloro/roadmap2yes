@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
 import { isPlainDate } from "@/lib/dates/plain-date";
+import { allPages } from "@/lib/supabase/all-pages";
 import { classifyDbError, type DbErrorKind } from "@/lib/supabase/errors";
 import type { SuggestionDismissal } from "@/domain/timeline";
 import {
@@ -64,7 +65,18 @@ export async function loadPercorsoData(db: Db, userId: string): Promise<Percorso
     db.from("memberships").select("partner_slot").eq("user_id", userId).maybeSingle(),
     db.from("wedding_partners").select("*"),
     db.from("decisions").select("id, key, status"),
-    db.from("tasks").select("*").order("created_at", { ascending: true }),
+    // Every task, page by page (the DB allows up to 2000 per wedding; `max_rows` is lower).
+    allPages((from, to) =>
+      db
+        .from("tasks")
+        .select("*")
+        .order("created_at", { ascending: true })
+        .order("id", { ascending: true })
+        .range(from, to),
+    ).then(
+      (data) => ({ data, error: null }),
+      (error: unknown) => ({ data: null, error }),
+    ),
     db.from("task_suggestion_dismissals").select("template_key, kind"),
     db.from("user_wedding_state").select("previous_seen_at").eq("user_id", userId).maybeSingle(),
   ]);

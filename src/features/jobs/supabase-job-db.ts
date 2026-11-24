@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Json } from "@/lib/supabase/database.types";
+import { allPages, chunk } from "@/lib/supabase/all-pages";
 import { todayInRome, type PlainDate } from "@/lib/dates/plain-date";
 import type { AuditEntry, DecisionEventEntry, DecisionEventKind } from "@/domain/news";
 import type { PlanPayment, PlanTask } from "@/domain/reminders";
@@ -22,7 +23,6 @@ import type {
 const DAY_MS = 86_400_000;
 /** Audit window: the digest looks back 7 days, and so does the due-date-change check (D38). */
 const AUDIT_DAYS = 7;
-const PAGE_LIMIT = 1000;
 const AUDIT_TABLES = ["tasks", "budget_versions", "payments"] as const;
 
 const CLAIM_STATUSES: readonly ClaimStatus[] = [
@@ -48,21 +48,6 @@ function unwrap<T>(result: { data: T | null; error: { code?: string } | null }):
   if (result.error) throw new JobDbError(result.error.code);
   if (result.data === null) throw new JobDbError("no_data");
   return result.data;
-}
-
-/** Reads every page of an ordered query (`max_rows` truncates a single response silently). */
-export async function allPages<T>(
-  page: (
-    from: number,
-    to: number,
-  ) => PromiseLike<{ data: T[] | null; error: { code?: string } | null }>,
-): Promise<T[]> {
-  const all: T[] = [];
-  for (let from = 0; ; from += PAGE_LIMIT) {
-    const rows = unwrap(await page(from, from + PAGE_LIMIT - 1));
-    all.push(...rows);
-    if (rows.length < PAGE_LIMIT) return all;
-  }
 }
 
 function asObject(value: Json | undefined): Record<string, Json | undefined> {
@@ -125,8 +110,8 @@ export function createSupabaseJobDb(client: SupabaseClient<Database>): JobDb {
     },
 
     async doneItemKeys(userId, exceptBatchKey, since) {
-      const rows = unwrap(
-        await client
+      const rows = await allPages((from, to) =>
+        client
           .from("notification_log")
           .select("item_keys")
           .eq("user_id", userId)
@@ -134,7 +119,8 @@ export function createSupabaseJobDb(client: SupabaseClient<Database>): JobDb {
           .in("status", ["claimed", "sent"])
           .neq("batch_key", exceptBatchKey)
           .gte("claimed_at", since.toISOString())
-          .limit(PAGE_LIMIT),
+          .order("id")
+          .range(from, to),
       );
       return rows.flatMap((r) => r.item_keys);
     },
@@ -201,22 +187,29 @@ async function loadWeddingData(
 
   const [taskRows, paymentRows, decisionRows, partnerRows, auditRows, eventRows] =
     await Promise.all([
-      client
-        .from("tasks")
-        .select("id, title, due_date, status, assignee, reminders_enabled, deleted_at")
-        .eq("wedding_id", weddingId)
-        .is("deleted_at", null)
-        .eq("status", "todo")
-        .not("due_date", "is", null)
-        .limit(PAGE_LIMIT),
-      client
-        .from("payments")
-        .select("id, item_id, amount_cents, due_date, paid, deleted_at")
-        .eq("wedding_id", weddingId)
-        .is("deleted_at", null)
-        .eq("paid", false)
-        .not("due_date", "is", null)
-        .limit(PAGE_LIMIT),
+      // Every list below is read page by page with a unique ORDER BY (`max_rows` truncates).
+      allPages((from, to) =>
+        client
+          .from("tasks")
+          .select("id, title, due_date, status, assignee, reminders_enabled, deleted_at")
+          .eq("wedding_id", weddingId)
+          .is("deleted_at", null)
+          .eq("status", "todo")
+          .not("due_date", "is", null)
+          .order("id")
+          .range(from, to),
+      ),
+      allPages((from, to) =>
+        client
+          .from("payments")
+          .select("id, item_id, amount_cents, due_date, paid, deleted_at")
+          .eq("wedding_id", weddingId)
+          .is("deleted_at", null)
+          .eq("paid", false)
+          .not("due_date", "is", null)
+          .order("id")
+          .range(from, to),
+      ),
       client
         .from("decisions")
         .select("status")
@@ -227,24 +220,30 @@ async function loadWeddingData(
         .from("wedding_partners")
         .select("user_id, first_name, last_name, label")
         .eq("wedding_id", weddingId),
-      client
-        .from("audit_log")
-        .select("id, at, actor_id, table_name, op, old_data, new_data")
-        .eq("wedding_id", weddingId)
-        .in("table_name", [...AUDIT_TABLES])
-        .gte("at", since)
-        .order("at", { ascending: false })
-        .limit(PAGE_LIMIT),
-      client
-        .from("decision_events")
-        .select("id, at, kind, actor_id, decision_id, option_id, payload")
-        .eq("wedding_id", weddingId)
-        .gte("at", since)
-        .order("at", { ascending: false })
-        .limit(PAGE_LIMIT),
+      allPages((from, to) =>
+        client
+          .from("audit_log")
+          .select("id, at, actor_id, table_name, op, old_data, new_data")
+          .eq("wedding_id", weddingId)
+          .in("table_name", [...AUDIT_TABLES])
+          .gte("at", since)
+          .order("at", { ascending: false })
+          .order("id", { ascending: false })
+          .range(from, to),
+      ),
+      allPages((from, to) =>
+        client
+          .from("decision_events")
+          .select("id, at, kind, actor_id, decision_id, option_id, payload")
+          .eq("wedding_id", weddingId)
+          .gte("at", since)
+          .order("at", { ascending: false })
+          .order("id", { ascending: false })
+          .range(from, to),
+      ),
     ]);
 
-  const tasks = unwrap(taskRows).map((t): PlanTask => ({
+  const tasks = taskRows.map((t): PlanTask => ({
     id: t.id,
     title: t.title,
     dueDate: t.due_date,
@@ -254,16 +253,17 @@ async function loadWeddingData(
     deletedAt: t.deleted_at,
   }));
 
-  const rawPayments = unwrap(paymentRows);
+  const rawPayments = paymentRows;
   const itemIds = [...new Set(rawPayments.map((p) => p.item_id))];
   const items = new Map<string, { description: string; deleted: boolean }>();
-  if (itemIds.length > 0) {
+  // Chunked: a long `.in()` list would exceed URL limits (and each chunk is far below max_rows).
+  for (const ids of chunk(itemIds)) {
     const rows = unwrap(
       await client
         .from("budget_items")
         .select("id, description, deleted_at")
         .eq("wedding_id", weddingId)
-        .in("id", itemIds),
+        .in("id", ids),
     );
     for (const r of rows)
       items.set(r.id, { description: r.description, deleted: r.deleted_at !== null });
@@ -291,7 +291,7 @@ async function loadWeddingData(
       label: p.label,
     }));
 
-  const audit: AuditEntry[] = unwrap(auditRows).map((a) => ({
+  const audit: AuditEntry[] = auditRows.map((a) => ({
     id: a.id,
     at: a.at,
     actorId: a.actor_id,
@@ -308,7 +308,7 @@ async function loadWeddingData(
     dueChangedOn: dueChanges(audit),
     people,
     audit,
-    decisionEvents: await decisionEvents(client, weddingId, unwrap(eventRows)),
+    decisionEvents: await decisionEvents(client, weddingId, eventRows),
   };
 }
 
@@ -347,18 +347,24 @@ async function decisionEvents(
   if (events.length === 0) return [];
   const decisionIds = [...new Set(events.map((e) => e.decision_id))];
   const optionIds = [...new Set(events.flatMap((e) => (e.option_id ? [e.option_id] : [])))];
-  const [decisions, options] = await Promise.all([
-    client.from("decisions").select("id, key").eq("wedding_id", weddingId).in("id", decisionIds),
-    optionIds.length > 0
-      ? client
-          .from("decision_options")
-          .select("id, title")
-          .eq("wedding_id", weddingId)
-          .in("id", optionIds)
-      : Promise.resolve({ data: [] as { id: string; title: string }[], error: null }),
-  ]);
-  const keys = new Map(unwrap(decisions).map((d) => [d.id, d.key]));
-  const titles = new Map(unwrap(options).map((o) => [o.id, o.title]));
+  const keys = new Map<string, string>();
+  for (const ids of chunk(decisionIds)) {
+    const rows = unwrap(
+      await client.from("decisions").select("id, key").eq("wedding_id", weddingId).in("id", ids),
+    );
+    for (const d of rows) keys.set(d.id, d.key);
+  }
+  const titles = new Map<string, string>();
+  for (const ids of chunk(optionIds)) {
+    const rows = unwrap(
+      await client
+        .from("decision_options")
+        .select("id, title")
+        .eq("wedding_id", weddingId)
+        .in("id", ids),
+    );
+    for (const o of rows) titles.set(o.id, o.title);
+  }
   return events.map((e) => {
     const referenceDate = asObject(e.payload)["reference_date"];
     return {

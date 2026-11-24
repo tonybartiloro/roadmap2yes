@@ -23,6 +23,7 @@ import { resolveReference, type ScenarioInput } from "@/domain/timeline";
 import { isPlainDate, type PlainDate } from "@/lib/dates/plain-date";
 import { displayName } from "@/lib/display-name";
 import type { Database } from "@/lib/supabase/database.types";
+import { allPages } from "@/lib/supabase/all-pages";
 import { classifyDbError } from "@/lib/supabase/errors";
 import { rowToTask } from "@/features/timeline/model";
 import {
@@ -211,6 +212,8 @@ interface BudgetFacts {
 const ITEM_STATUSES: readonly string[] = ["planned", "agreed", "cancelled"];
 const PAYMENT_KINDS: readonly string[] = ["deposit", "balance", "other"];
 
+// Budget categories, items and payments are bounded by realistic counts (tens to a few hundred
+// per wedding, far below `max_rows`), so they are read with a single query on purpose.
 async function loadBudgetFacts(db: Db): Promise<BudgetFacts> {
   const [versions, categories, items, payments] = await Promise.all([
     db
@@ -313,9 +316,17 @@ async function stepsSection(
     if (d.key === "location") return [{ id: d.id, kind: "location", title: "Scegli la location" }];
     return [];
   });
-  const tasks: HomeTask[] = must(
-    await db.from("tasks").select("*").is("deleted_at", null),
-    "compiti",
+  // Every live task, page by page (the DB allows up to 2000 per wedding; `max_rows` is lower).
+  const tasks: HomeTask[] = (
+    await allPages((from, to) =>
+      db
+        .from("tasks")
+        .select("*")
+        .is("deleted_at", null)
+        .order("created_at", { ascending: true })
+        .order("id", { ascending: true })
+        .range(from, to),
+    )
   ).map(rowToTask);
   const payments: PendingPayment[] = upcomingPayments(budget, today).map((p) => ({
     id: p.paymentId,
