@@ -502,3 +502,27 @@ Developer's answers to the 4 remaining questions: 1. OK (min 10 characters, lett
   - T15: clearAllFormDrafts on "Esci".
   - T16: REV-8, the unsubscribe route shape.
   - Designer visual check: the T3 list and the Countdown copy.
+
+## F3 — resumed, G2–G4 progress — 2026-11-24
+- T2 was resumed by a new developer and committed (0bc51c3, 441ff45).
+  - Security review code-6, round 1: 6 should.
+  - The architect ruled on all of them and updated the plan: §4.8, account_reusable, events written by the RPCs, one lock order, the limiter, P2/R26.
+  - Fixed in c9e4c6d/4190066; round 2 approved.
+- T8 (d3e8565, fixes 6a33fe2): code-8 found 1 blocking (the chosen scenario's dates were editable) and 5 should; round 2 approved.
+- T9 (9dea6b5, fixes 5ad24ae): code-7 found 3 should (caps on resume, attempt limit, mark-sent after fail); round 2 approved.
+- T11, T12, T13, T14 and T16 are built, reviewed (code-9 to code-13) and approved in round 2.
+- Coordinator decisions:
+  - The bureaucratic disclaimer uses the catalogue constant with the AC25 wording.
+  - Preview never writes.
+  - Budget defaults are seeded by T10 after onboarding, with a lazy fallback on /budget.
+  - Automatic sync does not bump `weddings.version`.
+  - Cap of 2000 tasks per wedding.
+  - The digest excludes tasks whose per-task switch is off.
+  - GitHub environments are main-only (release checklist).
+- Integrated: 847 unit tests, 164 integration, about 612 pgTAP; build green.
+- **Waiting on the developer: P2**, which covers 3 Auth settings and accepting R26. It blocks T7a, then T7b, T10, T15 and QA T17a–d.
+- Follow-ups:
+  - move `features/decisions` form-bits to `src/components`;
+  - `(app)/loading.tsx` is the fallback skeleton, so T15 should add its own;
+  - T15 calls `clearAllFormDrafts` on "Esci";
+  - T18 runbook: never `db reset --linked`, env/secret names, main-only environments.
