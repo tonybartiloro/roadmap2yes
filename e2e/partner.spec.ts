@@ -314,6 +314,8 @@ test.describe("invite by email (smtp)", () => {
     const link = extractLinks(mail).find((l) => l.includes("/invito/"));
     expect(link).toBeTruthy();
     const firstPath = new URL(link!).pathname;
+    // the invitation cannot be switched off: no unsubscribe link (AC52)
+    expect(extractLinks(mail).some((l) => l.includes("/email/disattiva"))).toBe(false);
 
     // "Invia di nuovo" rotates the token: the first link is dead
     await page.reload();
