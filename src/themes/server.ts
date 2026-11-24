@@ -10,8 +10,22 @@ import { DEFAULT_THEME_ID, THEME_COOKIE, isApprovedThemeId, resolveThemeId } fro
  */
 export type WeddingThemeLookup = () => Promise<string | null>;
 
-/** Timeout so a hanging database never blocks the first byte (DES-16). */
-const LOOKUP_TIMEOUT_MS = 1500;
+/** Budget of the WHOLE lookup (client creation, claims, query) so a hanging backend never blocks the first byte (DES-16). */
+export const LOOKUP_TIMEOUT_MS = 1500;
+export const BACKEND_HEADER = "x-r2y-backend";
+
+/** Resolves with `fallback` when `promise` is not settled within `ms` (or rejects). Never rejects. */
+export async function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<T>((resolve) => {
+    timer = setTimeout(() => resolve(fallback), ms);
+  });
+  try {
+    return await Promise.race([promise.catch(() => fallback), timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 /**
  * Default lookup: `weddings.theme_id` of the signed-in user through RLS (a user belongs to one
@@ -38,8 +52,9 @@ export const lookupWeddingThemeFromDb: WeddingThemeLookup = async () => {
 
 /**
  * Active theme id for the root layout: DB, else the `r2y-theme` cookie, else "giardino".
- * The proxy marks outage rewrites with `x-r2y-backend` when it can; in that case (and on the
- * `/servizio` page) the database is not touched at all.
+ * The proxy sets `x-r2y-backend` on the outage rewrite to `/servizio` (and strips client-sent
+ * copies): with it present the database is not touched at all. Otherwise the whole lookup runs
+ * under one timeout race.
  */
 export async function getActiveThemeId(
   lookup: WeddingThemeLookup = lookupWeddingThemeFromDb,
@@ -48,10 +63,16 @@ export async function getActiveThemeId(
   let backendDown = false;
   try {
     fromCookie = (await cookies()).get(THEME_COOKIE)?.value;
-    backendDown = (await headers()).has("x-r2y-backend");
+    backendDown = (await headers()).has(BACKEND_HEADER);
   } catch {
     return DEFAULT_THEME_ID;
   }
-  const fromDb = backendDown ? null : await lookup().catch(() => null);
+  const fromDb = backendDown
+    ? null
+    : await withTimeout(
+        Promise.resolve().then(() => lookup()),
+        LOOKUP_TIMEOUT_MS,
+        null,
+      );
   return resolveThemeId(fromDb, fromCookie);
 }

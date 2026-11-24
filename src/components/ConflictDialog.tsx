@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -90,6 +90,8 @@ export function ConflictDialog({
   saving = false,
 }: ConflictDialogProps) {
   const [expanded, setExpanded] = useState(false);
+  const descriptionId = useId();
+  const changesId = useId();
   const rows = diffFields(labels, mine, theirs, formatValue);
   const elapsed = formatElapsed(changedAt, now ?? new Date());
 
@@ -100,12 +102,12 @@ export function ConflictDialog({
         if (!next && !saving) onCancel(); // Escape means "Annulla", never "Salva comunque"
       }}
     >
-      <AlertDialogContent aria-describedby="conflict-description">
+      <AlertDialogContent aria-describedby={descriptionId}>
         <AlertDialogHeader>
           <AlertDialogTitle>
             {partnerName} ha modificato questo elemento {elapsed} fa
           </AlertDialogTitle>
-          <AlertDialogDescription id="conflict-description">
+          <AlertDialogDescription id={descriptionId}>
             Se salvi comunque, la tua versione sostituisce la sua. Se annulli, vedi la sua e la tua
             bozza resta copiabile.
           </AlertDialogDescription>
@@ -117,13 +119,13 @@ export function ConflictDialog({
               type="button"
               variant="outline"
               aria-expanded={expanded}
-              aria-controls="conflict-changes"
+              aria-controls={changesId}
               onClick={() => setExpanded((current) => !current)}
             >
               Vedi cosa è cambiato
             </Button>
             {expanded ? (
-              <table id="conflict-changes" className="mt-3 w-full text-left text-base">
+              <table id={changesId} className="mt-3 w-full text-left text-base">
                 <caption className="sr-only">Cosa è cambiato</caption>
                 <thead>
                   <tr className="border-border border-b">

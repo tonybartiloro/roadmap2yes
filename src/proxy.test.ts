@@ -144,3 +144,29 @@ describe("proxy: headers", () => {
     }
   });
 });
+
+describe("proxy: x-r2y-backend (proxy-owned header)", () => {
+  const forwardedHeader = (response: Response) =>
+    response.headers.get("x-middleware-request-x-r2y-backend");
+
+  it("sets it on the outage rewrite so the root layout skips the database", async () => {
+    getClaims.mockResolvedValue({
+      data: null,
+      error: { name: "AuthApiError", message: "", status: 540 },
+    });
+    evaluateGuards.mockResolvedValue({ action: "rewrite", to: "/servizio?motivo=paused" });
+    expect(forwardedHeader(await proxy(request("/percorso")))).toBe("paused");
+  });
+
+  it("strips a client-supplied value on every other request", async () => {
+    const spoofed = new NextRequest(new URL("/percorso", "http://localhost:3000"), {
+      headers: { "x-r2y-backend": "paused" },
+    });
+    expect(forwardedHeader(await proxy(spoofed))).toBeNull();
+  });
+
+  it("does not set it on a rewrite that is not an outage", async () => {
+    evaluateGuards.mockResolvedValue({ action: "rewrite", to: "/altro" });
+    expect(forwardedHeader(await proxy(request("/x")))).toBeNull();
+  });
+});

@@ -40,6 +40,9 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
     >
       <head>
         <meta name="theme-color" content={theme.light.background} />
+        {/* Order matters: the script reads `--background` from the computed style, so it must
+            come after the stylesheet (it does in Next's head output). The try/catch keeps it safe.
+            The server-rendered theme-color is the light background; dark users get the script's. */}
         <script dangerouslySetInnerHTML={{ __html: MODE_SCRIPT }} />
       </head>
       <body className="bg-background text-foreground min-h-dvh antialiased">

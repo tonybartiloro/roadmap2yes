@@ -4,14 +4,30 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 const PREFIX = "r2y-draft:";
 
+/** Drafts are a convenience, never a place for secrets: anything that looks like one is refused. */
+const SECRET_NAME = /code|codice|password|passwd|token|secret|otp|pin\b/i;
+
 /** Minimal storage surface (so the helpers are testable without a browser). */
 export interface DraftStorage {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
   removeItem(key: string): void;
+  /** Present on `Storage`; used by `clearAllFormDrafts`. */
+  readonly length?: number;
+  key?(index: number): string | null;
 }
 
 export type DraftParser<T> = (raw: unknown) => T | null;
+
+/** True if the draft key, or any (nested) field name of the value, looks like a secret. */
+export function containsSecretField(key: string, value: unknown, depth = 0): boolean {
+  if (SECRET_NAME.test(key)) return true;
+  if (depth > 5 || value === null || typeof value !== "object") return false;
+  if (Array.isArray(value)) return value.some((item) => containsSecretField("", item, depth + 1));
+  return Object.entries(value).some(
+    ([name, inner]) => SECRET_NAME.test(name) || containsSecretField("", inner, depth + 1),
+  );
+}
 
 export function readDraft<T>(
   storage: DraftStorage,
@@ -27,12 +43,14 @@ export function readDraft<T>(
   }
 }
 
+/** Returns false (and stores nothing) for secret-looking keys/fields, quota errors or private mode. */
 export function writeDraft(storage: DraftStorage, key: string, value: unknown): boolean {
+  if (containsSecretField(key, value)) return false;
   try {
     storage.setItem(PREFIX + key, JSON.stringify(value));
     return true;
   } catch {
-    return false; // quota or private mode: the draft is a convenience, never an error
+    return false;
   }
 }
 
@@ -44,7 +62,31 @@ export function removeDraft(storage: DraftStorage, key: string): void {
   }
 }
 
+/**
+ * Removes every draft of every user/wedding on this device. The sign-out flow ("Esci", T15)
+ * MUST call it, so the next person on a shared device never sees the previous one's drafts.
+ */
+export function clearAllFormDrafts(
+  storage: DraftStorage | undefined = typeof window === "undefined"
+    ? undefined
+    : window.localStorage,
+): void {
+  try {
+    if (!storage || typeof storage.key !== "function" || storage.length === undefined) return;
+    const keys: string[] = [];
+    for (let i = 0; i < storage.length; i += 1) {
+      const name = storage.key(i);
+      if (name?.startsWith(PREFIX)) keys.push(name);
+    }
+    for (const name of keys) storage.removeItem(name);
+  } catch {
+    // ignore
+  }
+}
+
 export interface UseFormDraftOptions<T> {
+  /** REQUIRED namespace: `${userId}:${weddingId}`. Two people on one device never share a draft. */
+  scope: string;
   /** Validates what comes out of storage (return `null` to discard a malformed draft). */
   parse?: DraftParser<T>;
   /** Debounce for `save` (ms). */
@@ -56,10 +98,12 @@ export interface UseFormDraftOptions<T> {
  *
  * - `draft` is `null` until the browser storage has been read (`ready`), so SSR and hydration match.
  * - `save(values)` is debounced; `clear()` after a successful save.
- * - NEVER store access codes or other secrets in a draft.
+ * - Namespaced by `scope` (`userId:weddingId`); `clearAllFormDrafts()` wipes all on sign-out.
+ * - Secret-looking keys/fields (code, password, token...) are refused by `writeDraft`.
  */
-export function useFormDraft<T>(key: string, options: UseFormDraftOptions<T> = {}) {
-  const { parse, debounceMs = 400 } = options;
+export function useFormDraft<T>(key: string, options: UseFormDraftOptions<T>) {
+  const { parse, debounceMs = 400, scope } = options;
+  const storageKey = `${scope}:${key}`;
   const parseRef = useRef(parse);
   useEffect(() => {
     parseRef.current = parse;
@@ -73,13 +117,13 @@ export function useFormDraft<T>(key: string, options: UseFormDraftOptions<T> = {
     if (timer.current) clearTimeout(timer.current);
     timer.current = null;
     if (pending.current) {
-      writeDraft(window.localStorage, key, pending.current.value);
+      writeDraft(window.localStorage, storageKey, pending.current.value);
       pending.current = null;
     }
-  }, [key]);
+  }, [storageKey]);
 
   useEffect(() => {
-    setDraft(readDraft<T>(window.localStorage, key, parseRef.current));
+    setDraft(readDraft<T>(window.localStorage, storageKey, parseRef.current));
     setReady(true);
     // Persist the last edit when the page goes away (offline tab closed, navigation).
     window.addEventListener("pagehide", flush);
@@ -87,7 +131,7 @@ export function useFormDraft<T>(key: string, options: UseFormDraftOptions<T> = {
       window.removeEventListener("pagehide", flush);
       flush();
     };
-  }, [key, flush]);
+  }, [storageKey, flush]);
 
   const save = useCallback(
     (value: T) => {
@@ -102,9 +146,9 @@ export function useFormDraft<T>(key: string, options: UseFormDraftOptions<T> = {
     if (timer.current) clearTimeout(timer.current);
     timer.current = null;
     pending.current = null;
-    removeDraft(window.localStorage, key);
+    removeDraft(window.localStorage, storageKey);
     setDraft(null);
-  }, [key]);
+  }, [storageKey]);
 
   return { draft, ready, save, clear };
 }

@@ -38,3 +38,18 @@ Q2. Is the proxy change for `x-r2y-backend` planned in T2 or T3? If neither, S1(
 Q3. Countdown copy for past/today is invented: needs product confirmation (flag in the PR/hand-off, not a code issue).
 
 Review file: /Users/tonybartiloro/Documents/roadmap2yes/.adf/features/FEAT-2026-001/reviews/code-4.md
+
+## Response (developer, round 1)
+
+| # | Response |
+|---|---|
+| S1 | Fixed. The whole lookup (client creation, getClaims, query) is now under one `withTimeout` race (1.5 s) in `getActiveThemeId`. `src/proxy.ts` (narrow edit) deletes any incoming `x-r2y-backend` and sets it on the outage rewrite; tests in `proxy.test.ts` (set on outage, stripped when spoofed, not set on non-outage rewrite) and `server.test.ts` (header present: lookup never called). |
+| S2 | Fixed: `src/themes/server.test.ts` (db id, null/reject/sync throw, unapproved id, invalid cookie, header, `cookies()` throwing, hanging lookup with fake timers) and `src/themes/mode.test.ts` (helpers and `MODE_SCRIPT` run in jsdom: stored value, garbage, no storage, `theme-color`). |
+| S3/Q1 | Fixed. `writeDraft` refuses keys/nested fields matching code/codice/password/token/secret/otp/pin. `scope` (`userId:weddingId`) is a required option and prefixes the storage key. New `clearAllFormDrafts()`: T15's "Esci" flow must call it on sign-out. Tests added. |
+| S4 | Fixed: `size="sm"` is `h-11`. |
+| N1 | Comment added in `layout.tsx`. |
+| N2 | Fixed with S1. |
+| N3 | Agreed: `MoneyInput` uses `parseEuroToCents` (no `parse` prop); the code is the reference. |
+| N4 | Fixed: timer cleared on unmount, "Codice copiato" announced in an `aria-live` region. |
+| N5 | Fixed: `useId` for the ids. T8 to confirm that "Annulla" keeps the draft copyable. |
+| Q2 | Done in T3 (proxy edit above). Q3: copy kept; the designer confirms it in the visual check. |

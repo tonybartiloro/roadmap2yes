@@ -16,6 +16,9 @@ import {
  * the login (plan §4.7, DES-16). Authorization itself stays in the DB (RLS).
  */
 
+/** Request header set on the outage rewrite to `/servizio` (read by `themes/server.ts`). */
+const BACKEND_HEADER = "x-r2y-backend";
+
 const NO_REFERRER_PREFIXES = ["/invito", "/auth", "/email"];
 
 function referrerPolicyFor(pathname: string): string {
@@ -67,6 +70,9 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   const { pathname, searchParams } = request.nextUrl;
   const cookiesToSet: CookieToSet[] = [];
   const forwarded = new Headers(request.headers);
+  // `x-r2y-backend` is proxy-owned (tells the root layout to skip the DB theme lookup on the
+  // service page): never trust one sent by a client.
+  forwarded.delete(BACKEND_HEADER);
 
   let claims: GuardClaims | null = null;
   let backend: BackendStatus = "ok";
@@ -104,6 +110,7 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   }
 
   const decision = await evaluateGuards({ pathname, searchParams, claims, backend, supabase });
+  if (decision.action === "rewrite" && backend !== "ok") forwarded.set(BACKEND_HEADER, backend);
   return respond(decision, request, forwarded, cookiesToSet);
 }
 

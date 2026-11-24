@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Check, Copy, Dices, Eye, EyeOff, Circle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -74,11 +74,20 @@ export function AccessCodeField({
       .filter(Boolean)
       .join(" ") || undefined;
 
+  const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (copiedTimer.current) clearTimeout(copiedTimer.current);
+    },
+    [],
+  );
+
   async function copy() {
     try {
       await navigator.clipboard.writeText(value);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      if (copiedTimer.current) clearTimeout(copiedTimer.current);
+      copiedTimer.current = setTimeout(() => setCopied(false), 2000);
     } catch {
       // clipboard unavailable: the code is visible and selectable
     }
@@ -172,6 +181,9 @@ export function AccessCodeField({
           </div>
         </>
       ) : null}
+      <p aria-live="polite" className="sr-only">
+        {copied ? "Codice copiato" : ""}
+      </p>
       {error ? (
         <p id={`${inputId}-error`} className="text-destructive text-sm">
           {error}
