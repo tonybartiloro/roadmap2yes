@@ -1,6 +1,8 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { classifyDbError, type DbErrorKind } from "@/lib/supabase/errors";
+import { readLoginLimits, readSupabaseSecretKey } from "@/lib/app-config";
+import { limiterKey } from "@/features/auth/limiter-keys";
 
 /**
  * Operations on Auth accounts that need the SECRET key (plan §4.8). One of the 4 lint-allowed
@@ -477,6 +479,12 @@ export function maskEmail(email: string): string {
  * GET of the link: changes NOTHING (mail scanners open links). Says whether it is usable, who invited
  * (first name or label of partner A) and a masked address. The reads are by ids the DB returned.
  */
+// Accepted residuals, to be listed in R27 / the runbook (T18):
+//  - (code-16 REV-7) these two reads use the secret client on tables, by ids the DB returned; a
+//    secret-only RPC returning name and masked email would shrink the surface, but core is closed
+//    for R1;
+//  - (code-16 REV-8) the token is in the URL path, so the hosting platform's request logs and the
+//    browser history hold it until first sign-in or 7 days. The app never logs it.
 export async function peekInviteToken(tokenHash: string): Promise<InvitePeek> {
   const checked = await checkToken(tokenHash);
   if (!checked.ok) return { ok: false, error: checked.error };
@@ -536,7 +544,12 @@ export async function consumeInviteToken(
     if (found.error || !email) return { ok: false, error: "failed" };
     const refused = checkCode(email);
     if (refused) return { ok: false, error: "policy", message: refused };
-    const { error } = await admin.updateUserById(checked.userId, { password: code });
+    // `app_metadata` is merged: clearing the flag matters when a temporary code was set on this
+    // pending account before B chose their own (code-16 REV-4).
+    const { error } = await admin.updateUserById(checked.userId, {
+      password: code,
+      app_metadata: { r2y_must_change_code: false },
+    });
     if (error) {
       const kind = classifyDbError(error);
       return { ok: false, error: kind ? "unavailable" : "failed" };
@@ -544,5 +557,51 @@ export async function consumeInviteToken(
     return { ok: true, userId: checked.userId, email };
   } catch (error) {
     return { ok: false, error: classifyDbError(error) ? "unavailable" : "failed" };
+  }
+}
+
+// ------------------------------------------------------------------ IP gate of the public POST
+
+/** Own bucket (`invite-link:{ip}`), so link failures never lock the login of the same address. */
+function inviteGateKey(ip: string): string {
+  return limiterKey(readSupabaseSecretKey(), "ip", `invite-link:${ip}`);
+}
+
+/**
+ * Gate of `/invito/[token]` POST, BEFORE any lookup or password change (code-16 REV-3): the same
+ * `login_gate` as the login with the IP bucket only. Without a usable IP there is no shared
+ * bucket (one visitor must not lock everyone out): the gate is open and the 256-bit token is the
+ * control. A gate that cannot be read is `unavailable`: fail closed.
+ */
+export async function inviteGate(ip: string | null): Promise<"open" | "blocked" | "unavailable"> {
+  if (ip === null) return "open";
+  try {
+    const { data, error } = await createAdminClient().rpc("login_gate", {
+      p_email_key: inviteGateKey(ip),
+      p_ip_key: null,
+    });
+    if (error) return "unavailable";
+    return (data as { blocked?: unknown } | null)?.blocked === true ? "blocked" : "open";
+  } catch {
+    return "unavailable";
+  }
+}
+
+/** Counts a bad link (failure) or clears the bucket (success). Never throws. */
+export async function inviteRecord(ip: string | null, success: boolean): Promise<void> {
+  if (ip === null) return;
+  const limits = readLoginLimits();
+  try {
+    await createAdminClient().rpc("login_record", {
+      p_email_key: inviteGateKey(ip),
+      p_ip_key: null,
+      p_success: success,
+      p_max_email: limits.maxFailuresPerIp,
+      p_max_ip: limits.maxFailuresPerIp,
+      p_window_minutes: limits.windowMinutes,
+      p_lock_minutes: limits.lockMinutes,
+    });
+  } catch {
+    // Not recorded: the answer to the person is unchanged.
   }
 }

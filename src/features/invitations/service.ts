@@ -19,6 +19,7 @@ import {
   failureMessage,
   INVITE_NOT_SENT,
   INVITE_SENT,
+  OLD_LINK_NOT_KILLED,
   PARTNER_FAILED,
 } from "./messages";
 import { inviteUrl, type InviteToken } from "./token";
@@ -204,14 +205,22 @@ export async function inviteByEmail(
 
 type PendingInvitation = { id: string; email: string; method: string };
 
-async function readPendingInvitation(db: SupabaseClient): Promise<PendingInvitation | null> {
-  const { data } = await db
-    .from("invitations")
-    .select("id,email,method")
-    .is("accepted_at", null)
-    .is("revoked_at", null)
-    .limit(1);
-  return ((data as PendingInvitation[] | null) ?? [])[0] ?? null;
+/** A failed read is an error, never "no invitation" (a security step may depend on it). */
+async function readPendingInvitation(
+  db: SupabaseClient,
+): Promise<{ ok: true; pending: PendingInvitation | null } | { ok: false }> {
+  try {
+    const { data, error } = await db
+      .from("invitations")
+      .select("id,email,method")
+      .is("accepted_at", null)
+      .is("revoked_at", null)
+      .limit(1);
+    if (error) return { ok: false };
+    return { ok: true, pending: ((data as PendingInvitation[] | null) ?? [])[0] ?? null };
+  } catch {
+    return { ok: false };
+  }
 }
 
 /** "Invia di nuovo": `rotate_invitation` first (the old link stops working), the email after. */
@@ -221,7 +230,9 @@ export async function resendInvite(
   invitationId: string,
 ): Promise<EmailInviteResult> {
   if (!deps.emailOn) return { ok: false, error: "email_off", message: EMAIL_OFF_INVITE };
-  const pending = await readPendingInvitation(db);
+  const read = await readPendingInvitation(db);
+  if (!read.ok) return { ok: false, error: "failed", message: PARTNER_FAILED };
+  const pending = read.pending;
   if (!pending || pending.id !== invitationId || pending.method !== "email") {
     return { ok: false, error: "failed", message: PARTNER_FAILED };
   }
@@ -272,13 +283,20 @@ export async function changePendingEmail(
   const changed = await updatePendingPartnerEmail(db, newEmail);
   if (!changed.ok) return fail(changed.error);
 
-  const pending = await readPendingInvitation(db);
-  if (pending?.method === "email") {
-    const resent = await resendInvite(db, deps, pending.id);
+  // Fail CLOSED (code-16 REV-1): the old link, mailed to the address just corrected, must be
+  // confirmed dead before this says "Fatto". Repeating the change is idempotent and retries it.
+  const read = await readPendingInvitation(db);
+  if (!read.ok) return { ok: false, error: "failed", message: OLD_LINK_NOT_KILLED };
+  if (read.pending?.method === "email") {
+    const resent = await resendInvite(db, deps, read.pending.id);
     if (resent.ok) return resent;
-    // Emails went off meanwhile (or the rotate failed): rotate anyway so the old link dies.
+    // Emails went off meanwhile (or the first rotate failed): rotate anyway so the old link dies.
     const { hash } = deps.newToken();
-    await dbStep(db, "rotate_invitation", { p_invitation_id: pending.id, p_token_hash: hash });
+    const rotated = await dbStep(db, "rotate_invitation", {
+      p_invitation_id: read.pending.id,
+      p_token_hash: hash,
+    });
+    if (!rotated.ok) return { ok: false, error: "failed", message: OLD_LINK_NOT_KILLED };
     return {
       ok: true,
       delivery: "none",

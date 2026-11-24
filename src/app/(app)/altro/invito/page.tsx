@@ -70,8 +70,8 @@ export default async function InvitePage() {
     <div className="flex max-w-xl flex-col gap-8">
       <h1 className="font-heading text-[28px] leading-9">Invito al partner</h1>
 
-      <section aria-labelledby="invite-state" className="flex flex-col gap-2">
-        <h2 id="invite-state" className="text-xl font-semibold">
+      <section aria-labelledby="invite-section-state" className="flex flex-col gap-2">
+        <h2 id="invite-section-state" className="text-xl font-semibold">
           Com&apos;è messo l&apos;invito
         </h2>
         <p className="flex flex-wrap items-center gap-2" data-testid="partner-state">
@@ -105,15 +105,15 @@ export default async function InvitePage() {
 
       {canInvite ? (
         <>
-          <section aria-labelledby="invite-code" className="flex flex-col gap-4">
-            <h2 id="invite-code" className="text-xl font-semibold">
+          <section aria-labelledby="invite-section-code" className="flex flex-col gap-4">
+            <h2 id="invite-section-code" className="text-xl font-semibold">
               Con un codice che gli dai di persona
             </h2>
             <CreateWithCodeForm defaults={defaults} />
           </section>
 
-          <section aria-labelledby="invite-email" className="flex flex-col gap-4">
-            <h2 id="invite-email" className="text-xl font-semibold">
+          <section aria-labelledby="invite-section-email" className="flex flex-col gap-4">
+            <h2 id="invite-section-email" className="text-xl font-semibold">
               Con un invito via email
             </h2>
             {emailOn ? (
@@ -131,29 +131,29 @@ export default async function InvitePage() {
       {pending && invitation ? (
         <>
           {state !== "pending_code" && emailOn ? (
-            <section aria-labelledby="invite-resend" className="flex flex-col gap-4">
-              <h2 id="invite-resend" className="text-xl font-semibold">
+            <section aria-labelledby="invite-section-resend" className="flex flex-col gap-4">
+              <h2 id="invite-section-resend" className="text-xl font-semibold">
                 Invia di nuovo
               </h2>
               <ResendForm invitationId={invitation.id} />
             </section>
           ) : null}
-          <section aria-labelledby="invite-email-change" className="flex flex-col gap-4">
-            <h2 id="invite-email-change" className="text-xl font-semibold">
+          <section aria-labelledby="invite-section-email-change" className="flex flex-col gap-4">
+            <h2 id="invite-section-email-change" className="text-xl font-semibold">
               Cambia l&apos;email
             </h2>
             <ChangePendingEmailForm currentEmail={invitation.email} />
           </section>
           {state === "pending_code" ? (
-            <section aria-labelledby="invite-temp-code" className="flex flex-col gap-4">
-              <h2 id="invite-temp-code" className="text-xl font-semibold">
+            <section aria-labelledby="invite-section-temp-code" className="flex flex-col gap-4">
+              <h2 id="invite-section-temp-code" className="text-xl font-semibold">
                 Codice dimenticato?
               </h2>
               <TemporaryCodeForm partnerName={name} subject={subject} />
             </section>
           ) : null}
-          <section aria-labelledby="invite-revoke" className="flex flex-col gap-4">
-            <h2 id="invite-revoke" className="text-xl font-semibold">
+          <section aria-labelledby="invite-section-revoke" className="flex flex-col gap-4">
+            <h2 id="invite-section-revoke" className="text-xl font-semibold">
               Revoca
             </h2>
             <RevokeForm invitationId={invitation.id} partnerName={name} />
@@ -162,8 +162,8 @@ export default async function InvitePage() {
       ) : null}
 
       {state === "active" && partner ? (
-        <section aria-labelledby="invite-temp-code" className="flex flex-col gap-4">
-          <h2 id="invite-temp-code" className="text-xl font-semibold">
+        <section aria-labelledby="invite-section-temp-code" className="flex flex-col gap-4">
+          <h2 id="invite-section-temp-code" className="text-xl font-semibold">
             Codice dimenticato?
           </h2>
           <p className="text-muted-foreground">

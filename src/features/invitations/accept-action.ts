@@ -2,7 +2,7 @@
 
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { consumeInviteToken } from "@/features/accounts/admin-ops";
+import { consumeInviteToken, inviteGate, inviteRecord } from "@/features/accounts/admin-ops";
 import type { FormState } from "@/features/auth/form-state";
 import { clientIp } from "@/features/auth/limiter-keys";
 import { limitedPasswordLogin } from "@/features/auth/login";
@@ -45,10 +45,19 @@ export async function acceptInviteAction(_prev: FormState, formData: FormData): 
     };
   }
 
+  // IP gate BEFORE the lookup and before the password changes (code-16 REV-3).
+  const ip = clientIp(await headers());
+  const gate = await inviteGate(ip);
+  if (gate === "blocked") return { status: "error", message: tooManyAttempts() };
+  if (gate === "unavailable") return { status: "error", message: UNAVAILABLE };
+
   const consumed = await consumeInviteToken(hashInviteToken(token), code, (email) => {
     const policy = validateAccessCode(code, { email });
     return policy.ok ? null : policy.message;
   });
+  // Only an unknown/unusable link counts as a failure; a policy refusal is a typo, not a guess.
+  if (!consumed.ok && consumed.error === "invalid_link") await inviteRecord(ip, false);
+  if (consumed.ok) await inviteRecord(ip, true);
   if (!consumed.ok) {
     switch (consumed.error) {
       case "invalid_link":
@@ -67,7 +76,6 @@ export async function acceptInviteAction(_prev: FormState, formData: FormData): 
   }
 
   const supabase = await createClient();
-  const ip = clientIp(await headers());
   const outcome = await limitedPasswordLogin(supabase.auth, { email: consumed.email, code, ip });
   if (outcome.status === "blocked") return { status: "error", message: tooManyAttempts() };
   if (outcome.status === "unavailable") return { status: "error", message: UNAVAILABLE };

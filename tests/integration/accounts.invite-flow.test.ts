@@ -1,6 +1,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { beforeAll, describe, expect, it } from "vitest";
-import { consumeInviteToken, peekInviteToken } from "@/features/accounts/admin-ops";
+import {
+  consumeInviteToken,
+  inviteGate,
+  inviteRecord,
+  peekInviteToken,
+  setTemporaryCode,
+} from "@/features/accounts/admin-ops";
+import { readLoginLimits } from "@/lib/app-config";
 import {
   changePendingEmail,
   createPartnerByCode,
@@ -388,5 +395,125 @@ describe("giveTemporaryCode (service)", () => {
     expect(result).toEqual({ ok: true });
     expect(mail.sent).toEqual([]);
     expect(await canSignIn(b.email, temp)).toBe(true);
+  });
+});
+
+/** A user client whose chosen calls fail, to prove the steps that must fail closed. */
+function flaky(client: unknown, breaks: { rpc?: string; table?: string }): SupabaseClient {
+  const real = client as SupabaseClient;
+  return {
+    rpc: (fn: string, args?: Record<string, unknown>) =>
+      fn === breaks.rpc
+        ? Promise.resolve({ data: null, error: { message: "boom", code: "XX000" } })
+        : real.rpc(fn, args),
+    from: (table: string) => {
+      if (table !== breaks.table) return real.from(table);
+      const chain: Record<string, unknown> = {};
+      chain["select"] = () => chain;
+      chain["is"] = () => chain;
+      chain["limit"] = () => Promise.resolve({ data: null, error: { message: "down" } });
+      return chain;
+    },
+  } as unknown as SupabaseClient;
+}
+
+describe("changePendingEmail fails closed (code-16 REV-1)", () => {
+  it("if the old link cannot be rotated away it says so instead of 'Fatto'", async () => {
+    const w = await createWedding();
+    const { token } = await inviteFlow(w);
+    const result = await changePendingEmail(
+      flaky(w.founderClient, { rpc: "rotate_invitation" }),
+      depsWith(capture().sender),
+      uniqueEmail("moved"),
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      message: "Non sono riuscito a invalidare il vecchio link, riprova.",
+    });
+    // The old link is still alive: the point is that the person was NOT told it was cut off.
+    expect(await peekInviteToken(hashInviteToken(token))).toMatchObject({ ok: true });
+  });
+
+  it("if the pending invitation cannot be read it is an error, not 'no email invite'", async () => {
+    const w = await createWedding();
+    await inviteFlow(w);
+    const result = await changePendingEmail(
+      flaky(w.founderClient, { table: "invitations" }),
+      depsWith(capture().sender),
+      uniqueEmail("moved2"),
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      message: "Non sono riuscito a invalidare il vecchio link, riprova.",
+    });
+  });
+
+  it("repeating the same change once the DB is back rotates the link and succeeds", async () => {
+    const w = await createWedding();
+    const { token } = await inviteFlow(w);
+    const next = uniqueEmail("retry");
+    await changePendingEmail(
+      flaky(w.founderClient, { rpc: "rotate_invitation" }),
+      depsWith(capture().sender),
+      next,
+    );
+    const mail = capture();
+    const again = await changePendingEmail(asDb(w.founderClient), depsWith(mail.sender), next);
+    expect(again.ok).toBe(true);
+    expect(mail.sent.map((m) => m.to)).toEqual([next]);
+    expect(await peekInviteToken(hashInviteToken(token))).toMatchObject({ ok: false });
+  });
+});
+
+describe("temporary code before the link (code-16 REV-4)", () => {
+  it("B's own chosen code clears the forced-change flag set on the pending account", async () => {
+    const w = await createWedding();
+    const { email, token } = await inviteFlow(w);
+    const temp = randomCode();
+    expect(await setTemporaryCode(asDb(w.founderClient), temp)).toMatchObject({ ok: true });
+    const before = await anonClient().auth.signInWithPassword({ email, password: temp });
+    expect(before.data.user?.app_metadata).toMatchObject({ r2y_must_change_code: true });
+    // That sign-in made the account non-reusable: use a fresh pending invite for the real check.
+    const w2 = await createWedding();
+    const second = await inviteFlow(w2);
+    await setTemporaryCode(asDb(w2.founderClient), randomCode());
+    const own = randomCode();
+    const consumed = await consumeInviteToken(hashInviteToken(second.token), own, () => null);
+    expect(consumed).toMatchObject({ ok: true });
+    const entered = await anonClient().auth.signInWithPassword({
+      email: second.email,
+      password: own,
+    });
+    expect(entered.data.user?.app_metadata).toMatchObject({ r2y_must_change_code: false });
+    expect(token).toBeTruthy();
+  });
+});
+
+describe("IP gate of the invite POST (code-16 REV-3)", () => {
+  const ip = () => `198.51.100.${Math.floor(Math.random() * 250)}:${Math.random()}`;
+
+  it("opens, blocks after the IP threshold of bad links, and is per address", async () => {
+    const address = ip();
+    expect(await inviteGate(address)).toBe("open");
+    for (let i = 0; i < readLoginLimits().maxFailuresPerIp; i += 1) {
+      await inviteRecord(address, false);
+    }
+    expect(await inviteGate(address)).toBe("blocked");
+    expect(await inviteGate(ip())).toBe("open");
+  });
+
+  it("without a usable IP there is no shared bucket: always open", async () => {
+    await inviteRecord(null, false);
+    expect(await inviteGate(null)).toBe("open");
+  });
+
+  it("a success clears a bucket that is not locked", async () => {
+    const address = ip();
+    for (let i = 0; i < 3; i += 1) await inviteRecord(address, false);
+    await inviteRecord(address, true);
+    for (let i = 0; i < readLoginLimits().maxFailuresPerIp - 1; i += 1) {
+      await inviteRecord(address, false);
+    }
+    expect(await inviteGate(address)).toBe("open"); // the 3 earlier failures were cleared
   });
 });

@@ -10,6 +10,7 @@ export const CODE_CREATED =
   "Fatto: l'accesso è pronto. Consegna il codice di persona: qui non lo rivedrai.";
 export const TEMP_CODE_SET =
   "Fatto: il codice temporaneo è pronto. Consegnalo di persona: al prossimo accesso dovrà sceglierne uno suo.";
+export const OLD_LINK_NOT_KILLED = "Non sono riuscito a invalidare il vecchio link, riprova.";
 export const EMAIL_CHANGED = "Fatto: l'email è cambiata.";
 export const INVITE_REVOKED = "Invito revocato.";
 export const INVITE_SENT = "Fatto: l'invito è partito.";
