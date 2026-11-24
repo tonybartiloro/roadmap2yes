@@ -75,3 +75,19 @@ Other reads that could be truncated at 1000 rows (none realistic for a two-perso
 - `home/data.ts:374-388` (`AUDIT_FETCH`, `EVENT_FETCH`) are deliberate caps; `export/data.ts` already pages at 500 (correct).
 
 Proposal (optional, a later task): a shared `allPages` helper in `lib/supabase`, used by the job per-wedding reads (`:137`, `:237`, `:244` first) with an ORDER BY.
+
+## Round 4 (f4c4b9d)
+
+Verdict: approved
+Reviewed `git show f4c4b9d`. `npx vitest run src/lib/supabase src/features/jobs src/features/timeline src/features/home`: 10 files, 154 tests pass.
+
+- Ordering: every paged query ends in a unique key.
+  - Tasks in `timeline/queries.ts` and `home/data.ts` (created_at, id).
+  - Job tasks, payments and `doneItemKeys` (id).
+  - Job `audit_log` and `decision_events` (at desc, id desc).
+  - The recipients and memberships reads from round 3 (unchanged).
+- Termination and size: `allPages` ends on the first short page. `PAGE_LIMIT` is now 500, so it stays below `max_rows` (1000). That closes the caveat from round 3.
+- Errors: `PageReadError` carries `cause`. `classifyDbError` walks `cause` (`errors.ts:59-65`), so paused or unreachable outages are still classified. In `timeline/queries.ts` the rejection is turned back into `{data:null, error}`, which `must()` classifies. In `home/data.ts` a throw reaches `section()`, which rethrows classified outages. The message stays value-free.
+- Behaviour: timeline and home read the same rows in the same `created_at` order, with `id` as a tie-break, so nothing changes visibly. `chunk` (size 100) bounds the `.in()` lists in the job (budget items, decisions, options); results are merged into maps.
+- Note (not blocking): offset paging is not a snapshot, so a write between two pages could shift a boundary. This is negligible for a two-person app.
+- Note (not blocking): budget reads (`home/data.ts:222-227`, `budget/data.ts:111-113`) and `decisions/data.ts:119-120,138` stay single queries. The home one is documented as intentional.
