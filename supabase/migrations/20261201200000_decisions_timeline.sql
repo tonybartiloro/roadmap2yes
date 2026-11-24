@@ -18,6 +18,14 @@
 --   3. else earliest candidate scenario whose date is not before today in Europe/Rome; if every one
 --      is in the past, the earliest of them; tie-break by id as text.
 --   Candidate = `decision_options.status = 'candidate'` (T4 calls it "open").
+--
+-- Lock order (plan §4.8): advisory locks (core RPCs) -> the `weddings` row -> decision row ->
+-- option / scenario rows. choose_option, reopen_decision, set_reference_scenario,
+-- complete_onboarding and insert_tasks_core lock the wedding FIRST (`for no key update`, which does
+-- not conflict with the KEY SHARE taken by foreign-key checks of child inserts). Row triggers that
+-- run sync_timeline_for lock the wedding last, after the row being written; they can only meet an
+-- RPC on the wedding row itself, never on a different one, so no cycle exists. This cannot be
+-- exercised by a two-session pgTAP test (one session per file).
 
 -- ---------------------------------------------------------------------------------------------
 -- Tables
@@ -331,7 +339,10 @@ begin
   v_new := v_ref.ref_date;
 
   if v_new is distinct from v_old then
+    -- A derived value, not a user edit: it must not bump weddings.version (AC40 friction).
+    perform set_config('r2y.keep_version', 'on', true);
     update public.weddings set applied_reference_date = v_new where id = p_wedding;
+    perform set_config('r2y.keep_version', 'off', true);
   end if;
 
   update public.tasks t
@@ -350,6 +361,25 @@ begin
   return v_new;
 end;
 $$;
+
+-- Runs after weddings_bump_version (trigger name order): undoes the bump for derived updates.
+create function private.weddings_keep_version()
+returns trigger
+language plpgsql
+set search_path = pg_catalog, pg_temp
+as $$
+begin
+  if coalesce(current_setting('r2y.keep_version', true), '') = 'on' then
+    new.version := old.version;
+    new.updated_at := old.updated_at;
+    new.updated_by := old.updated_by;
+  end if;
+  return new;
+end;
+$$;
+
+create trigger weddings_keep_version before update on public.weddings
+  for each row execute function private.weddings_keep_version();
 
 -- The two standard decisions of a wedding (created when onboarding completes).
 create function private.ensure_decisions(p_wedding uuid)
@@ -502,6 +532,13 @@ begin
       new.deleted_at := now();
       new.deleted_by := auth.uid();
     else
+      -- Restore: candidates exist only while the decision is open, and a restored option is
+      -- always a candidate (never a dead "discarded" one on an open decision).
+      select d.status into v_status from public.decisions d where d.id = new.decision_id;
+      if v_status = 'taken' then
+        raise exception 'decision_taken' using errcode = 'P0001';
+      end if;
+      new.status := 'candidate';
       new.deleted_by := null;
     end if;
   else
@@ -582,13 +619,24 @@ declare
   v_type text;
   v_loc_type text;
   v_loc_deleted timestamptz;
+  v_dec_status text;
+  v_opt_status text;
 begin
-  select d.type into v_type
+  select d.type, d.status, o.status into v_type, v_dec_status, v_opt_status
   from public.decision_options o
   join public.decisions d on d.id = o.decision_id
   where o.id = new.option_id and o.wedding_id = new.wedding_id;
   if v_type is distinct from 'date' then
     raise exception 'not_a_date_option' using errcode = 'P0001';
+  end if;
+
+  -- A taken decision is definitive until it is reopened with a reason (AC19, AC21): the date of a
+  -- scenario cannot move meanwhile. choose_option converts a period inside the RPC flag.
+  if tg_op = 'UPDATE' and not private.in_rpc()
+     and (new.kind is distinct from old.kind or new.date_from is distinct from old.date_from
+          or new.date_to is distinct from old.date_to)
+     and (v_dec_status = 'taken' or v_opt_status = 'chosen') then
+    raise exception 'decision_taken' using errcode = 'P0001';
   end if;
 
   -- Q7: only a `location` option of the same wedding (the composite FK pins the wedding), not deleted.
@@ -791,11 +839,15 @@ declare
   v_payload jsonb := '{}'::jsonb;
   v_ref date;
   v_version integer;
+  v_wedding uuid;
 begin
-  select * into v_dec from public.decisions d where d.id = p_decision_id for no key update;
-  if not found or not public.has_permission(v_dec.wedding_id, 'decisions', 'write') then
+  -- Lock order (see header): weddings first, then the decision and its rows.
+  select d.wedding_id into v_wedding from public.decisions d where d.id = p_decision_id;
+  if v_wedding is null or not public.has_permission(v_wedding, 'decisions', 'write') then
     raise exception 'forbidden' using errcode = '42501';
   end if;
+  perform 1 from public.weddings w where w.id = v_wedding for no key update;
+  select * into v_dec from public.decisions d where d.id = p_decision_id for no key update;
   if p_expected_version is not null and p_expected_version <> v_dec.version then
     raise exception 'version_conflict' using errcode = 'P0001';
   end if;
@@ -882,11 +934,14 @@ declare
   v_prev uuid;
   v_ref date;
   v_version integer;
+  v_wedding uuid;
 begin
-  select * into v_dec from public.decisions d where d.id = p_decision_id for no key update;
-  if not found or not public.has_permission(v_dec.wedding_id, 'decisions', 'write') then
+  select d.wedding_id into v_wedding from public.decisions d where d.id = p_decision_id;
+  if v_wedding is null or not public.has_permission(v_wedding, 'decisions', 'write') then
     raise exception 'forbidden' using errcode = '42501';
   end if;
+  perform 1 from public.weddings w where w.id = v_wedding for no key update;
+  select * into v_dec from public.decisions d where d.id = p_decision_id for no key update;
   if p_expected_version is not null and p_expected_version <> v_dec.version then
     raise exception 'version_conflict' using errcode = 'P0001';
   end if;
@@ -906,8 +961,10 @@ begin
   where id = v_dec.id
   returning version into v_version;
 
+  -- Every non-candidate becomes a candidate again, deleted ones included (a deleted discarded
+  -- option must not stay dead when it is restored later).
   update public.decision_options set status = 'candidate'
-  where decision_id = v_dec.id and deleted_at is null and status in ('chosen', 'discarded');
+  where decision_id = v_dec.id and status in ('chosen', 'discarded');
 
   if v_dec.type = 'date' then
     update public.weddings set manual_reference_option_id = v_prev where id = v_dec.wedding_id;
@@ -1051,6 +1108,11 @@ declare
 begin
   if p_tasks is null or jsonb_typeof(p_tasks) <> 'array' or jsonb_array_length(p_tasks) > 100 then
     raise exception 'invalid_tasks' using errcode = 'P0001';
+  end if;
+  -- Lock order (see header): weddings first, so the reference cannot change under our feet.
+  perform 1 from public.weddings w where w.id = p_wedding for no key update;
+  if (select count(*) from public.tasks t where t.wedding_id = p_wedding) + jsonb_array_length(p_tasks) > 2000 then
+    raise exception 'too_many_tasks' using errcode = 'P0001';
   end if;
   select r.ref_date into v_ref from private.resolve_reference(p_wedding, private.rome_today()) r;
 
@@ -1259,6 +1321,7 @@ revoke all on function
   private.sync_timeline_for(uuid, boolean),
   private.ensure_decisions(uuid),
   private.task_rules(),
+  private.weddings_keep_version(),
   private.options_before_write(),
   private.options_after_write(),
   private.scenarios_before_write(),
