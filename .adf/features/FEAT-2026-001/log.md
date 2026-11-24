@@ -488,3 +488,17 @@ Developer's answers to the 4 remaining questions: 1. OK (min 10 characters, lett
   - T7a: wire `[auth.email.template.recovery]` + `site_url` in config.toml;
   - T16: `Referrer-Policy: no-referrer` on `/email/disattiva` and no query logging; route reads `tipo` and `t`, GET confirms, POST changes.
 - `.env.example`: fake EMAIL_LINK_SECRET lengthened (local `.env.local` copies need updating).
+
+## F3 — PAUSED — 2026-11-24 (developer restarting Claude Code)
+- T2 developer stopped mid-task; its work is UNCOMMITTED in the working tree (supabase/migrations/20261201100000_core.sql, seeds/01_core.sql, tests/00_helpers + core_*.test.sql; the deleted .gitkeep files). It has not been verified and not reviewed. It was about to remove the pgTAP/db:types `hashFiles` skips in ci.yml.
+- On resume: start a new T2 developer to read the existing files, finish the T2 scope, and run db:reset, db:test, lint, typecheck, test and test:integration.
+  - Include the T1 review follow-ups: a signup-refused and weak-code integration test, and a service client in a tests/ helper rather than admin.ts.
+  - Use the rite enum `civile|religioso|simbolico|unknown`.
+  - Then commit, and run the T2 review with a security focus.
+- Done and reviewed: T0, T1, T3, T4, T5, T6. Next after T2: G2 = T7a ‖ T8 ‖ T9; QA T17a.
+- Routed follow-ups:
+  - T7a: config.toml recovery template + site_url; encoded-path guard test; keep the guards.ts signature.
+  - T8/T11/T14: reference rule with `today`; dismissal `kind` column.
+  - T15: clearAllFormDrafts on "Esci".
+  - T16: REV-8, the unsubscribe route shape.
+  - Designer visual check: the T3 list and the Countdown copy.
