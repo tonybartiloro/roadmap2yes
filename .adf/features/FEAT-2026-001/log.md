@@ -546,3 +546,17 @@ Developer's answers to the 4 remaining questions: 1. OK (min 10 characters, lett
   - Resend and AC9 after the domain exists;
   - a B "change your initial code" hint on Home, if wanted.
 - Next: F4 documentation (T18).
+
+## F4 — documentation — 2026-11-24
+- T18 (a87d6e5, 28a465e, 306704f) delivered the following:
+  - `docs/functional` (13 pages, Italian, informal "tu");
+  - `docs/technical` (architecture, data model, security, email and job, environments-and-release runbook, local dev and tests);
+  - the README;
+  - the ADR "consequences from F3".
+- Doc vs code inconsistencies were resolved in favour of the code:
+  - plan text: HMAC limiter keys; migrate.yml runs staging only through manual dispatch from main;
+  - design.md updated to access-code auth (committed by the coordinator after the designer's commit was blocked, at the developer's request);
+  - the ADR note on `public.has_permission`.
+- Unverified (flagged in the runbook): Supabase dashboard menu names, restorability past 90 days paused, whether an `EMAIL_TRANSPORT` change needs a redeploy.
+- adf verify passes.
+- Next: F5 release.

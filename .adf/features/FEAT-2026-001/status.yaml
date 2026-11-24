@@ -3,7 +3,7 @@ id: FEAT-2026-001
 title: "Fondamenta, onboarding guidato, timeline e budget"
 type: feature
 size: L
-phase: F4
+phase: F5
 branch: feature/FEAT-2026-001-fondamenta-onboarding-budget
 ticket: ""
 created: 2026-11-23
@@ -19,5 +19,5 @@ links:
   pr: ""
   brief: ""
   plan: ""
-  docs_functional: ""
-  docs_technical: ""
+  docs_functional: docs/functional
+  docs_technical: docs/technical
