@@ -100,7 +100,7 @@ Migrazioni additive. `public` è esposto con RLS su tutto; `private` non è espo
 | `private.role_permissions` | `role`, `area`, `action` | Solo `partner` in R1 |
 | `invitations` | `wedding_id`, `slot='B'`, `email`, `method` (`code`/`email`), `invitee_user_id`, `token_hash` (solo `email`), `expires_at` (solo `email`), `revoked_at`, `accepted_at`, `accepted_by`, `last_sent_at`, `send_count` | Un solo invito pendente per matrimonio. `token_hash` non leggibile ed escluso dall'audit |
 | `account_events` | `wedding_id`, `kind` (`partner_account_created`/`temp_code_set`/`code_changed`/`email_changed`/`invite_revoked`), `actor_id`, `target_user_id`, `at` | Append-only. Alimenta Novità e trasparenza: "Tony ha impostato un codice temporaneo per Jessica". Mai il codice |
-| `private.login_attempts` | `key_hash bytea` (sha256 dell'email normalizzata, o `ip:` + IP), `failed_count`, `window_start`, `locked_until` | Limitatore applicativo (§4.3) |
+| `private.login_attempts` | `key_hash bytea` (HMAC-SHA256 con `SUPABASE_SECRET_KEY` dell'email normalizzata, o `ip:` + IP; R27), `failed_count`, `window_start`, `locked_until` | Limitatore applicativo (§4.3) |
 | `user_wedding_state` | `user_id`, `wedding_id`, `last_seen_at`, `previous_seen_at`, `last_export_at`, `welcome_dismissed_at` | |
 | `audit_log` | come prima, colonne escluse via `TG_ARGV` | |
 | `heartbeats` | `source`, `ran_at`, `details` | |
@@ -205,7 +205,7 @@ Il codice d'accesso è la password di Supabase Auth: hashata da Supabase (bcrypt
 1. **Server action `signIn(email, code)`**:
    - zod;
    - se l'email è quella di bootstrap, `ensureBootstrapUser()`;
-   - `login_gate(sha256(email), ip)` con la chiave segreta: se la chiave email o IP è bloccata, risponde "Troppi tentativi. Riprova tra 15 minuti.", **identico per qualunque email**;
+   - `login_gate(hmac(email), hmac(ip))` con la chiave segreta: se la chiave email o IP è bloccata, risponde "Troppi tentativi. Riprova tra 15 minuti.", **identico per qualunque email**;
    - `signInWithPassword` dal server (cookie di sessione via `@supabase/ssr`);
    - esito negativo: `login_record(failure)` e "Email o codice non corretti." (neutro);
    - esito positivo: `login_record(success)` azzera il contatore dell'email **solo se non è bloccata** (revisione T2, REV-5): un blocco attivo non viene mai cancellato né accorciato da un successo, e la chiave IP non è mai azzerata da un successo;
@@ -456,7 +456,7 @@ Le RPC che partono da un id di invito (`rotate_invitation`, `revoke_invitation`,
 - **Cache**: browser Playwright e immagini Docker di Supabase.
 - **Retry**: `retries: 1` solo in CI. Un test passato al secondo tentativo viene **riportato come flaky** (bug da correggere, non verde silenzioso).
 - **Dati**: utenti e matrimoni unici per test (`@example.test` casuali); nessuna pulizia, perché le tabelle append-only lo impediscono.
-- **`migrate.yml`**: staging sulle PR con migrazioni; prod al push su main nell'environment `production`. Solo migrazioni additive.
+- **`migrate.yml`**: prod al push su main nell'environment `production`; staging solo con `workflow_dispatch` da `main` (nessun segreto su `pull_request`, revisione code-13). Le migrazioni di una PR arrivano allo staging dopo il merge o con un'esecuzione manuale. Solo migrazioni additive.
 
 ## Alternatives considered
 | Option | Pros | Cons | Why not |
