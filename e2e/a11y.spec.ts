@@ -26,14 +26,23 @@ test("the axe harness is not vacuous: a deliberate contrast and target-size viol
 }) => {
   await page.context().setExtraHTTPHeaders({ "x-forwarded-for": ip });
   await page.goto("/accesso");
+  // cold start: let hydration, fonts and layout settle before injecting and measuring
+  await expect(page.getByTestId("login-form")).toBeVisible();
+  await page.waitForLoadState("networkidle");
+  await page.evaluate(() => document.fonts.ready);
   await page.evaluate(() => {
     const bad = document.createElement("div");
     bad.innerHTML =
       '<p id="qa-low" style="color:#bbbbbb;background:#ffffff;font-size:16px">testo poco contrastato</p>' +
       '<div style="display:flex"><button id="qa-tiny" style="width:10px;height:10px;padding:0;margin:0">x</button>' +
       '<button id="qa-tiny2" style="width:10px;height:10px;padding:0;margin:0">y</button></div>';
-    document.querySelector("main")?.appendChild(bad);
+    (document.querySelector("main") ?? document.body).appendChild(bad);
   });
+  await expect(page.locator("#qa-low")).toBeVisible();
+  await expect(page.locator("#qa-tiny2")).toBeVisible();
+  await page.evaluate(
+    () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))),
+  );
   const findings = await axeFindings(page);
   const ids = findings.map((f) => f.id);
   expect(ids).toContain("color-contrast");
