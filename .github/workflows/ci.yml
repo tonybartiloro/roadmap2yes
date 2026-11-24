@@ -88,10 +88,8 @@ jobs:
       - name: Reset database once
         run: npm run db:reset
       - name: pgTAP (developer + QA)
-        if: ${{ hashFiles('supabase/tests/**/*.sql') != '' }}
         run: npm run db:test
       - name: database.types.ts is up to date
-        if: ${{ hashFiles('src/lib/supabase/database.types.ts') != '' }}
         run: |
           npm run db:types
           git diff --exit-code -- src/lib/supabase/database.types.ts
