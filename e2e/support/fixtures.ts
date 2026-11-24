@@ -1,4 +1,11 @@
-import { test as base, expect } from "@playwright/test";
+import {
+  test as base,
+  expect,
+  type Browser,
+  type BrowserContext,
+  type Page,
+  type TestInfo,
+} from "@playwright/test";
 import { randomInt } from "node:crypto";
 import {
   addPartnerB,
@@ -37,6 +44,28 @@ export const newFounder = (role: "sposo" | "sposa" = "sposo") =>
 
 /** An account with no membership and no invitation: lands on /su-invito. */
 export const strayAccount = () => createUser();
+
+/**
+ * A second, independent browser session (the other partner) with the same device options as the
+ * current project (viewport, locale, time zone, base URL).
+ */
+export async function newSession(
+  browser: Browser,
+  testInfo: TestInfo,
+): Promise<{ context: BrowserContext; page: Page }> {
+  const use = testInfo.project.use;
+  const context = await browser.newContext({
+    ...(use.baseURL ? { baseURL: use.baseURL } : {}),
+    ...(use.viewport ? { viewport: use.viewport } : {}),
+    ...(use.userAgent ? { userAgent: use.userAgent } : {}),
+    ...(use.isMobile !== undefined ? { isMobile: use.isMobile } : {}),
+    ...(use.hasTouch !== undefined ? { hasTouch: use.hasTouch } : {}),
+    ...(use.deviceScaleFactor ? { deviceScaleFactor: use.deviceScaleFactor } : {}),
+    locale: use.locale ?? "it-IT",
+    timezoneId: use.timezoneId ?? "Europe/Rome",
+  });
+  return { context, page: await context.newPage() };
+}
 
 export const test = base.extend<{ ip: string }>({
   ip: async ({}, provide) => {
