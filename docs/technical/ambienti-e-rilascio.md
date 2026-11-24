@@ -176,7 +176,7 @@ Dopo ogni modifica, annotate la data e chi l'ha fatta nel log del rilascio (non 
 
 Le migrazioni stanno in `supabase/migrations/` e si applicano da GitHub Actions con `migrate.yml`.
 
-**Produzione.** Il push su `main` che tocca `supabase/migrations/**` avvia il job nell'environment `production`. Il job collega il progetto, fa un `db push --dry-run`, e poi `db push`. Il job aspetta l'approvazione del reviewer.
+**Produzione.** Il push su `main` che tocca `supabase/migrations/**` avvia il job nell'environment `production`. Il job collega il progetto, fa un `db push --remote --dry-run`, e poi `db push --remote` (la CLI 3.x punta al database locale senza `--remote`). Nessun reviewer richiesto, per decisione dello sviluppatore (2026-11-24): le migrazioni partono al merge.
 
 **Staging.** Il progetto di staging riceve le migrazioni solo con l'avvio manuale del workflow (`workflow_dispatch`), e solo da `main`. Questo significa che **le migrazioni di una PR non arrivano allo staging prima del merge**. È una differenza rispetto al piano di FEAT-2026-001 (che parlava di staging sulle PR): va decisa la procedura (vedi [Punti da confermare](#punti-da-confermare)).
 
