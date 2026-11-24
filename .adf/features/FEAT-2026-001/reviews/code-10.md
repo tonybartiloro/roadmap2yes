@@ -1,7 +1,7 @@
-# FEAT-2026-001 — code review, round 1 (T11 Percorso UI)
+# FEAT-2026-001 — code review, rounds 1 and 2 (T11 Percorso UI)
 
-Verdict: changes requested
-Scope reviewed: commits 1d57c9f (data layer) and dbf1c82 (UI): `src/app/(app)/percorso/**`, `src/features/timeline/**`, `tests/integration/timeline.percorso.test.ts`. `npm run typecheck` and `npm run lint` are clean; `vitest run src/features/timeline` has 56 tests passing (the integration suite was not run).
+Verdict: approved (round 2). Round 1 was changes requested; see the Round 2 section at the end.
+Scope reviewed: commits 1d57c9f (data layer) and dbf1c82 (UI): `src/app/(app)/percorso/**`, `src/features/timeline/**`, `tests/integration/timeline.percorso.test.ts`. Round 2 covers f12f730. `npm run typecheck` and `npm run lint` were clean in round 1. After f12f730, `vitest run src/features/timeline` has 59 tests passing (the integration suite was not run).
 
 Security: the server actions use zod plus the user session (`createClient`), with no service key anywhere. `wedding_id` is read server-side from RLS (`weddingIdOf`), and the client never sends it. `?anteprima` is capped at 64 characters and only matched against the user's own candidate scenarios, so an unknown id gives a notice and writes nothing. `buildPercorsoView` is pure and takes `today` as input. The TS reference rule matches `private.resolve_reference` in the DB, and there is an integration test for it. No blocking security issue.
 
@@ -17,7 +17,7 @@ Declared deviations (my evaluation):
 1. Integration test path `tests/integration/*.test.ts` is covered by the `integration` project in vitest, so it is fine.
 2. The default filter "Tutti" instead of "Miei" is accepted. AC30 does not force "Miei", and showing everything is the safer default. Please align design §3.4 at the next design pass.
 3. The native category select is accepted: it is accessible, has a 44 px target and works on mobile.
-4. No banner fade or scroll-padding is accepted, because `globals.css` is not in the T11 scope. Add `scroll-padding-top` for the sticky banner to the polish task (design a11y line 729); keyboard focus can be hidden under `sticky top-0` meanwhile.
+4. No banner fade or scroll-padding is accepted, because `globals.css` is not in the T11 scope. Per the coordinator, `scroll-padding-top` for the sticky banner moves to the designer's polish list (design a11y line 729).
 5. The disclaimer is REV-1.
 6. `/scelte/date` resolves to `src/app/(app)/scelte/[key]/page.tsx`, so it is fine.
 7. No conflict dialog for set-reference is accepted: the RPC has no version, and the DB errors `decision_taken` and `invalid_option` are mapped to messages.
@@ -35,8 +35,16 @@ Checked and OK:
 - **Next 16:** dynamic server page, no `use cache`, client boundary at `PercorsoScreen`, `revalidatePath` in the actions.
 
 ## AC coverage
-AC15 ✅ (view.test, hidden note) · AC16 ✅ (integration suggestions) · AC20 ✅ (integration reopen, banner) · AC24 ✅ (TS equals DB test) · AC25 ⚠️ (REV-1, wording) · AC29 ✅ · AC30 ✅ (filters, tests) · AC31 ✅ with REV-3 · AC32 ⚠️ (REV-2) · AC40 ✅ (integration conflict, ConflictDialog tests)
+AC15 ✅ (view.test, hidden note) · AC16 ✅ (integration suggestions) · AC20 ✅ (integration reopen, banner) · AC24 ✅ (TS equals DB test) · AC25 ✅ (after round 2) · AC29 ✅ · AC30 ✅ (filters, tests) · AC31 ✅ · AC32 ✅ (after round 2) · AC40 ✅ (integration conflict, ConflictDialog tests)
 
 ## Questions for the developer
-- Is writing task state in preview intentional (REV-2)? If so, update the design.
-- Was 360 px checked visually? The banner has "Esci", "Imposta come riferimento" and "Altro" on one wrapping row, and I could not verify it without a browser.
+- Was 360 px checked visually? The banner has "Esci", "Imposta come riferimento" and "Altro" on one wrapping row, and I could not verify it without a browser. This is not blocking.
+
+## Round 2 (f12f730)
+Verdict: approved.
+- REV-1 closed. `TaskSheet` and the test use `BUREAUCRATIC_DISCLAIMER`, and `COPY.bureaucratic` is gone.
+- REV-2 closed. Checkboxes are disabled in preview. "+", suggestions, "Eliminati di recente" and the bulk acknowledge are hidden. The sheet is read-only. A new test asserts that no action is called.
+- REV-3 closed. Every "Annulla" goes through `undoWrite`, which shows an error toast and calls `router.refresh()`. A test covers a rejected undo.
+- REV-4 closed. `deleted_at` now uses `getNow()`.
+- REV-5 closed. `write()` sets the sheet error only from `save()`, and a test covers it.
+- `vitest run src/features/timeline`: 59 of 59 passing. No new findings.
