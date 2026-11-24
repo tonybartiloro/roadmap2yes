@@ -67,7 +67,7 @@ Testata: titolo, riga di stato del riferimento (§3.8: "Scadenze calcolate sul 3
 | **Fatti** | Completati | Collassata, contatore, "Annulla" sul completamento. |
 
 - **Adesso vuoto** (nulla di urgente): "Per ora niente di urgente. Il prossimo passo è «{titolo}», tra {n} settimane."
-- Riga compito: checkbox 44 px, titolo, scadenza relativa ("tra 3 settimane", la data esatta nel tooltip e per lo screen reader), categoria, assegnatario (**Entrambi** / nome partner A / nome partner B, iniziali + nome; mai solo colore), eventuale badge "Da rivedere". Tocco → dettaglio in sheet (consiglio, nota "Indicativo: verifica sempre con il comune o la parrocchia" per le tappe burocratiche, note, modifica, elimina con Annulla ≥8 s).
+- Riga compito: checkbox 44 px, titolo, scadenza relativa ("tra 3 settimane", la data esatta nel tooltip e per lo screen reader), categoria, assegnatario (**Entrambi** / nome partner A / nome partner B, iniziali + nome; mai solo colore), eventuale badge "Da rivedere". Tocco → dettaglio in sheet (consiglio, nota "Indicativo: verificate sempre con il comune o la parrocchia" per le tappe burocratiche, note, modifica, elimina con Annulla ≥8 s).
 - Form compito: titolo, scadenza (opzionale), categoria, note, "Chi se ne occupa" (3 opzioni, predefinito Entrambi), "Ricordamelo per email" (interruttore, attivo; per i compiti di Entrambi il promemoria va a tutti e due).
 - Altre aree del Percorso: casella **"Suggerimenti da rivedere"** (accetta/ignora, AC16), banner **"Data riaperta"** (AC20), "Eliminati di recente" (ripristina), "Da rivedere" con "Va bene così".
 - Il raggruppamento si ricalcola ogni giorno (e in anteprima, §3.8) senza spostare di colpo ciò che stai guardando: al cambio di gruppo la riga si sposta con una dissolvenza e un annuncio `aria-live`.
@@ -644,6 +644,8 @@ Tono: **informale, "tu"**, caldo e diretto, come un amico che ti aiuta; ti rivol
 | Home, senza data | "Il primo passo: scegli la data" |
 | Conto alla rovescia provvisorio | "Se fosse il 3 settembre 2027: mancano 284 giorni" |
 | Conto alla rovescia definitivo | "Mancano 284 giorni (40 settimane)" |
+| Conto alla rovescia, oggi (F3) | definitivo "È oggi!" · provvisorio "Se fosse il 12 marzo 2027: sarebbe oggi" (confermati) |
+| Conto alla rovescia, passato (F3) | provvisorio "La data del 12 marzo 2027 è passata" + oltre 60 giorni in mesi ("da 18 mesi"), mai "da 548 giorni"; definitivo "Sono passati N giorni" (plurale), "È passato 1 giorno" al singolare; link "Cambia riferimento" sempre presente |
 | Benvenuto del secondo partner | "Ciao Jessica, ti stavamo aspettando. Tony ha già preparato un po' di cose: dai un'occhiata e correggi quello che non ti torna." |
 | Onboarding, passo 1 | "Iniziamo da te: come ti chiami?" |
 | Onboarding, passo 2 | "Ora il tuo partner. Gli mandiamo un invito per entrare con te." |
@@ -668,7 +670,7 @@ Tono: **informale, "tu"**, caldo e diretto, come un amico che ti aiuta; ti rivol
 | Errore importo | "Inserisci un importo in euro, ad esempio 1.500,00." |
 | Errore email partner | "Questa è la tua email: inserisci quella del tuo partner." |
 | Offline | "Sei offline. Le modifiche non sono ancora salvate." |
-| Avviso tappe burocratiche | "Indicativo: verifica sempre con il comune o la parrocchia." |
+| Avviso tappe burocratiche | "Indicativo: verificate sempre con il comune o la parrocchia" (testo di AC25; plurale perché la pratica è di coppia: eccezione consapevole al "tu", unica nel testo corrente) |
 | Data prima del 3/9/2027 | "È prima della data che desideravate: ricontrolla con la location." |
 | Sessione scaduta | "La sessione è scaduta. Entra di nuovo: non hai perso nulla." |
 | Tema | "Scegli lo stile della tua app. Lo puoi cambiare quando vuoi." |
