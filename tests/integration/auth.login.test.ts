@@ -9,6 +9,7 @@ import {
   serviceClient,
   signInAs,
   stackEnv,
+  uniqueEmail,
 } from "../support/supabase";
 
 /**
@@ -47,7 +48,7 @@ describe("limitedPasswordLogin against the real stack", () => {
   it("unknown email and wrong code get the SAME neutral outcome", async () => {
     const user = await createUser();
     const ip = fakeIp();
-    const unknown = await attempt("nobody.here@example.test", "Wrong-code-123", ip);
+    const unknown = await attempt(uniqueEmail("nobody"), "Wrong-code-123", ip);
     const wrong = await attempt(user.email, "Wrong-code-123", ip);
     expect(unknown).toEqual({ status: "invalid" });
     expect(wrong).toEqual({ status: "invalid" });
