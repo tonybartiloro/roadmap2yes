@@ -430,3 +430,22 @@ Developer's answers to the 4 remaining questions: 1. OK (min 10 characters, lett
 - Recorded as D49–D54 in brief.md; Q-A/Q-B/Q-C marked approved in plan.md; ADR 0001 → accepted.
 - Project memory updated: docker: true, npm commands, stack/tests/environments sections.
 - Next: F3, group G0 = T1 scaffolding + CI (developer) ‖ T0 milestone spec (product-owner), then QA T17a.
+
+## F3 — T0 done — 2026-11-24
+- PO wrote milestones-spec.md: 54 milestones (civile 43, religioso con effetti civili 47, simbolico 41, "non lo so" 38), 9 style phrases, acceptance examples (§5), 13 uncertainties.
+- For T4: offsets are applied months first, then weeks/days; added the task-only category `organizzazione`; the rite enum must match `weddings.rite` (3 rites + "non lo so").
+- Legal timings (U1–U6) are only indicative and must be checked against an official source before any public release.
+- Open, non-blocking (defaults applied): "Scegliere data e location" does not tick itself when the date is decided (R1); offsets v1.0.0 are a starting point.
+- For the designer: align the design.md §7.1 disclaimer wording to "verificate sempre…" (plural).
+
+## F3 — T1 done — 2026-11-24
+- 7 commits (4f5ba05..b8ddd5f): Next 16.4.6, React 19.3.1, TS 5.9.3 (typescript-eslint requires <6.1), Tailwind 4.3.5, Vitest 5.1.1, Playwright 1.65.1, Supabase CLI 3.3.0 as devDependency.
+- Green: lint, typecheck, 128 unit tests, build, db:start/reset/stop. Local Auth rejects signup and codes under 10 characters or without letters + digits. Unauthenticated `/percorso` → `/accesso`. e2e runs with 0 specs. gitleaks and actionlint clean.
+- Deviations accepted:
+  - ports 544xx (54322 is taken on this machine) and e2e ports 3000/3201/3202;
+  - a separate Mailpit container (SMTP 54425, web 54426) for app emails;
+  - `classifyDbError` returns paused|unreachable|null;
+  - extra lint guards;
+  - `.gitignore` gets `next-env.d.ts` and `*.tsbuildinfo`;
+  - `guards.ts` placeholder handed to T7a.
+- Gap: approved P1 dependencies not installed (vaul, react-day-picker, nodemailer + types, react-hook-form, @hookform/resolvers, prettier-plugin-tailwindcss, @vitejs/plugin-react, @testing-library/user-event). Sent back to the T1 developer. `server-only` and `vite` were added beyond P1 as tooling peers; to be reported to the developer.
