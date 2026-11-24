@@ -50,6 +50,21 @@ function unwrap<T>(result: { data: T | null; error: { code?: string } | null }):
   return result.data;
 }
 
+/** Reads every page of an ordered query (`max_rows` truncates a single response silently). */
+export async function allPages<T>(
+  page: (
+    from: number,
+    to: number,
+  ) => PromiseLike<{ data: T[] | null; error: { code?: string } | null }>,
+): Promise<T[]> {
+  const all: T[] = [];
+  for (let from = 0; ; from += PAGE_LIMIT) {
+    const rows = unwrap(await page(from, from + PAGE_LIMIT - 1));
+    all.push(...rows);
+    if (rows.length < PAGE_LIMIT) return all;
+  }
+}
+
 function asObject(value: Json | undefined): Record<string, Json | undefined> {
   return value !== null && typeof value === "object" && !Array.isArray(value) ? value : {};
 }
@@ -71,14 +86,19 @@ export function createSupabaseJobDb(client: SupabaseClient<Database>): JobDb {
     },
 
     async recipients() {
-      const rows = unwrap(await client.rpc("job_recipients"));
+      // PostgREST caps every response at `max_rows` (1000): page through ALL recipients, or the
+      // ones past the cap would silently never get an email. `job_recipients` is ordered.
+      const rows = await allPages((from, to) => client.rpc("job_recipients").range(from, to));
       // Day each partner joined (for B: the first login), to avoid catch-up at entry (D44).
       const joined = new Map<string, PlainDate>();
-      const memberships = unwrap(
-        await client
+      const memberships = await allPages((from, to) =>
+        client
           .from("memberships")
           .select("wedding_id, user_id, created_at")
-          .eq("role", "partner"),
+          .eq("role", "partner")
+          .order("wedding_id")
+          .order("user_id")
+          .range(from, to),
       );
       for (const m of memberships) {
         joined.set(`${m.wedding_id}:${m.user_id}`, todayInRome(new Date(m.created_at)));
