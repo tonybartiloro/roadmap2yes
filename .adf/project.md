@@ -41,7 +41,7 @@ Web app personale per organizzare e tracciare il matrimonio di Tony e Jessica: g
 Data desiderata: 3 settembre 2027 (non prima); alternative maggio-giugno o settembre 2028 in base alla disponibilità della location. Nulla è ancora deciso.
 
 ## Stack and architecture
-Approvato al Gate B di FEAT-2026-001 (2026-11-24), ADR `docs/adr/0001-stack-auth-ambienti.md`: Next.js 16 App Router + TypeScript su Vercel Hobby (fra1); Supabase free eu-central-1 (Postgres, Auth email + codice d'accesso, RLS come unico livello di autorizzazione; Storage solo più avanti, nessun object storage esterno); Tailwind v4 + shadcn/ui; Resend come unico provider email, acceso solo quando esiste il dominio (senza Resend nessuna email e avviso in app). Primo utente creato da variabili d'ambiente `R2Y_BOOTSTRAP_*` (solo creazione). Tutto deve restare **gratuito**; il dominio è l'unica spesa, a carico dello sviluppatore.
+Approvato al Gate B di FEAT-2026-001 (2026-11-24), ADR `docs/adr/0001-stack-auth-ambienti.md`: Next.js 16 App Router + TypeScript su Vercel Hobby (dub1); Supabase free eu-west-1 (Postgres, Auth email + codice d'accesso, RLS come unico livello di autorizzazione; Storage solo più avanti, nessun object storage esterno); Tailwind v4 + shadcn/ui; Resend come unico provider email, acceso solo quando esiste il dominio (senza Resend nessuna email e avviso in app). Primo utente creato da variabili d'ambiente `R2Y_BOOTSTRAP_*` (solo creazione). Tutto deve restare **gratuito**; il dominio è l'unica spesa, a carico dello sviluppatore.
 
 ## Conventions
 Conventional commits, squash merge, branch `{type}/{ID}-{slug}`. Da definire con la prima feature.

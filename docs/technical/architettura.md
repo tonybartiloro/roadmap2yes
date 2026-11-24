@@ -10,8 +10,8 @@ Questo documento descrive come è costruita l'app. Le decisioni che la fissano s
 | UI | Tailwind CSS v4, shadcn/ui (Radix), react-hook-form, zod 4 | Mobile first. Temi come variabili CSS su `[data-theme]` |
 | Dati e accesso | Supabase: Postgres, Auth (password), RLS | `@supabase/ssr` per le sessioni nei cookie, `supabase-js` per le chiamate |
 | Email | `EmailSender` con tre trasporti: `none`, `smtp` (solo locale e CI), `resend` | Resend è l'unico fornitore in produzione, quando esiste il dominio |
-| Hosting | Vercel Hobby, regione `fra1`; un solo progetto con ambienti Preview e Production | Il cron giornaliero è in `vercel.json` |
-| Database | Supabase free, regione `eu-central-1`; un progetto di produzione e uno di staging | Il progetto di staging contiene solo dati finti |
+| Hosting | Vercel Hobby, regione `dub1` (Dublino); un solo progetto con ambienti Preview e Production | Il cron giornaliero è in `vercel.json` |
+| Database | Supabase free, regione `eu-west-1` (Irlanda); un progetto di produzione e uno di staging | Il progetto di staging contiene solo dati finti |
 | Test | Vitest, pgTAP, Playwright, axe | Vedi [Sviluppo locale e test](sviluppo-locale-e-test.md) |
 
 Nessuno storage di file: R1 non carica file. Lo storage, quando servirà (R6), sarà Supabase Storage.
