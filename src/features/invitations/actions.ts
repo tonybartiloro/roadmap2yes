@@ -63,6 +63,20 @@ const formError = (failure: ServiceFailure): FormState => ({
 const invalid = (message = GENERIC_FAILURE): FormState => ({ status: "error", message });
 
 const BAD_EMAIL = "Controlla l'email: non sembra un indirizzo valido.";
+const BAD_FIELD = "Controlla questo campo: è troppo lungo.";
+
+/** Message and field of the FIRST invalid input (an email problem is the only one called "email"). */
+function invalidInput(issues: readonly { path: readonly PropertyKey[] }[]): {
+  message: string;
+  field: string;
+} {
+  const field = String(issues[0]?.path[0] ?? "email");
+  return field === "email"
+    ? { message: BAD_EMAIL, field }
+    : field === "code"
+      ? { message: PARTNER_FAILED, field }
+      : { message: BAD_FIELD, field };
+}
 
 // ---------------------------------------------------------------------------------- typed (T10)
 
@@ -76,7 +90,7 @@ export async function createPartnerAccount(input: {
 }): Promise<PartnerActionResult> {
   const parsed = partnerWithCodeSchema.safeParse(input);
   if (!parsed.success) {
-    return { ok: false, error: "invalid", message: BAD_EMAIL, field: "email" };
+    return { ok: false, error: "invalid", ...invalidInput(parsed.error.issues) };
   }
   const result = await createPartnerByCode(await createClient(), parsed.data);
   if (result.ok) refresh();
@@ -99,7 +113,7 @@ export async function invitePartnerByEmail(input: {
 }): Promise<PartnerActionResult> {
   const parsed = partnerSchema.safeParse(input);
   if (!parsed.success) {
-    return { ok: false, error: "invalid", message: BAD_EMAIL, field: "email" };
+    return { ok: false, error: "invalid", ...invalidInput(parsed.error.issues) };
   }
   const result = await inviteByEmail(await createClient(), deps(), parsed.data);
   if (result.ok) refresh();
@@ -121,7 +135,8 @@ export async function createPartnerWithCodeAction(
 ): Promise<InviteFormState> {
   const parsed = partnerWithCodeSchema.safeParse(formFields(formData));
   if (!parsed.success) {
-    return { status: "error", message: BAD_EMAIL, field: { name: "email", message: BAD_EMAIL } };
+    const { message, field } = invalidInput(parsed.error.issues);
+    return { status: "error", message, field: { name: field, message } };
   }
   const result = await createPartnerByCode(await createClient(), parsed.data);
   if (!result.ok) return formError(result);
@@ -135,7 +150,8 @@ export async function inviteByEmailAction(
 ): Promise<InviteFormState> {
   const parsed = partnerSchema.safeParse(formFields(formData));
   if (!parsed.success) {
-    return { status: "error", message: BAD_EMAIL, field: { name: "email", message: BAD_EMAIL } };
+    const { message, field } = invalidInput(parsed.error.issues);
+    return { status: "error", message, field: { name: field, message } };
   }
   const result = await inviteByEmail(await createClient(), deps(), parsed.data);
   if (!result.ok) return formError(result);

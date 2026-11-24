@@ -9,7 +9,7 @@ const optionalText = (max: number) =>
   z
     .string()
     .max(max)
-    .optional()
+    .nullish()
     .transform((value) => {
       const trimmed = (value ?? "").trim();
       return trimmed === "" ? null : trimmed;
