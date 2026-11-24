@@ -7,8 +7,9 @@
  *   - `ping`  (staging: nobody runs the daily job there): writes a `keepalive` heartbeat through
  *             `record_heartbeat` and reads it back. A real write + read keeps the free Supabase
  *             project from being paused (~7 days of inactivity).
- *   - `check` (production): the newest `daily_job` heartbeat must be at most 36 hours old, and the
- *             last run must not report a failure or an exceeded email quota.
+ *   - `check` (production): over the `daily_job` heartbeats of the last 8 days, the newest must be
+ *             at most 36 hours old, no gap may exceed 36 hours, and no run may report a failure or
+ *             an exceeded email quota (a bad Tuesday is not hidden by a good Saturday).
  * Exit code 1 on any problem, so the workflow turns red and GitHub notifies the owner.
  */
 import { createClient } from "@supabase/supabase-js";
@@ -21,29 +22,48 @@ export interface HeartbeatRow {
   details: unknown;
 }
 
-/** Pure evaluation of the newest `daily_job` heartbeat. Returns the problems found (empty = healthy). */
-export function evaluateHeartbeat(input: {
+/** The weekly check looks at every `daily_job` heartbeat of the last 8 days (REV-1). */
+export const WINDOW_DAYS = 8;
+
+/**
+ * Pure evaluation of the `daily_job` heartbeats of the window (any order). Returns the problems
+ * found (empty = healthy): the newest must be at most `maxAgeHours` old, no gap between
+ * consecutive heartbeats may exceed it, and no run may report a failure or an exceeded quota.
+ */
+export function evaluateHeartbeats(input: {
   now: Date;
-  heartbeat: HeartbeatRow | null;
+  heartbeats: readonly HeartbeatRow[];
   maxAgeHours?: number;
 }): string[] {
-  const { now, heartbeat, maxAgeHours = MAX_HEARTBEAT_AGE_HOURS } = input;
-  if (!heartbeat) return ["no daily_job heartbeat has ever been recorded"];
+  const { now, maxAgeHours = MAX_HEARTBEAT_AGE_HOURS } = input;
+  if (input.heartbeats.length === 0) {
+    return [`no daily_job heartbeat in the last ${WINDOW_DAYS} days`];
+  }
+  const rows = input.heartbeats.map((h) => ({
+    at: new Date(h.ranAt).getTime(),
+    details:
+      h.details !== null && typeof h.details === "object"
+        ? (h.details as Record<string, unknown>)
+        : {},
+  }));
+  if (rows.some((r) => Number.isNaN(r.at))) return ["a heartbeat has an invalid timestamp"];
+  rows.sort((a, b) => a.at - b.at);
+
   const problems: string[] = [];
-  const ranAt = new Date(heartbeat.ranAt).getTime();
-  if (Number.isNaN(ranAt)) return ["the last heartbeat has an invalid timestamp"];
-  const ageHours = (now.getTime() - ranAt) / 3_600_000;
-  if (ageHours > maxAgeHours) {
-    problems.push(`last heartbeat is ${Math.floor(ageHours)} h old (limit ${maxAgeHours} h)`);
+  const hours = (ms: number) => ms / 3_600_000;
+  const age = hours(now.getTime() - rows[rows.length - 1]!.at);
+  if (age > maxAgeHours) {
+    problems.push(`last heartbeat is ${Math.floor(age)} h old (limit ${maxAgeHours} h)`);
   }
-  const details =
-    heartbeat.details !== null && typeof heartbeat.details === "object"
-      ? (heartbeat.details as Record<string, unknown>)
-      : {};
-  if (details["ok"] === false) problems.push("the last daily job run reported a failure");
-  if (details["over_quota"] === true) {
-    problems.push("the email quota was exceeded in the last run (emails were skipped)");
+  for (let i = 1; i < rows.length; i++) {
+    const gap = hours(rows[i]!.at - rows[i - 1]!.at);
+    if (gap > maxAgeHours) problems.push(`gap of ${Math.floor(gap)} h between two daily runs`);
   }
+  const failed = rows.filter((r) => r.details["ok"] === false).length;
+  if (failed > 0) problems.push(`${failed} daily job run(s) reported a failure`);
+  const over = rows.filter((r) => r.details["over_quota"] === true).length;
+  if (over > 0)
+    problems.push(`the email quota was exceeded in ${over} run(s) (emails were skipped)`);
   return problems;
 }
 
@@ -83,13 +103,13 @@ async function main(): Promise<void> {
     .from("heartbeats")
     .select("ran_at, details")
     .eq("source", "daily_job")
+    .gte("ran_at", new Date(Date.now() - WINDOW_DAYS * 86_400_000).toISOString())
     .order("ran_at", { ascending: false })
-    .limit(1);
+    .limit(100);
   if (error) fail(`could not read the heartbeats (${error.code ?? "error"})`);
-  const row = data?.[0];
-  const problems = evaluateHeartbeat({
+  const problems = evaluateHeartbeats({
     now: new Date(),
-    heartbeat: row ? { ranAt: row.ran_at, details: row.details } : null,
+    heartbeats: (data ?? []).map((r) => ({ ranAt: r.ran_at, details: r.details })),
   });
   if (problems.length > 0) fail(problems.join("; "));
   console.log("keepalive: daily job healthy");

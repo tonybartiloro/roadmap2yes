@@ -11,6 +11,12 @@ name: Migrate
 #   - Secrets are used ONLY by the `push` (production) and `workflow_dispatch` (staging) triggers,
 #     never by `pull_request`: in a public repository a PR may change this very file.
 #   - Production is gated by the `production` GitHub environment (required reviewer = approval).
+#   - REQUIRED REPOSITORY SETTING: the environments `production` and `staging` must have
+#     "Deployment branches" = `main` only. The `if` on the job is a second barrier, not a substitute.
+#   - Secrets are step-level `env`, so `npm ci` and its lifecycle scripts never see them.
+#   - Ordering: this runs in parallel with the Vercel deploy of the same merge, so the new code may
+#     briefly run before the migration. Migrations MUST be additive and backward compatible with
+#     the previous code (plan §12).
 on:
   push:
     branches: [main]
@@ -32,12 +38,8 @@ jobs:
     name: db push (${{ github.event_name == 'push' && 'production' || 'staging' }})
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    if: github.ref == 'refs/heads/main'
     environment: ${{ github.event_name == 'push' && 'production' || 'staging' }}
-    env:
-      # Environment-scoped secrets (Settings > Environments > staging / production).
-      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-      SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -46,10 +48,21 @@ jobs:
           cache: npm
       # The Supabase CLI is the devDependency pinned in package-lock.json (no third-party action).
       - run: npm ci
+      # Environment-scoped secrets (Settings > Environments > staging / production), step level.
       - name: Link the remote project
         run: npx supabase link --project-ref "$SUPABASE_PROJECT_REF"
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
       - name: Pending migrations (dry run)
         run: npx supabase db push --dry-run
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
       # Never add --include-seed here, and never replace this step with `db reset --linked`.
       - name: Apply migrations
         run: npx supabase db push
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}

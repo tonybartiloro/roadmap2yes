@@ -238,6 +238,8 @@ async function sendDigests(
   data: WeddingJobData,
 ): Promise<void> {
   const today = summary.today;
+  // The digest goes out on the first run from Monday to Wednesday that has content, once per ISO
+  // week: an empty Monday is not claimed, so new content may send it on Tuesday or Wednesday.
   if (!isDigestWindow(today)) return;
   const since = new Date(ctx.now.getTime() - DIGEST_NEWS_DAYS * DAY_MS).toISOString();
 
