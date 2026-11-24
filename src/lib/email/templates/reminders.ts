@@ -1,7 +1,7 @@
 import { APP_NAME } from "@/components/app-name";
 import { formatEuro } from "@/lib/money";
 import type { PlainDate } from "@/lib/dates/plain-date";
-import { escapeHtml, singleLine } from "../escape";
+import { escapeHtml, safeUrl, singleLine } from "../escape";
 import type { RenderedEmail } from "../types";
 import { formatLongDate, limitRows } from "./format";
 import { paragraph, renderLayout, type EmailPalette } from "./layout";
@@ -19,7 +19,9 @@ export interface Unsubscribe {
 
 const ONE_CLICK = "List-Unsubscribe=One-Click";
 
-function unsubscribeHeaders(url: string): Record<string, string> {
+function unsubscribeHeaders(url: string): Record<string, string> | undefined {
+  // Only a validated http(s) URL that cannot break the `<...>` syntax goes in the header.
+  if (safeUrl(url) === "#" || /[<>\s]/.test(url)) return undefined;
   return { "List-Unsubscribe": `<${url}>`, "List-Unsubscribe-Post": ONE_CLICK };
 }
 
@@ -103,7 +105,7 @@ export function renderReminderEmail(input: ReminderEmailInput): RenderedEmail {
     title: subject,
     bodyHtml,
     button: { label: "Apri il Percorso", url: input.appUrl },
-    footerHtml: `${escapeHtml(footer)} <a href="${escapeHtml(input.unsubscribeUrl)}">disattiva i promemoria</a>`,
+    footerHtml: `${escapeHtml(footer)} <a href="${escapeHtml(safeUrl(input.unsubscribeUrl))}">disattiva i promemoria</a>`,
   });
   const text = [
     `Ciao ${name},`,
@@ -116,7 +118,8 @@ export function renderReminderEmail(input: ReminderEmailInput): RenderedEmail {
     `${footer} ${input.unsubscribeUrl}`,
     APP_NAME,
   ].join("\n");
-  return { subject, html, text, headers: unsubscribeHeaders(input.unsubscribeUrl) };
+  const headers = unsubscribeHeaders(input.unsubscribeUrl);
+  return headers ? { subject, html, text, headers } : { subject, html, text };
 }
 
 export interface DigestTodo extends ReminderTask {
@@ -196,7 +199,7 @@ export function renderDigestEmail(input: DigestEmailInput): RenderedEmail | null
     title: subject,
     bodyHtml,
     button: { label: `Apri ${APP_NAME}`, url: input.appUrl },
-    footerHtml: `${escapeHtml(footer)} <a href="${escapeHtml(input.unsubscribeUrl)}">disattiva il riepilogo</a><br>${escapeHtml(change)} <a href="${escapeHtml(input.preferencesUrl)}">Promemoria</a>`,
+    footerHtml: `${escapeHtml(footer)} <a href="${escapeHtml(safeUrl(input.unsubscribeUrl))}">disattiva il riepilogo</a><br>${escapeHtml(change)} <a href="${escapeHtml(safeUrl(input.preferencesUrl))}">Promemoria</a>`,
   });
   const text = [
     `Ciao ${name},`,
@@ -210,5 +213,6 @@ export function renderDigestEmail(input: DigestEmailInput): RenderedEmail | null
     `${change} ${input.preferencesUrl}`,
     APP_NAME,
   ].join("\n");
-  return { subject, html, text, headers: unsubscribeHeaders(input.unsubscribeUrl) };
+  const headers = unsubscribeHeaders(input.unsubscribeUrl);
+  return headers ? { subject, html, text, headers } : { subject, html, text };
 }

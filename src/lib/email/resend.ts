@@ -1,6 +1,6 @@
 import "server-only";
 import { cleanHeaders } from "./smtp";
-import { singleLine } from "./escape";
+import { isSingleAddress, singleLine } from "./escape";
 import type { EmailMessage, EmailSender, EmailSendResult } from "./types";
 
 export const RESEND_API_URL = "https://api.resend.com/emails";
@@ -21,6 +21,9 @@ export class ResendSender implements EmailSender {
   ) {}
 
   async send(message: EmailMessage): Promise<EmailSendResult> {
+    if (!isSingleAddress(message.to)) {
+      return { ok: false, error: "invalid_recipient", retryable: false };
+    }
     const headers: Record<string, string> = {
       Authorization: `Bearer ${this.apiKey}`,
       "Content-Type": "application/json",
@@ -56,7 +59,12 @@ export class ResendSender implements EmailSender {
         return { ok: true };
       }
     }
-    const retryable = response.status === 429 || response.status >= 500 || response.status === 409;
+    let retryable = response.status === 429 || response.status >= 500;
+    if (response.status === 409) {
+      // 409 is retryable only while the first request with this key is still in flight.
+      const raw = await response.text().catch(() => "");
+      retryable = raw.includes("concurrent_idempotent_requests");
+    }
     return { ok: false, error: `resend_http_${response.status}`, retryable };
   }
 }

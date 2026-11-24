@@ -9,7 +9,11 @@ import type { UnsubscribableKind } from "./types";
  * - The MAC covers a fixed context string, the KIND and the user id, so a token for `reminders`
  *   never works for `digest` and never for another user.
  * - Verification is constant-time. The user id is a random uuid (no email, no name in the URL).
- * - The secret (`EMAIL_LINK_SECRET`) is read at call time and never logged.
+ * - The secret (`EMAIL_LINK_SECRET`, at least 32 chars) is read at call time and never logged.
+ * - Rotation: changing the secret invalidates every unsubscribe link already sent. That is
+ *   acceptable: users can still switch emails off from Altro > Promemoria, and new emails carry
+ *   links signed with the new secret. Tokens have no expiry on purpose (unsubscribing only
+ *   reduces mail and POST is idempotent).
  */
 const CONTEXT = "r2y-unsubscribe-v1";
 export const UNSUBSCRIBE_KINDS: readonly UnsubscribableKind[] = ["reminders", "digest"];
@@ -18,8 +22,12 @@ function mac(secret: string, kind: UnsubscribableKind, userId: string): Buffer {
   return createHmac("sha256", secret).update(`${CONTEXT}\n${kind}\n${userId}`).digest();
 }
 
+export const MIN_SECRET_LENGTH = 32;
+
+/** The secret, or `undefined` when missing or shorter than 32 characters (weak HMAC key). */
 function resolveSecret(secret: string | undefined): string | undefined {
-  return secret ?? readJobSecrets().emailLinkSecret;
+  const key = secret ?? readJobSecrets().emailLinkSecret;
+  return key !== undefined && key.length >= MIN_SECRET_LENGTH ? key : undefined;
 }
 
 /** Throws (value-free message) when no secret is configured: never emit an unsigned link. */
@@ -28,7 +36,8 @@ export function createUnsubscribeToken(
   secret?: string,
 ): string {
   const key = resolveSecret(secret);
-  if (!key) throw new Error("Missing email configuration: EMAIL_LINK_SECRET");
+  if (!key)
+    throw new Error("Missing or too short email configuration: EMAIL_LINK_SECRET (min 32 chars)");
   const id = Buffer.from(input.userId, "utf8").toString("base64url");
   return `${id}.${mac(key, input.kind, input.userId).toString("base64url")}`;
 }

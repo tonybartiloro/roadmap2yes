@@ -5,7 +5,7 @@ import {
   verifyUnsubscribeToken,
 } from "./unsubscribe-token";
 
-const SECRET = "test-secret-1";
+const SECRET = "test-secret-0123456789-0123456789-ab";
 const USER = "6f1d2c1e-0000-4000-8000-000000000001";
 
 describe("unsubscribe token", () => {
@@ -16,7 +16,9 @@ describe("unsubscribe token", () => {
   it("rejects another kind, another secret and tampering", () => {
     const token = createUnsubscribeToken({ userId: USER, kind: "reminders" }, SECRET);
     expect(verifyUnsubscribeToken(token, "digest", SECRET)).toBeNull();
-    expect(verifyUnsubscribeToken(token, "reminders", "other")).toBeNull();
+    expect(
+      verifyUnsubscribeToken(token, "reminders", "other-secret-0123456789-0123456789-cd"),
+    ).toBeNull();
     const [id, mac] = token.split(".") as [string, string];
     const otherId = Buffer.from("someone-else").toString("base64url");
     expect(verifyUnsubscribeToken(`${otherId}.${mac}`, "reminders", SECRET)).toBeNull();
@@ -28,6 +30,13 @@ describe("unsubscribe token", () => {
       expect(verifyUnsubscribeToken(bad, "digest", SECRET)).toBeNull();
     }
     expect(verifyUnsubscribeToken("a.b", "digest", undefined)).toBeNull();
+  });
+  it("rejects a secret shorter than 32 characters in sign and verify", () => {
+    expect(() => createUnsubscribeToken({ userId: USER, kind: "digest" }, "short")).toThrow(
+      "EMAIL_LINK_SECRET",
+    );
+    const token = createUnsubscribeToken({ userId: USER, kind: "digest" }, SECRET);
+    expect(verifyUnsubscribeToken(token, "digest", "short")).toBeNull();
   });
   it("refuses to sign without a secret", () => {
     const saved = process.env["EMAIL_LINK_SECRET"];

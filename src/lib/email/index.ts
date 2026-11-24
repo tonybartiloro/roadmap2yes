@@ -1,5 +1,5 @@
 import "server-only";
-import { readEmailConfig, type Env } from "@/lib/app-config";
+import { readEmailConfig, type EmailConfig, type Env } from "@/lib/app-config";
 import { createSmtpSender } from "./smtp";
 import { ResendSender } from "./resend";
 import type { EmailSender, EmailSendResult } from "./types";
@@ -17,7 +17,16 @@ export type {
  * (local/CI) with a host. Absent / `none` / incomplete means NO email. Never throws.
  */
 export function emailEnabled(env: Env = process.env): boolean {
-  return readEmailConfig(env).enabled;
+  return resolveConfig(env).enabled;
+}
+
+/** `smtp` (clear text, local catcher) is refused on Vercel Production: it is local/CI only. */
+function resolveConfig(env: Env): EmailConfig {
+  const config = readEmailConfig(env);
+  if (config.transport === "smtp" && env["VERCEL_ENV"] === "production") {
+    return { transport: "none", enabled: false, reason: "smtp not allowed in production" };
+  }
+  return config;
 }
 
 /** Used when emails are off. The callers check `emailEnabled()` first, so it is never reached. */
@@ -32,7 +41,7 @@ const LOCAL_FROM = "roadmap2yes <noreply@example.test>";
 
 /** Sender for the current runtime configuration; `NullSender` when emails are off. */
 export function getEmailSender(env: Env = process.env): EmailSender {
-  const config = readEmailConfig(env);
+  const config = resolveConfig(env);
   switch (config.transport) {
     case "resend":
       return new ResendSender(config.apiKey, config.from);

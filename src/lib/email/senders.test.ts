@@ -68,6 +68,24 @@ describe("SmtpSender", () => {
   });
 });
 
+describe("SmtpSender recipient and production guard", () => {
+  it("rejects a multi-recipient `to`", async () => {
+    const sendMail = vi.fn();
+    const result = await new SmtpSender({ sendMail }, "n@example.test").send({
+      ...message,
+      to: "a@example.test,b@example.test",
+    });
+    expect(result).toEqual({ ok: false, error: "invalid_recipient", retryable: false });
+    expect(sendMail).not.toHaveBeenCalled();
+  });
+  it("smtp is refused on Vercel Production", () => {
+    const env = { EMAIL_TRANSPORT: "smtp", SMTP_HOST: "127.0.0.1", VERCEL_ENV: "production" };
+    expect(emailEnabled(env)).toBe(false);
+    expect(getEmailSender(env)).toBeInstanceOf(NullSender);
+    expect(emailEnabled({ ...env, VERCEL_ENV: "preview" })).toBe(true);
+  });
+});
+
 describe("ResendSender", () => {
   const key = "re_secret_key_123";
   it("posts the payload with Idempotency-Key and no SDK", async () => {
@@ -88,9 +106,49 @@ describe("ResendSender", () => {
     });
     expect(body.subject).toBe("Ciao Bcc: x@example.test");
   });
+  it("sets a timeout signal", async () => {
+    const doFetch = vi.fn().mockResolvedValue(new Response("{}", { status: 200 }));
+    await new ResendSender(key, "n@example.test", doFetch).send(message);
+    expect(doFetch.mock.calls[0]![1].signal).toBeInstanceOf(AbortSignal);
+  });
+  it("tolerates a 2xx with a malformed body", async () => {
+    const doFetch = vi.fn().mockResolvedValue(new Response("not json", { status: 200 }));
+    expect(await new ResendSender(key, "n@example.test", doFetch).send(message)).toEqual({
+      ok: true,
+    });
+  });
+  it("409: retryable only for concurrent_idempotent_requests", async () => {
+    const run = async (name: string) =>
+      new ResendSender(
+        key,
+        "n@example.test",
+        vi.fn().mockResolvedValue(new Response(`{"name":"${name}"}`, { status: 409 })),
+      ).send(message);
+    expect(await run("concurrent_idempotent_requests")).toMatchObject({ retryable: true });
+    expect(await run("invalid_idempotent_request")).toMatchObject({ retryable: false });
+  });
+  it("rejects a multi-recipient or malformed `to` without calling the API", async () => {
+    const doFetch = vi.fn();
+    const sender = new ResendSender(key, "n@example.test", doFetch);
+    for (const to of [
+      "a@example.test,b@example.test",
+      "a@example.test b",
+      "<a@example.test>",
+      "x",
+    ]) {
+      expect(await sender.send({ ...message, to })).toEqual({
+        ok: false,
+        error: "invalid_recipient",
+        retryable: false,
+      });
+    }
+    expect(doFetch).not.toHaveBeenCalled();
+  });
   it.each([
+    [400, false],
     [429, true],
     [500, true],
+    [503, true],
     [422, false],
     [401, false],
   ])("status %i -> retryable %s, never leaks the key", async (status, retryable) => {

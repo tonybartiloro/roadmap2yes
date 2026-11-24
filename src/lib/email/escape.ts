@@ -31,3 +31,8 @@ export function safeUrl(value: string): string {
     return "#";
   }
 }
+
+/** True for ONE bare address: no comma, semicolon, angle brackets, quotes or whitespace. */
+export function isSingleAddress(value: string): boolean {
+  return value.length <= 254 && /^[^\s,;<>"]+@[^\s,;<>"]+$/.test(value);
+}

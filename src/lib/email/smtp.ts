@@ -1,6 +1,6 @@
 import "server-only";
 import nodemailer from "nodemailer";
-import { singleLine } from "./escape";
+import { isSingleAddress, singleLine } from "./escape";
 import type { EmailMessage, EmailSender, EmailSendResult } from "./types";
 
 /** Minimal slice of a nodemailer transport (lets tests inject a mock). */
@@ -33,6 +33,9 @@ export class SmtpSender implements EmailSender {
   ) {}
 
   async send(message: EmailMessage): Promise<EmailSendResult> {
+    if (!isSingleAddress(message.to)) {
+      return { ok: false, error: "invalid_recipient", retryable: false };
+    }
     try {
       const info = await this.mail.sendMail({
         from: this.from,

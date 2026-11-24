@@ -103,6 +103,29 @@ describe("reminder", () => {
       "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
     });
   });
+  it("does not trust unsubscribe URLs: javascript: links and bad headers are neutralised", () => {
+    const m = renderReminderEmail({
+      recipientName: "T",
+      sevenDays: [task("x")],
+      today: [],
+      appUrl: URL,
+      unsubscribeUrl: "javascript:alert(1)",
+    });
+    expect(m.html).not.toContain("javascript:");
+    expect(m.headers).toBeUndefined();
+    const d = renderDigestEmail({
+      recipientName: "T",
+      partnerName: "J",
+      todo: [task("x")],
+      payments: [],
+      news: [],
+      appUrl: URL,
+      preferencesUrl: "javascript:alert(2)",
+      unsubscribeUrl: "https://a.example.test/u>\r\nBcc: x",
+    });
+    expect(d!.html).not.toContain("javascript:");
+    expect(d!.headers).toBeUndefined();
+  });
   it("refuses an empty reminder", () => {
     expect(() =>
       renderReminderEmail({
