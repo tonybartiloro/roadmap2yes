@@ -194,7 +194,9 @@ describe("task actions (AC31, AC40)", () => {
     expect(message).toBe("Compito completato.");
     expect(options.duration).toBeGreaterThanOrEqual(8000);
     expect(options.action.label).toBe("Annulla");
-    expect(screen.getByTestId("live-region").textContent).toContain("spostato in Fatti");
+    await waitFor(() =>
+      expect(screen.getByTestId("live-region").textContent).toContain("spostato in Fatti"),
+    );
 
     options.action.onClick();
     await waitFor(() =>

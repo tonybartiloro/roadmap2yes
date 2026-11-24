@@ -222,9 +222,10 @@ export function PercorsoScreen({
   function toggle(taskId: string, done: boolean) {
     const task = tasks.find((t) => t.id === taskId);
     if (!task) return;
+    // Urgent update (outside the transition) so the announcement is never deferred behind the write.
+    setAnnouncement(done ? `«${task.title}» spostato in Fatti.` : `«${task.title}» riaperto.`);
     startTransition(async () => {
       applyOptimistic({ type: "status", id: taskId, done, at: new Date().toISOString() });
-      setAnnouncement(done ? `«${task.title}» spostato in Fatti.` : `«${task.title}» riaperto.`);
       const mine = { ...taskToFields(task), status: done ? ("done" as const) : ("todo" as const) };
       const run = (version: number) =>
         setTaskStatusAction({ id: taskId, expectedVersion: version, done });
