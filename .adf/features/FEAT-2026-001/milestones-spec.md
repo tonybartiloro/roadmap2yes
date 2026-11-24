@@ -31,7 +31,7 @@ Sigle nelle tabelle: **TUTTI** = civile, religioso, simbolico, unknown. **C** ci
 ### 1.2 Avviso burocratico
 Testo unico, costante in un solo punto (AC25): **"Indicativo: verificate sempre con il comune o la parrocchia"**. Nota: design §7.1 riporta la variante "verifica sempre …" (singolare); vale la forma di AC25, plurale, e il designer allinea il copy.
 
-## 2. Catalogo delle tappe (54)
+## 2. Catalogo delle tappe (53; la numerazione arriva a 54 perché il n. 38 non esiste)
 
 Legenda offset: `12m` = 12 mesi prima; `2m+2w` = 2 mesi e 2 settimane prima (mesi per primi); `5w` = 5 settimane prima; `3d` = 3 giorni prima; `-2w` = 2 settimane **dopo** la data; `—` = indipendente dalla data.
 
@@ -142,7 +142,7 @@ Regole d'uso: appare in "Adesso" (via la regola (c) del piano §5: tappa in evid
 | Religioso | 37 | 10 (40, 41, 42, 43, 45, 46, 47, 48, 49, 50) | **47** | 4 | 8 (40, 41, 42, 43, 45, 46, 47, 48) |
 | Simbolico | 37 | 4 (44, 51, 52, 53) | **41** | 4 | 1 (52) |
 | Non lo so | 37 | 1 (54) | **38** | 5 (1–4 e 54) | 0 |
-| Catalogo totale | | | **54** | | 10 (39, 40, 41, 42, 43, 45, 46, 47, 48, 52) |
+| Catalogo totale | | | **53** | | 10 (39, 40, 41, 42, 43, 45, 46, 47, 48, 52) |
 
 ### 2.5 Tappe future (non generate in R1)
 Non fanno parte del modello R1 e **non vanno generate**: raccolta online delle conferme (RSVP) e sito pubblico (R3), gestione tavoli come funzione (R5), funzioni su abiti/testimoni/documenti/lista nozze (R4), foto e video condivisi del giorno (R6). Le tappe 11, 13, 26, 30 sono semplici compiti manuali e **non** devono promettere strumenti dell'app. Quando queste release arriveranno, si aggiungeranno nuove tappe (id nuovi) con `version` e `highlightFirst: false`.
@@ -272,7 +272,7 @@ Il riferimento è il primo giorno: **2028-05-01** (indicato in chiaro "calcolata
 Rito civile, riferimento passa da 2027-09-03 a 2028-05-01, tutti `todo` e non modificate a mano: ogni tappa con offset si sposta di conseguenza (es. `scegli-abiti` 2026-12-03 → 2027-08-01). Una tappa con `due_overridden = true` o completata non si muove. Le 4 tappe senza offset non cambiano e non ricevono `needs_review`. Riaprendo la decisione "data", tutte le tappe con `dependsOn: date` ancora `todo` ricevono `needs_review`: nel rito civile sono 43 − 4 = **39** (le 4 senza offset sono escluse).
 
 ### 5.8 Conteggi attesi (test di catalogo)
-- `milestones.length = 54`; per rito: civile 43, religioso 47, simbolico 41, unknown 38.
+- `milestones.length = 53` (numerazione fino a 54, n. 38 assente); per rito: civile 43, religioso 47, simbolico 41, unknown 38.
 - Tappe con `bureaucratic: true`: 10 in tutto; civile 5, religioso 8, simbolico 1, unknown 0.
 - `highlightFirst`: 4 tappe in tutto (1, 2, 3, 54); tra le comuni esattamente 3.
 - Tappe con `offset: null`: 5 (1, 2, 3, 4, 54).
