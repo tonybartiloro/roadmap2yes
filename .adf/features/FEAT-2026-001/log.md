@@ -560,3 +560,16 @@ Developer's answers to the 4 remaining questions: 1. OK (min 10 characters, lett
 - Unverified (flagged in the runbook): Supabase dashboard menu names, restorability past 90 days paused, whether an `EMAIL_TRANSPORT` change needs a redeploy.
 - adf verify passes.
 - Next: F5 release.
+
+## F5 — services and staging — 2026-11-24
+- PR #1 (https://github.com/tonybartiloro/roadmap2yes/pull/1) opened. CI is green, including e2e-full with the WebKit smoke via the `e2e-full` label. A gitleaks false positive was allowlisted by exact line.
+- Supabase: the prod project is `roadmap2yes` and the staging project is `roadmap2yes-stage`, both in **eu-west-1**. Vercel was moved to `dub1` at the developer's decision.
+- Staging migrations were applied via the Supabase MCP and the history aligned to the file versions. The advisors show only intended items, and unindexed FKs are noted as a follow-up.
+- Vercel project `roadmap2yes`:
+  - created via MCP; the developer installed the GitHub app;
+  - the coordinator set the non-secret env vars, and the developer set the 10 secrets;
+  - Node 24.x;
+  - the first deploy was wrongly targeted to production from the feature branch and was cancelled before going live.
+- Preview smoke on staging passed: bootstrap login, onboarding, a Percorso with 43 tasks, Home, Budget and Scelte. Copy fixes followed: gender-neutral partner copy and the theme card accessible name.
+- GitHub environments `production`, `staging` and `production-keepalive` are restricted to `main`. The non-secret ref and URL are kept as environment Variables, and the workflows were switched to `vars.*`.
+- **Developer decision:** no required reviewers on `production`. Merging to main applies the migrations to production without a second approval. Gate C is asked in chat before the merge.
