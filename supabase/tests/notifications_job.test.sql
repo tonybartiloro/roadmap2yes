@@ -5,6 +5,9 @@ begin;
 \set su 'reset role; do $x$ begin perform set_config(''request.jwt.claims'','''',true); perform set_config(''request.jwt.claim.sub'','''',true); end $x$;'
 select plan(69);
 
+-- Independent of committed rows (integration suites write to notification_log with arbitrary clocks,
+-- and the caps count every row): start from an empty ledger. Rolled back with the transaction.
+delete from public.notification_log;
 select * from tests.make_wedding('nj1') \gset w1_
 select * from tests.make_wedding('nj2') \gset w2_
 -- B of wedding 1: has an account and a partner row, but NO membership yet (never logged in)
