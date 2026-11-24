@@ -55,3 +55,16 @@ Commits: 8ffff11, 41702e8, 3785e27, da5261c. Verdict: **changes requested** (0 b
 
 ## AC coverage
 AC42 covered at data level (tests); AC44 Info shows the heartbeat (untested, S2); AC49 covered; AC52 covered; AC59 implemented, not tested (S2); AC62 implemented via `SignOutButton`.
+
+## Round 2 (reviewer, commit 24e1e61)
+`npx vitest run` on export, notifications, appearance and altro: 7 files, 22 tests passed. I did not run the new integration test for S1 (it needs the local stack); I read it.
+
+- S1: closed. `actor_id` is mapped to `{slot, name}` and `partners` is rebuilt without `user_id`. The new test checks both user ids and `actor_id` are absent from all three files, and that an event shows A / Tony.
+- S2: closed. AC59 page test, the glue tests in all three features, and `describeCheck` extracted with its own test.
+- C1 / Q1: closed. Coordinator decision: partner emails stay, and plan §10 gets a note.
+- C2, C3: closed (comments added).
+- Q2: closed.
+
+AC coverage after round 2: AC42, AC44, AC49, AC52, AC59, AC62 all covered.
+
+Verdict: **approved**. 0 open findings.

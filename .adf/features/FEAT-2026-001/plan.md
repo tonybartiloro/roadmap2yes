@@ -424,7 +424,8 @@ Le RPC che partono da un id di invito (`rotate_invitation`, `revoke_invitation`,
 - **CSV**: `compiti.csv` e `budget.csv` con `;`, BOM, escaping RFC 4180.
 - **File**: 3 download separati con data nel nome.
 - **Promemoria**: `record_export()` aggiorna la data dell'ultimo export, usata per il promemoria a 30 giorni.
-- **In più**: la location collegata a ogni scenario di data (JSON e colonna CSV).
+- **In più**: la location collegata a ogni scenario di data (solo nel JSON, `dateScenarios[].locationOption`; nessuna colonna CSV, decisione F3/T5).
+- **Implementazione (F3/T15)**: azione server con la sessione dell'utente che restituisce il testo dei file; il browser li salva come Blob. Nessun id utente nell'export (gli autori sono `{slot, name}`); le email dei partner restano incluse perché sono dati della coppia (AC42 "impostazioni").
 
 ### 11. Ambienti e configurazione
 | Variabile | Locale | Preview (Vercel) | Production (Vercel) |
