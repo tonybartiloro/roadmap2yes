@@ -36,6 +36,9 @@ describe("parseEuroToCents (AC38, D40)", () => {
     ["19,99", 1999],
     ["0,29", 29],
     ["1.005,10", 100510],
+    [",50", 50],
+    [".5", 50],
+    ["0000000000001", 100],
   ])("%s -> %d cents", (input, cents) => {
     expect(ok(input)).toBe(cents);
   });
@@ -54,7 +57,6 @@ describe("parseEuroToCents (AC38, D40)", () => {
     ["1.234.56", "invalid"],
     ["1,5,5", "invalid"],
     ["12,", "invalid"],
-    [",5", "invalid"],
     ["1,5.5", "invalid"],
     ["1.000.000.001", "too-large"],
     ["1000000000,01", "too-large"],

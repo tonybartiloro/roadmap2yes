@@ -31,3 +31,18 @@ AC coverage: AC33-AC38 (money, totals, warnings, bars), AC41 (news), AC42 (expor
 - Q3: system actions (`actorId === null`) in audit/account events are shown to everyone: intended (e.g. cron-created rows)? 
 
 Developer choices evaluated: names/email parts < 3 chars ignored (ok), 72 limit in bytes (ok, see nit 5), agreed without amount counts 0 (ok, documented), Ancora da pagare clamp (ok), no over-warning when Assegnato null (ok, align bar), news phrasing and audit whitelist (ok), error text without final period (matches AC38 literal; fine).
+
+## Developer response (round 1)
+
+| # | Response |
+|---|---|
+| 1 | Fixed: `budget.csv` has an "Assegnato" column; item rows leave it empty, "(assegnato)" rows fill only it. Test updated. |
+| 2 | Fixed: CSV uses `itemPaidCents`/`itemAgreedCents` and skips deleted categories. Test with a cancelled item that has a paid payment and a deleted category. |
+| 3 | Fixed: audit case for `weddings` removed; the decision event is the single source (optional `referenceDate` added to `DecisionEventEntry`). Test with both rows. |
+| 4 | Fixed: `overflow` false when nothing is assigned. |
+| 5 | Fixed: personal check also compares a separator-stripped code. Limit stays in bytes; documented in the constant (message says "caratteri", ASCII is the norm). |
+| 6 | Fixed: draw and attempt caps (1000) throw. Doc comment tells callers to validate and regenerate. |
+| 7 | Fixed: leading zeros no longer count toward the cap; ",50"/".5" now parse (D40: 1-2 digits = decimals); misplaced `toCsv` comment corrected. "1.5000" stays "invalid" (harmless). |
+| Q1 | Not intended; deduped as in 3. |
+| Q2 | Not intended; now accepted. |
+| Q3 | Not intended; null-actor rows are skipped, except a system `reference_auto` shown with a neutral, unattributed phrase. |

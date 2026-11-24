@@ -1,5 +1,5 @@
 import { CATEGORY_LABELS } from "@/content/milestones/categories";
-import { budgetTotals } from "@/domain/budget/totals";
+import { budgetTotals, itemAgreedCents, itemPaidCents } from "@/domain/budget/totals";
 import { todayInRome, type PlainDate } from "@/lib/dates/plain-date";
 import { formatCentsPlain } from "@/lib/money";
 import { toCsv } from "./csv";
@@ -85,17 +85,19 @@ function budgetCsv(input: ExportInput): string {
     items: input.budgetItems,
     payments: input.payments,
   });
-  const categoryName = new Map(input.budgetCategories.map((c) => [c.id, c.name]));
+  const categoryName = new Map(
+    input.budgetCategories.filter((c) => !c.deleted).map((c) => [c.id, c.name]),
+  );
   const rows = input.budgetItems
     .filter((i) => !i.deleted && categoryName.has(i.categoryId))
     .map((item) => {
-      const itemPayments = input.payments.filter((p) => p.itemId === item.id && !p.deleted);
-      const paid = itemPayments.filter((p) => p.paid).reduce((s, p) => s + p.amountCents, 0);
-      const agreed = item.status === "agreed" ? (item.agreedCents ?? 0) : null;
+      const paid = itemPaidCents(item, input.payments);
+      const agreed = item.status === "agreed" ? itemAgreedCents(item) : null;
       return [
         categoryName.get(item.categoryId),
         item.description,
         ITEM_STATUS_LABEL[item.status],
+        "",
         formatCentsPlain(item.plannedCents),
         agreed === null ? "" : formatCentsPlain(agreed),
         formatCentsPlain(paid),
@@ -107,13 +109,23 @@ function budgetCsv(input: ExportInput): string {
     c.name,
     "(assegnato)",
     "",
-    "",
-    "",
-    "",
     c.assigned === null ? "" : formatCentsPlain(c.assigned),
+    "",
+    "",
+    "",
+    "",
   ]);
   return toCsv(
-    ["Categoria", "Voce", "Stato", "Previsto", "Concordato", "Pagato", "Ancora da pagare"],
+    [
+      "Categoria",
+      "Voce",
+      "Stato",
+      "Assegnato",
+      "Previsto",
+      "Concordato",
+      "Pagato",
+      "Ancora da pagare",
+    ],
     [...rows, ...assigned],
   );
 }

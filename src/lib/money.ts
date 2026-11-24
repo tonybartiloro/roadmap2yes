@@ -6,6 +6,7 @@
  * - digits with `,` or `.` followed by 1-2 digits = decimals ("12,5" = 12,50 €, "1.5" = 1,50 €);
  * - `.` followed by exactly 3 digits and no comma = thousands ("1.500" = 1.500,00 €);
  * - 3 digits after a comma = error ("12,345");
+ * - a missing integer part is zero (",50" = 0,50 €);
  * - both separators: the last one is the decimal mark, the other one groups thousands, so both
  *   "1.234,56" and a pasted "1,234.56" are accepted;
  * - at least 0, at most 2 decimals, at most 1 billion euros.
@@ -39,8 +40,9 @@ function integerPart(raw: string, thousandsSep: "." | ","): string | null {
 }
 
 function toCents(integer: string, decimals: string): MoneyParseResult {
-  if (integer.length > 13) return fail("too-large");
-  const cents = Number(integer) * 100 + Number(decimals.padEnd(2, "0"));
+  const digits = integer.replace(/^0+(?=\d)/, "") || "0";
+  if (digits.length > 13) return fail("too-large");
+  const cents = Number(digits) * 100 + Number(decimals.padEnd(2, "0"));
   return cents > MAX_CENTS ? fail("too-large") : { ok: true, cents };
 }
 
@@ -70,15 +72,15 @@ export function parseEuroToCents(input: string): MoneyParseResult {
     const parts = text.split(",");
     if (parts.length !== 2) return fail("invalid");
     const [intRaw, decRaw] = parts as [string, string];
-    if (!/^\d+$/.test(intRaw)) return fail("invalid");
-    return decimalsToCents(intRaw, decRaw);
+    if (!/^\d*$/.test(intRaw)) return fail("invalid");
+    return decimalsToCents(intRaw || "0", decRaw);
   }
 
   // Dots only.
   const parts = text.split(".");
   if (parts.length === 2) {
     const [intRaw, decRaw] = parts as [string, string];
-    if (/^\d+$/.test(intRaw) && /^\d{1,2}$/.test(decRaw)) return toCents(intRaw, decRaw);
+    if (/^\d*$/.test(intRaw) && /^\d{1,2}$/.test(decRaw)) return toCents(intRaw || "0", decRaw);
   }
   const integer = integerPart(text, ".");
   if (integer === null || text.startsWith("0")) return fail("invalid");

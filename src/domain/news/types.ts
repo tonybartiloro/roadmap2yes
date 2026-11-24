@@ -38,10 +38,13 @@ export interface DecisionEventEntry {
   readonly id: string | number;
   readonly at: string;
   readonly kind: DecisionEventKind;
+  /** `null` = system event (e.g. automatic reference), shown with a neutral phrase. */
   readonly actorId: string | null;
   /** `decisions.key`, e.g. "date" or "location"; other keys fall back to a generic phrase. */
   readonly decisionKey: string;
   readonly optionTitle?: string | null;
+  /** For `reference_set` / `reference_auto`: the date the deadlines now follow. */
+  readonly referenceDate?: string | null;
 }
 
 export interface NewsPerson extends NameParts {

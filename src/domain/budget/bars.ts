@@ -24,7 +24,7 @@ export function barModel(agreed: Cents, paid: Cents, assigned: Cents | null): Ba
       paidPercent: null,
       agreedWidth: 0,
       paidWidth: 0,
-      overflow: agreed > 0,
+      overflow: false,
       text: agreed > 0 ? "Nessun importo assegnato" : "Niente di concordato",
     };
   }

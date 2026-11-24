@@ -29,6 +29,12 @@ function decisionObject(key: string): string {
 }
 
 function decisionEventText(e: DecisionEventEntry, who: string): string | null {
+  if (e.actorId === null) {
+    // System events are never attributed to a person.
+    return e.kind === "reference_auto"
+      ? `Il riferimento è tornato automatico${e.referenceDate ? `: ora le scadenze seguono il ${formatShortDate(e.referenceDate)}` : ""}`
+      : null;
+  }
   switch (e.kind) {
     case "chosen":
       return DECISION_PHRASES[e.decisionKey]
@@ -41,7 +47,9 @@ function decisionEventText(e: DecisionEventEntry, who: string): string | null {
         ? `${who} ha aggiunto un'opzione: ${e.optionTitle}`
         : `${who} ha aggiunto ${DECISION_PHRASES[e.decisionKey]?.added ?? "un'opzione"}`;
     case "reference_set":
-      return `${who} ha impostato un riferimento per le scadenze`;
+      return e.referenceDate
+        ? `${who} ha impostato il ${formatShortDate(e.referenceDate)} come riferimento per le scadenze`
+        : `${who} ha impostato un riferimento per le scadenze`;
     case "reference_auto":
       return `${who} è tornato al riferimento automatico`;
     default:
@@ -80,14 +88,6 @@ function auditText(e: AuditEntry, who: string): string | null {
   const next = e.newData ?? {};
   const prev = e.oldData ?? {};
   switch (e.tableName) {
-    case "weddings": {
-      const was = str(prev.applied_reference_date);
-      const now = str(next.applied_reference_date);
-      if (e.op !== "UPDATE" || was === now) return null;
-      return now
-        ? `${who} ha cambiato il riferimento: ora le scadenze seguono il ${formatShortDate(now)}`
-        : `${who} ha tolto il riferimento: le scadenze non hanno più una data`;
-    }
     case "tasks": {
       const title = str(next.title);
       if (!title) return null;
@@ -128,7 +128,7 @@ export function buildNews(input: NewsInput): NewsItem[] {
 
   const items: NewsItem[] = [];
   for (const e of input.audit ?? []) {
-    if (!isNew(e.at, e.actorId)) continue;
+    if (e.actorId === null || !isNew(e.at, e.actorId)) continue;
     const text = auditText(e, nameOf(e.actorId));
     if (text)
       items.push({ id: `audit:${e.id}`, at: e.at, actorId: e.actorId, source: "audit", text });

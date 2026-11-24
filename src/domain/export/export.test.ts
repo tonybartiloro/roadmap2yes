@@ -176,11 +176,52 @@ describe("export (AC42, AC60, plan §10)", () => {
   it("writes budget.csv in plain decimal comma amounts", () => {
     const lines = bundle.budgetCsv.split("\r\n");
     expect(lines[0]).toBe(
-      `${CSV_BOM}Categoria;Voce;Stato;Previsto;Concordato;Pagato;Ancora da pagare`,
+      `${CSV_BOM}Categoria;Voce;Stato;Assegnato;Previsto;Concordato;Pagato;Ancora da pagare`,
     );
-    expect(lines[1]).toBe("Catering;Menu;Concordato;9000,00;11200,50;3000,00;8200,50");
-    expect(lines[2]).toBe("Catering;Torta;Previsto;150,50;;0,00;");
-    expect(lines[3]).toBe("Catering;(assegnato);;;;;10000,00");
+    expect(lines[1]).toBe("Catering;Menu;Concordato;;9000,00;11200,50;3000,00;8200,50");
+    expect(lines[2]).toBe("Catering;Torta;Previsto;;150,50;;0,00;");
+    expect(lines[3]).toBe("Catering;(assegnato);;10000,00;;;;");
+  });
+});
+
+describe("budget.csv consistency with the app totals", () => {
+  it("counts Pagato like the totals (agreed items only) and skips deleted categories", () => {
+    const csv = buildExport(
+      {
+        ...input,
+        budgetCategories: [
+          ...input.budgetCategories,
+          { id: "c9", name: "Vecchia", assignedCents: 5, deleted: true },
+        ],
+        budgetItems: [
+          ...input.budgetItems,
+          {
+            id: "i9",
+            categoryId: "c1",
+            description: "Annullata",
+            status: "cancelled",
+            plannedCents: 1,
+            agreedCents: null,
+          },
+          {
+            id: "i8",
+            categoryId: "c9",
+            description: "Orfana",
+            status: "planned",
+            plannedCents: 1,
+            agreedCents: null,
+          },
+        ],
+        payments: [
+          ...input.payments,
+          { id: "p9", itemId: "i9", kind: "other", amountCents: 700, dueDate: null, paid: true },
+        ],
+      },
+      now,
+    ).budgetCsv;
+    expect(csv).toContain("Catering;Annullata;Annullata;;0,01;;0,00;");
+    expect(csv).not.toContain("Orfana");
+    expect(csv).not.toContain("Vecchia");
   });
 });
 

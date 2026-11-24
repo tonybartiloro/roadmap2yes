@@ -234,7 +234,7 @@ describe("bars (AC37)", () => {
     expect(barModel(0, 0, null).text).toBe("Niente di concordato");
     expect(barModel(500, 0, 0)).toMatchObject({
       agreedPercent: null,
-      overflow: true,
+      overflow: false,
       text: "Nessun importo assegnato",
     });
   });

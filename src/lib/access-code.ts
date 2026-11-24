@@ -7,7 +7,7 @@ import { isWeakCode } from "@/content/weak-codes";
  */
 
 export const ACCESS_CODE_MIN_LENGTH = 10;
-/** bcrypt ignores everything past 72 bytes. */
+/** bcrypt ignores everything past 72 bytes; the limit is checked in UTF-8 bytes (the message says "caratteri": ASCII codes are the norm). */
 export const ACCESS_CODE_MAX_BYTES = 72;
 
 export const ACCESS_CODE_ERRORS = {
@@ -66,7 +66,10 @@ export function validateAccessCode(
   if (!/\p{L}/u.test(code) || !/\d/.test(code)) return fail("needs-letter-and-digit");
   if (isWeakCode(code)) return fail("weak");
   const folded = fold(code);
-  if (personalFragments(subject).some((f) => folded.includes(f))) return fail("personal");
+  const compact = folded.replace(/[^\p{L}\p{N}]/gu, "");
+  if (personalFragments(subject).some((f) => folded.includes(f) || compact.includes(f))) {
+    return fail("personal");
+  }
   return { ok: true };
 }
 
@@ -84,12 +87,15 @@ export interface GenerateOptions {
   readonly random?: RandomBytes;
 }
 
+const MAX_DRAWS = 1000;
+
 /** Uniform pick from the alphabet by rejection sampling (no modulo bias). */
 function pickChars(count: number, random: RandomBytes): string {
   const n = ACCESS_CODE_ALPHABET.length;
   const limit = 256 - (256 % n);
   let out = "";
-  while (out.length < count) {
+  for (let draws = 0; out.length < count; draws++) {
+    if (draws >= MAX_DRAWS) throw new Error("Random source produced no usable bytes");
     for (const byte of random(new Uint8Array(count * 2))) {
       if (byte < limit && out.length < count) out += ACCESS_CODE_ALPHABET[byte % n];
     }
@@ -100,6 +106,8 @@ function pickChars(count: number, random: RandomBytes): string {
 /**
  * "Genera un codice": cryptographically random, in groups of 4 separated by dashes
  * ("k7mq-x2vd-h9pt"). The dashes are part of the code. Always contains letters and digits.
+ * It is not checked against the personal-data rule: callers should run `validateAccessCode` with
+ * the owner as subject and regenerate on failure (chance is ~1e-4).
  */
 export function generateAccessCode({
   length = 12,
@@ -108,9 +116,10 @@ export function generateAccessCode({
   if (!Number.isInteger(length) || length < ACCESS_CODE_MIN_LENGTH || length > 64) {
     throw new RangeError(`Access code length must be an integer between 10 and 64: ${length}`);
   }
-  for (;;) {
+  for (let attempt = 0; attempt < MAX_DRAWS; attempt++) {
     const chars = pickChars(length, random);
     if (!/[a-z]/.test(chars) || !/[2-9]/.test(chars)) continue;
     return chars.match(/.{1,4}/g)!.join("-");
   }
+  throw new Error("Random source never produced a code with a letter and a digit");
 }

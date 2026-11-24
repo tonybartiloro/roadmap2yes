@@ -76,6 +76,11 @@ describe("validateAccessCode (BR20, D49)", () => {
     );
   });
 
+  it("is separator-insensitive for the personal-data check", () => {
+    expect(validateAccessCode("tony-rossi-4821", subject)).toMatchObject({ code: "personal" });
+    expect(validateAccessCode("t-o-n-y-r-o-s-s-i-9", subject)).toMatchObject({ code: "personal" });
+  });
+
   it("does not let very short names block everything", () => {
     expect(errorOf("pesca7cavallo9", { firstName: "Al", email: "a@example.test" })).toBeNull();
   });
@@ -128,6 +133,11 @@ describe("generateAccessCode", () => {
     const random = (a: Uint8Array) => a.map(() => stream[pos++ % stream.length]!);
     const code = generateAccessCode({ random }).replaceAll("-", "");
     expect(code.startsWith("a4")).toBe(true);
+  });
+
+  it("throws instead of hanging on a broken random source", () => {
+    expect(() => generateAccessCode({ random: (a) => a.map(() => 255) })).toThrow();
+    expect(() => generateAccessCode({ random: (a) => a.map(() => 0) })).toThrow();
   });
 
   it("supports a custom length and validates it", () => {

@@ -18,7 +18,7 @@ export function csvCell(cell: CsvCell): string {
   return /[;"\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
 }
 
-/** Cells that are pre-formatted amounts (e.g. "-1,50" is never produced, but "12,50" must stay as is). */
+/** Amounts are never negative (DB check), so a text cell like "-1,50" is not a case: it would get the apostrophe. */
 export function toCsv(header: readonly string[], rows: readonly (readonly CsvCell[])[]): string {
   const lines = [header, ...rows].map((row) => row.map(csvCell).join(SEPARATOR));
   return CSV_BOM + lines.join("\r\n") + "\r\n";

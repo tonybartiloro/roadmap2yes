@@ -181,13 +181,71 @@ describe("news (AC41, plan §9)", () => {
       },
     ] as const;
     expect(texts({ audit })).toEqual([
-      "Jessica ha cambiato il riferimento: ora le scadenze seguono il 12 mar 2027",
       "Jessica ha completato «Fotografo»",
       "Jessica ha aggiunto il compito «Fedi»",
       "Jessica ha impostato il budget a € 30.000",
       "Jessica ha segnato un pagamento come pagato",
-      "Jessica ha tolto il riferimento: le scadenze non hanno più una data",
     ]);
+  });
+
+  it("shows a reference change once, from the decision event, with the date", () => {
+    const at = "2026-11-21T10:00:00Z";
+    const items = buildNews({
+      ...base,
+      audit: [
+        {
+          id: 1,
+          at,
+          actorId: "jess",
+          tableName: "weddings",
+          op: "UPDATE",
+          oldData: { applied_reference_date: "2027-09-03" },
+          newData: { applied_reference_date: "2027-03-12" },
+        },
+      ],
+      decisionEvents: [
+        {
+          id: 1,
+          at,
+          kind: "reference_set",
+          actorId: "jess",
+          decisionKey: "date",
+          referenceDate: "2027-03-12",
+        },
+      ],
+    });
+    expect(items.map((i) => i.text)).toEqual([
+      "Jessica ha impostato il 12 mar 2027 come riferimento per le scadenze",
+    ]);
+  });
+
+  it("shows system events only with a neutral phrase, never attributed", () => {
+    const at = "2026-11-21T10:00:00Z";
+    expect(
+      texts({
+        audit: [
+          {
+            id: 1,
+            at,
+            actorId: null,
+            tableName: "tasks",
+            op: "INSERT",
+            newData: { title: "X", source: "user" },
+          },
+        ],
+        decisionEvents: [
+          {
+            id: 1,
+            at,
+            kind: "reference_auto",
+            actorId: null,
+            decisionKey: "date",
+            referenceDate: "2027-03-12",
+          },
+          { id: 2, at, kind: "chosen", actorId: null, decisionKey: "date" },
+        ],
+      }),
+    ).toEqual(["Il riferimento è tornato automatico: ora le scadenze seguono il 12 mar 2027"]);
   });
 
   it("maps account events, including transparency for a temporary code", () => {
