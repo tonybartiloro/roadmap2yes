@@ -1,0 +1,6 @@
+// A string that merely mentions the directive in a normal expression is fine.
+export const label = "we do not use cache here";
+export async function getData() {
+  "use server";
+  return 1;
+}

@@ -1,0 +1,7 @@
+export function A() {
+  return (
+    <div className="border-accent bg-accent/10 text-foreground">
+      <span className="text-primary decoration-accent">x</span>
+    </div>
+  );
+}

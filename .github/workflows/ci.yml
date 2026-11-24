@@ -1,0 +1,292 @@
+name: CI
+
+# Plan §12. Public repository: only FAKE data here, no repository secrets are used by these jobs.
+# Third-party actions are pinned by commit SHA (tag in the comment).
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+  push:
+    branches: [main]
+  schedule:
+    - cron: "0 2 * * *" # nightly: e2e-full including the 12-theme axe matrix
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+env:
+  # Build-time/runtime values for the throw-away LOCAL stack. Real keys are exported from the
+  # started stack by `npm run db:env` (see the "Export local stack env" steps).
+  NEXT_TELEMETRY_DISABLED: "1"
+  SUPABASE_IMAGES_TAR: /tmp/supabase-images.tar
+
+jobs:
+  # ---------------------------------------------------------------------------------------------
+  checks:
+    name: checks (lint, typecheck, unit, build)
+    # PR jobs run on every PR event except the bare `labeled` one (only `e2e-full` reacts to it).
+    if: ${{ github.event_name != 'schedule' && !(github.event_name == 'pull_request' && github.event.action == 'labeled') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      # Includes the ESLint guards (`use cache`, `text-accent`, admin.ts import scopes) and the
+      # "emails only @example.test" guard over the whole repository.
+      - run: npm run lint
+      - run: npm run typecheck
+      - name: Unit tests (default TZ)
+        run: npm test
+      - name: Unit tests (TZ=UTC and TZ=America/Los_Angeles)
+        run: npm run test:tz
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54421
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_ci_placeholder
+      # Theme and font gates (T3). `check:fonts` reads the build output of the step above.
+      - name: themes.css is up to date
+        run: |
+          npm run gen:themes
+          git diff --exit-code -- src/app/themes.css
+      - name: Font budget per theme
+        run: npm run check:fonts
+
+  # ---------------------------------------------------------------------------------------------
+  db:
+    name: db (pgTAP, integration, acceptance)
+    if: ${{ github.event_name != 'schedule' && !(github.event_name == 'pull_request' && github.event.action == 'labeled') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Restore Supabase Docker images
+        id: images
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ env.SUPABASE_IMAGES_TAR }}
+          key: supabase-images-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - name: Load cached images
+        if: steps.images.outputs.cache-hit == 'true'
+        run: docker load -i "$SUPABASE_IMAGES_TAR"
+      # `-x` list lives in package.json (verified against the pinned CLI version); analytics is
+      # disabled in supabase/config.toml. Also starts the Mailpit catcher (SMTP 54425).
+      - name: Start local stack
+        run: npm run db:start
+      - name: Reset database once
+        run: npm run db:reset
+      - name: pgTAP (developer + QA)
+        run: npm run db:test
+      - name: database.types.ts is up to date
+        run: |
+          npm run db:types
+          git diff --exit-code -- src/lib/supabase/database.types.ts
+      - name: Export local stack env
+        run: npm run -s db:env >> "$GITHUB_ENV"
+      - name: Integration and acceptance (Vitest, files run one at a time)
+        run: npm run test:integration
+        env:
+          SMTP_HOST: 127.0.0.1
+          SMTP_PORT: "54425"
+          MAILPIT_API_URL: http://127.0.0.1:54426
+          EMAIL_TRANSPORT: smtp
+          R2Y_BOOTSTRAP_EMAIL: bootstrap@example.test
+          R2Y_BOOTSTRAP_ACCESS_CODE: ci-demo-code-2026
+          R2Y_BOOTSTRAP_ROLE: sposo
+          CRON_SECRET: ci-fake-cron-secret
+          EMAIL_LINK_SECRET: ci-fake-email-link-secret
+      - name: Save Supabase Docker images
+        if: ${{ always() && steps.images.outputs.cache-hit != 'true' }}
+        continue-on-error: true
+        run: |
+          docker images --format '{{.Repository}}:{{.Tag}}' | grep -E 'supabase|mailpit' | xargs -r docker save -o "$SUPABASE_IMAGES_TAR"
+
+  # ---------------------------------------------------------------------------------------------
+  e2e-mobile:
+    name: e2e-mobile (Chromium 360 px)
+    if: ${{ github.event_name != 'schedule' && !(github.event_name == 'pull_request' && github.event.action == 'labeled') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CI: "true"
+      E2E_CLOCK: "1"
+      EMAIL_TRANSPORT: smtp
+      SMTP_HOST: 127.0.0.1
+      SMTP_PORT: "54425"
+      MAILPIT_API_URL: http://127.0.0.1:54426
+      NEXT_PUBLIC_SITE_URL: http://127.0.0.1:3000
+      R2Y_BOOTSTRAP_EMAIL: bootstrap@example.test
+      R2Y_BOOTSTRAP_ACCESS_CODE: ci-demo-code-2026
+      R2Y_BOOTSTRAP_ROLE: sposo
+      CRON_SECRET: ci-fake-cron-secret
+      EMAIL_LINK_SECRET: ci-fake-email-link-secret
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Restore Supabase Docker images
+        id: images
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ env.SUPABASE_IMAGES_TAR }}
+          key: supabase-images-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - name: Load cached images
+        if: steps.images.outputs.cache-hit == 'true'
+        run: docker load -i "$SUPABASE_IMAGES_TAR"
+      - run: npm run db:start
+      - run: npm run db:reset
+      - name: Export local stack env
+        run: npm run -s db:env >> "$GITHUB_ENV"
+      - name: Cache Playwright browsers
+        id: playwright
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build
+      # Needs the build above and the local stack env exported above. HEADERS_REQUIRED makes a
+      # missing build a failure instead of a (green) skip.
+      - name: Headers of the built app
+        run: npx vitest run --project integration tests/acceptance/headers.test.ts
+        env:
+          HEADERS_REQUIRED: "1"
+      - name: e2e (project mobile)
+        run: npx playwright test --project=mobile
+      - name: Report flaky tests (passed only on retry)
+        if: ${{ always() && hashFiles('test-results/report.json') != '' }}
+        run: |
+          node -e "
+            const s = JSON.parse(require('fs').readFileSync('test-results/report.json','utf8')).stats;
+            if (s.flaky > 0) {
+              console.log('::warning title=Flaky e2e tests::' + s.flaky + ' test(s) passed only on retry. This is a bug to fix, not a green run.');
+              require('fs').appendFileSync(process.env.GITHUB_STEP_SUMMARY, '### Flaky e2e tests: ' + s.flaky + '\nPassed only on retry: fix them.\n');
+            }"
+      - name: Upload Playwright report
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: playwright-report-mobile
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+      - name: Save Supabase Docker images
+        if: ${{ always() && steps.images.outputs.cache-hit != 'true' }}
+        continue-on-error: true
+        run: |
+          docker images --format '{{.Repository}}:{{.Tag}}' | grep -E 'supabase|mailpit' | xargs -r docker save -o "$SUPABASE_IMAGES_TAR"
+
+  # ---------------------------------------------------------------------------------------------
+  secrets:
+    name: secrets (gitleaks, full history)
+    if: ${{ github.event_name != 'schedule' && !(github.event_name == 'pull_request' && github.event.action == 'labeled') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      # Binary from the official image (no marketplace licence needed). `--redact` keeps any
+      # finding out of the public log.
+      - name: gitleaks (whole history)
+        run: |
+          docker run --rm -v "$PWD:/repo" \
+            -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0=/repo \
+            ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f \
+            git /repo --config /repo/.gitleaks.toml --redact --no-banner --verbose
+
+  # ---------------------------------------------------------------------------------------------
+  e2e-full:
+    name: e2e-full (desktop, WebKit smoke, time, degraded, email-off)
+    # push to main, nightly, or a PR carrying the `e2e-full` label
+    if: ${{ github.event_name == 'push' || github.event_name == 'schedule' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'e2e-full')) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      CI: "true"
+      E2E_CLOCK: "1"
+      E2E_ALL_SERVERS: "1" # also starts the `degraded` and `email-off` servers
+      # The 12 themes x light/dark x 3 screens axe matrix runs only in the nightly job.
+      E2E_AXE_MATRIX: ${{ github.event_name == 'schedule' && '1' || '0' }}
+      EMAIL_TRANSPORT: smtp
+      SMTP_HOST: 127.0.0.1
+      SMTP_PORT: "54425"
+      MAILPIT_API_URL: http://127.0.0.1:54426
+      NEXT_PUBLIC_SITE_URL: http://127.0.0.1:3000
+      R2Y_BOOTSTRAP_EMAIL: bootstrap@example.test
+      R2Y_BOOTSTRAP_ACCESS_CODE: ci-demo-code-2026
+      R2Y_BOOTSTRAP_ROLE: sposo
+      CRON_SECRET: ci-fake-cron-secret
+      EMAIL_LINK_SECRET: ci-fake-email-link-secret
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Restore Supabase Docker images
+        id: images
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ env.SUPABASE_IMAGES_TAR }}
+          key: supabase-images-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - name: Load cached images
+        if: steps.images.outputs.cache-hit == 'true'
+        run: docker load -i "$SUPABASE_IMAGES_TAR"
+      - run: npm run db:start
+      - run: npm run db:reset
+      - name: Export local stack env
+        run: npm run -s db:env >> "$GITHUB_ENV"
+      - name: Cache Playwright browsers
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - run: npx playwright install --with-deps chromium webkit
+      - run: npm run build
+      - name: Headers of the built app
+        run: npx vitest run --project integration tests/acceptance/headers.test.ts
+        env:
+          HEADERS_REQUIRED: "1"
+      - name: e2e (all projects)
+        run: npx playwright test
+      - name: Report flaky tests (passed only on retry)
+        if: ${{ always() && hashFiles('test-results/report.json') != '' }}
+        run: |
+          node -e "
+            const s = JSON.parse(require('fs').readFileSync('test-results/report.json','utf8')).stats;
+            if (s.flaky > 0) {
+              console.log('::warning title=Flaky e2e tests::' + s.flaky + ' test(s) passed only on retry. This is a bug to fix, not a green run.');
+              require('fs').appendFileSync(process.env.GITHUB_STEP_SUMMARY, '### Flaky e2e tests: ' + s.flaky + '\nPassed only on retry: fix them.\n');
+            }"
+      - name: Upload Playwright report
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: playwright-report-full
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+      - name: Save Supabase Docker images
+        if: ${{ always() && steps.images.outputs.cache-hit != 'true' }}
+        continue-on-error: true
+        run: |
+          docker images --format '{{.Repository}}:{{.Tag}}' | grep -E 'supabase|mailpit' | xargs -r docker save -o "$SUPABASE_IMAGES_TAR"

@@ -1,0 +1,108 @@
+# Local + CI stack only (plan §4.1, §11, §12). Remote Auth settings (staging/prod)
+# are applied from the Supabase dashboard following the runbook checklist:
+# there is NO `supabase config push`.
+# Fake/local values only: this repository is public.
+
+project_id = "roadmap2yes"
+
+[api]
+enabled = true
+port = 54421
+# Only `public` is exposed through the API (private schema is never exposed).
+schemas = ["public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54422
+shadow_port = 54420
+health_timeout = "2m"
+major_version = 17
+
+[db.pooler]
+enabled = false
+
+[db.migrations]
+enabled = true
+
+[db.seed]
+enabled = true
+# One seed file per task (01_core, 02_decisions_timeline, 03_budget): fake data only.
+sql_paths = ["./seeds/*.sql"]
+
+# Services not needed in R1 are disabled (free-tier friendly, faster CI).
+[realtime]
+enabled = false
+
+[studio]
+enabled = false
+
+[storage]
+enabled = false
+
+[edge_runtime]
+enabled = false
+
+[analytics]
+enabled = false
+
+# Non-default ports (544xx) so the stack coexists with other local Supabase projects.
+# Mail catcher (Mailpit). Used only for e2e of email-based flows (invite, recovery).
+[local_smtp]
+enabled = true
+port = 54424
+
+[auth]
+enabled = true
+site_url = "http://127.0.0.1:3000"
+additional_redirect_urls = ["http://127.0.0.1:3000", "http://localhost:3000"]
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+refresh_token_reuse_interval = 10
+# Public signup is closed: accounts are created only by the admin API (plan §4.1).
+enable_signup = false
+enable_anonymous_sign_ins = false
+enable_manual_linking = false
+# Access code policy enforced by the Auth server, also for direct API calls (Q-A).
+minimum_password_length = 10
+password_requirements = "letters_digits"
+
+# High limits on purpose: local/CI e2e creates many users and logins.
+# The real per-IP limit is verified on staging/prod via the dashboard checklist.
+[auth.rate_limit]
+email_sent = 1000
+sms_sent = 30
+anonymous_users = 30
+token_refresh = 1000
+sign_in_sign_ups = 1000
+token_verifications = 1000
+web3 = 30
+
+[auth.email]
+enabled = true
+# Defence in depth: the email provider refuses signups too (top-level enable_signup is false).
+enable_signup = false
+# Hardening against a direct `PUT /user` with a stolen session (plan §4.1, P2, risk R26):
+# - enable_confirmations: an email change asked to GoTrue is not applied without confirmation;
+# - double_confirm_changes: confirmation needed on BOTH addresses (with emails off it never arrives);
+# - secure_password_change: a direct code change needs a session younger than 24 h (or a nonce).
+# The app never uses `PUT /user`: it verifies the current code and then calls the admin API with
+# `email_confirm: true`, so none of these three settings needs an email provider.
+enable_confirmations = true
+double_confirm_changes = true
+secure_password_change = true
+max_frequency = "1s"
+otp_length = 6
+otp_expiry = 3600
+
+# Recovery link (only offered when emails are on): confirmed by POST on /auth/conferma.
+[auth.email.template.recovery]
+subject = "Il tuo accesso a roadmap2yes"
+content_path = "./supabase/templates/recovery.html"
+
+[auth.sms]
+enabled = false
+
+[auth.mfa.totp]
+enroll_enabled = false
+verify_enabled = false

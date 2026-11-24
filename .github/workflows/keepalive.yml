@@ -1,0 +1,68 @@
+name: Keepalive
+
+# Weekly health check (plan §7, AC44). Free Supabase projects are paused after ~7 days without
+# database activity, so this workflow touches the database every week:
+#   - staging: writes and reads back a `keepalive` heartbeat (no daily job runs there);
+#   - production: over the heartbeats of the last 8 days, checks that the Vercel daily job ran at
+#     least every 36 hours and never failed nor exceeded the email quota.
+# A failure turns the run red and GitHub emails the repository owner.
+#
+# REQUIRED REPOSITORY SETTING: the environments `staging` and `production-keepalive` must have
+# "Deployment branches" = `main` only (production-keepalive holds the PRODUCTION secret key and has
+# no reviewers: without the branch policy any branch could read it). The `if` on each job is a
+# second barrier. Secrets are step-level `env`, so `npm ci` never sees them.
+#
+# Secrets (environment-scoped, names only here): NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SECRET_KEY.
+# The production check uses its own environment `production-keepalive` (NO required reviewers,
+# otherwise every weekly run would wait for an approval); `production` stays reserved for migrate.yml.
+# `schedule` and `workflow_dispatch` only: no `pull_request`, so no secret is ever exposed to a PR.
+on:
+  schedule:
+    - cron: "17 6 * * 1" # Mondays 06:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: keepalive
+  cancel-in-progress: false
+
+jobs:
+  staging:
+    name: staging (ping)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: github.ref == 'refs/heads/main'
+    environment: staging
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run keepalive:check
+        env:
+          KEEPALIVE_MODE: ping
+          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+
+  production:
+    name: production (daily job heartbeat)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: github.ref == 'refs/heads/main'
+    environment: production-keepalive
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run keepalive:check
+        env:
+          KEEPALIVE_MODE: check
+          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}

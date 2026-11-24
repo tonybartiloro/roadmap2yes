@@ -1,0 +1,21 @@
+# Secret scan (plan §12, brief AC45). CI runs gitleaks on the WHOLE history.
+# The repository is public: every REAL finding must be fixed (rotate the secret), never allowlisted.
+# There is no path allowlist: a real key pasted into .env.example or any other file IS flagged.
+#
+# The only exception is the narrow value-based allowlist below. It covers known FAKE test constants
+# and the public access-code alphabet that the default `generic-api-key` rule reports as false
+# positives. Each entry matches the exact source line pattern, not a file or a path. Never extend it
+# to cover anything that could be a real secret.
+
+title = "roadmap2yes gitleaks config"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Fake test secrets and the public access-code alphabet (false positives, PR #1)"
+regexTarget = "line"
+regexes = [
+  '''const SECRET = "(test-secret|unit-test-link-secret|qa-cron-secret|integration-cron-secret)[-0-9a-z]*";''',
+  '''export const ACCESS_CODE_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";''',
+]
