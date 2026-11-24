@@ -27,7 +27,11 @@ export function tasksFor(rite: Rite, reference: string | null, overrides = {}): 
   return asTasks(generateTasks(rite, reference), overrides);
 }
 
-export function userTask(id: string, dueDate: string | null, extra: Partial<TimelineTask> = {}): TimelineTask {
+export function userTask(
+  id: string,
+  dueDate: string | null,
+  extra: Partial<TimelineTask> = {},
+): TimelineTask {
   return {
     id,
     title: id,

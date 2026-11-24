@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { MILESTONES, getMilestone } from "@/content/milestones";
-import {
-  generateTasks,
-  previewDueDates,
-  recalculateDueDates,
-} from "./generate";
+import { generateTasks, previewDueDates, recalculateDueDates } from "./generate";
 import { asTasks, tasksFor } from "./test-helpers";
 
 const due = (rite: Parameters<typeof generateTasks>[0], ref: string | null) =>
@@ -28,7 +24,12 @@ describe("generateTasks per rite (AC24, AC25, AC63)", () => {
     expect(tasks).toHaveLength(38);
     const keys = tasks.map((t) => t.templateKey);
     expect(keys).toContain("scegli-il-rito");
-    for (const k of ["richiedi-pubblicazioni", "corso-prematrimoniale", "contatta-parrocchia", "scegli-celebrante"]) {
+    for (const k of [
+      "richiedi-pubblicazioni",
+      "corso-prematrimoniale",
+      "contatta-parrocchia",
+      "scegli-celebrante",
+    ]) {
       expect(keys).not.toContain(k);
     }
   });
@@ -70,7 +71,12 @@ describe("spec §5.1: civile, reference 2027-09-03", () => {
   });
 
   it("the 4 date-independent civil milestones have no date", () => {
-    for (const k of ["scegli-data-e-location", "definisci-budget-iniziale", "lista-invitati-preliminare", "decidi-stile-e-priorita"]) {
+    for (const k of [
+      "scegli-data-e-location",
+      "definisci-budget-iniziale",
+      "lista-invitati-preliminare",
+      "decidi-stile-e-priorita",
+    ]) {
       expect(d[k]).toBeNull();
     }
   });
@@ -120,7 +126,12 @@ describe("recalculateDueDates (AC28, spec §5.7)", () => {
       to: "2027-08-01",
     });
     const touched = new Set(changes.map((c) => c.taskId));
-    for (const k of ["scegli-data-e-location", "definisci-budget-iniziale", "lista-invitati-preliminare", "decidi-stile-e-priorita"]) {
+    for (const k of [
+      "scegli-data-e-location",
+      "definisci-budget-iniziale",
+      "lista-invitati-preliminare",
+      "decidi-stile-e-priorita",
+    ]) {
       expect(touched.has(k)).toBe(false);
     }
   });
@@ -131,7 +142,14 @@ describe("recalculateDueDates (AC28, spec §5.7)", () => {
       "scegli-musica": { status: "done" },
       "scegli-catering": { deleted: true },
     });
-    t.push({ ...t[0]!, id: "mine", source: "user", templateKey: null, templateVersion: null, dueDate: "2027-01-01" });
+    t.push({
+      ...t[0]!,
+      id: "mine",
+      source: "user",
+      templateKey: null,
+      templateVersion: null,
+      dueDate: "2027-01-01",
+    });
     const touched = new Set(recalculateDueDates(t, "2028-05-01").map((c) => c.taskId));
     for (const k of ["scegli-abiti", "scegli-musica", "scegli-catering", "mine"]) {
       expect(touched.has(k)).toBe(false);
@@ -174,7 +192,7 @@ describe("previewDueDates (AC32): pure, with count", () => {
     expect(result.rows.find((r) => r.taskId === "scegli-testimoni")).toEqual({
       taskId: "scegli-testimoni",
       current: "2027-01-03",
-      preview: "2027-09-01" > "" ? "2027-09-01" : "",
+      preview: "2027-09-01",
       changed: true,
     });
     expect(JSON.stringify(tasks)).toBe(snapshot);

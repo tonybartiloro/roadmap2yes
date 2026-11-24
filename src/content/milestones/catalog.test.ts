@@ -69,7 +69,9 @@ describe("milestone catalogue (spec §5.8)", () => {
 
   it("has a label for every category and a single disclaimer wording", () => {
     for (const c of MILESTONE_CATEGORIES) expect(CATEGORY_LABELS[c]).toBeTruthy();
-    expect(BUREAUCRATIC_DISCLAIMER).toBe("Indicativo: verificate sempre con il comune o la parrocchia");
+    expect(BUREAUCRATIC_DISCLAIMER).toBe(
+      "Indicativo: verificate sempre con il comune o la parrocchia",
+    );
   });
 
   it("spot-checks spec values", () => {
@@ -77,7 +79,11 @@ describe("milestone catalogue (spec §5.8)", () => {
       offset: { months: 2, weeks: 2 },
       priority: 50,
     });
-    expect(getMilestone("scegli-il-rito")).toMatchObject({ priority: 5, offset: null, rites: ["unknown"] });
+    expect(getMilestone("scegli-il-rito")).toMatchObject({
+      priority: 5,
+      offset: null,
+      rites: ["unknown"],
+    });
   });
 
   it("validation catches bad catalogues", () => {
