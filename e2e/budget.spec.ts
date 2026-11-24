@@ -191,14 +191,12 @@ test.describe("categories (AC34)", () => {
     const w = await seedWedding({ budgetCents: 2_000_000 });
     const musica = await categoryId(w, "musica");
     const fiori = await categoryId(w, "fiori-allestimento");
-    await w.wedding.founderClient
-      .from("budget_items")
-      .insert({
-        wedding_id: w.weddingId,
-        category_id: fiori,
-        description: "Centrotavola",
-        planned_cents: 30_000,
-      });
+    await w.wedding.founderClient.from("budget_items").insert({
+      wedding_id: w.weddingId,
+      category_id: fiori,
+      description: "Centrotavola",
+      planned_cents: 30_000,
+    });
     await loginAs(page, w.wedding.founder, uniqueIp());
 
     // empty: delete with Annulla
@@ -318,16 +316,14 @@ test.describe("items, payments, bars and warnings (AC35, AC36, AC37)", () => {
       .from("budget_categories")
       .update({ assigned_cents: 1_000_000 })
       .eq("id", catering);
-    await w.wedding.founderClient
-      .from("budget_items")
-      .insert({
-        wedding_id: w.weddingId,
-        category_id: catering,
-        description: "Menu",
-        status: "agreed",
-        agreed_cents: 1_120_000,
-        planned_cents: 1_120_000,
-      });
+    await w.wedding.founderClient.from("budget_items").insert({
+      wedding_id: w.weddingId,
+      category_id: catering,
+      description: "Menu",
+      status: "agreed",
+      agreed_cents: 1_120_000,
+      planned_cents: 1_120_000,
+    });
     await loginAs(page, w.wedding.founder, uniqueIp());
     await page.goto("/budget");
     const warnings = page.getByTestId("budget-warnings");

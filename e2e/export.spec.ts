@@ -55,15 +55,13 @@ test("JSON and both CSV files, dated names, complete content, nothing sensitive 
       .select("id")
       .single()
   ).data!.id;
-  await w.wedding.founderClient
-    .from("payments")
-    .insert({
-      wedding_id: w.weddingId,
-      item_id: item,
-      kind: "deposit",
-      amount_cents: 300_000,
-      due_date: romeDate(10),
-    });
+  await w.wedding.founderClient.from("payments").insert({
+    wedding_id: w.weddingId,
+    item_id: item,
+    kind: "deposit",
+    amount_cents: 300_000,
+    due_date: romeDate(10),
+  });
 
   await loginAs(page, w.wedding.founder, uniqueIp());
   await page.goto("/altro/esporta");
