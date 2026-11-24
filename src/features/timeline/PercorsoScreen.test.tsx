@@ -564,6 +564,37 @@ describe("scenario selector and preview (AC32)", () => {
     for (const fn of Object.values(actions)) expect(fn).not.toHaveBeenCalled();
   });
 
+  it("two quick toggles of one task go in order, the second on the version the first returned (QA-4)", async () => {
+    let finish: (value: unknown) => void = () => {};
+    actions.setTaskStatusAction.mockReturnValueOnce(new Promise((resolve) => (finish = resolve)));
+    actions.setTaskStatusAction.mockResolvedValueOnce(ok({ id: "a", version: 4 }));
+    renderScreen({ tasks: [task("a", { title: "Fiori", dueDate: at(2), version: 2 })] });
+    await userEvent.click(screen.getByRole("checkbox", { name: /Segna come fatto/ }));
+    await userEvent.click(screen.getByRole("checkbox", { name: /Riapri: Fiori/, hidden: true }));
+    expect(actions.setTaskStatusAction).toHaveBeenCalledTimes(1);
+    finish(ok({ id: "a", version: 3 }));
+    await waitFor(() => expect(actions.setTaskStatusAction).toHaveBeenCalledTimes(2));
+    expect(actions.setTaskStatusAction).toHaveBeenLastCalledWith({
+      id: "a",
+      expectedVersion: 3,
+      done: false,
+    });
+  });
+
+  it("closing the sheet with Escape gives focus back to the task title (QA-6)", async () => {
+    renderScreen({ tasks: [task("a", { title: "Fiori", dueDate: at(2) })] });
+    const title = screen.getByTestId("task-title");
+    await userEvent.click(title);
+    await screen.findByTestId("task-sheet");
+    await userEvent.keyboard("{Escape}");
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId("task-title")));
+  });
+
+  it("the partner shortcut reads well without a name (QA-3)", () => {
+    renderScreen({ partners: [{ slot: "A", name: "Tony", userId: ME }] });
+    expect(screen.getByTestId("assignee-shortcut-partner").textContent).toBe("Del tuo partner");
+  });
+
   it("a failed undo shows an error and reloads (AC31)", async () => {
     actions.setTaskStatusAction.mockResolvedValueOnce(ok({ id: "a", version: 2 }));
     renderScreen({ tasks: [task("a", { title: "Scegliere il menù", dueDate: at(2) })] });

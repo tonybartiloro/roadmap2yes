@@ -17,6 +17,7 @@ import {
   type Filters,
   type StatusFilter,
 } from "./filters";
+import { ofPartner } from "./copy";
 import { PanelContent } from "./PanelContent";
 
 /** One-tap "Miei / di {partner} / Tutti" (AC30): the same field as the assignee filter. */
@@ -31,7 +32,7 @@ export function AssigneeShortcut({
 }) {
   const options: { value: AssigneeFilter; label: string }[] = [
     { value: "mine", label: "Miei" },
-    { value: "partner", label: `Di ${partnerName}` },
+    { value: "partner", label: ofPartner(partnerName) },
     { value: "all", label: "Tutti" },
   ];
   return (
@@ -130,7 +131,7 @@ export function FiltersPanel({
   const assigneeOptions: readonly { value: AssigneeFilter; label: string }[] = [
     { value: "all", label: "Tutti" },
     { value: "mine", label: "I miei e di Entrambi" },
-    { value: "partner", label: `Di ${partnerName} e di Entrambi` },
+    { value: "partner", label: `${ofPartner(partnerName)} e di Entrambi` },
   ];
 
   return (

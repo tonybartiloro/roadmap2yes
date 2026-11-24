@@ -1,5 +1,6 @@
 import { diffDays, type PlainDate } from "@/lib/dates/plain-date";
 import { formatShortDate, plural } from "@/components/format";
+import { PARTNER_FALLBACK_NAME } from "@/lib/display-name";
 
 /** Italian copy of the Percorso (design §7.1: informal "tu"). One place, so tests can pin it. */
 export const COPY = {
@@ -44,4 +45,9 @@ export function relativeDue(due: PlainDate, today: PlainDate): string {
 /** "tra 3 settimane (12 mar 2027)": for screen readers and the title attribute. */
 export function dueExactText(due: PlainDate, today: PlainDate): string {
   return `${relativeDue(due, today)} (${formatShortDate(due)})`;
+}
+
+/** "Di Jessica" / "Del tuo partner": the partner name or the nameless fallback, grammatical either way. */
+export function ofPartner(name: string): string {
+  return name === PARTNER_FALLBACK_NAME ? "Del tuo partner" : `Di ${name}`;
 }

@@ -38,7 +38,9 @@ export function TaskSheet({
   onDelete,
   onAcknowledge,
   readOnly = false,
+  onCloseAutoFocus,
 }: {
+  onCloseAutoFocus?: (event: Event) => void;
   target: SheetTarget;
   today: PlainDate;
   partners: readonly PartnerView[];
@@ -72,7 +74,11 @@ export function TaskSheet({
 
   return (
     <Sheet open={open} onOpenChange={(next) => (!next ? close() : undefined)}>
-      <PanelContent data-testid="task-sheet" aria-describedby={undefined}>
+      <PanelContent
+        data-testid="task-sheet"
+        aria-describedby={undefined}
+        onCloseAutoFocus={onCloseAutoFocus}
+      >
         {open ? (
           <>
             <SheetHeader>

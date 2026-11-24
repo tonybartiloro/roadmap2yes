@@ -89,7 +89,9 @@ export function PercorsoHeader({
   const line = referenceLine(view);
   return (
     <header className="flex flex-col gap-3" data-testid="percorso-header">
-      <h1 className="text-[28px] leading-[34px]">Percorso</h1>
+      <h1 id="percorso-title" tabIndex={-1} className="text-[28px] leading-[34px]">
+        Percorso
+      </h1>
 
       {reference ? (
         <div className="flex flex-col gap-2" data-testid="reference-status">

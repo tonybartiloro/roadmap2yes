@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useOptimistic, useState, useTransition } from "react";
+import { useMemo, useOptimistic, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
@@ -104,6 +104,10 @@ export function PercorsoScreen({
   const [sheet, setSheet] = useState<
     { kind: "none" } | { kind: "new" } | { kind: "task"; id: string }
   >({ kind: "none" });
+  const opener = useRef<{ el: HTMLElement | null; taskId: string | null }>({
+    el: null,
+    taskId: null,
+  });
   const [sheetSaving, setSheetSaving] = useState(false);
   const [sheetError, setSheetError] = useState<string | null>(null);
   const [conflict, setConflict] = useState<ConflictState | null>(null);
@@ -113,6 +117,28 @@ export function PercorsoScreen({
   const [confirmError, setConfirmError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [announcement, setAnnouncement] = useState("");
+
+  /** Opens the sheet remembering what opened it, to give focus back on close (WCAG 2.4.3). */
+  function openSheet(next: { kind: "new" } | { kind: "task"; id: string }) {
+    const active = document.activeElement;
+    opener.current = {
+      el: active instanceof HTMLElement && active !== document.body ? active : null,
+      taskId: next.kind === "task" ? next.id : null,
+    };
+    setSheet(next);
+  }
+
+  /** Focus returns to the task title (or its opener); if the task is gone, to the page title. */
+  function restoreFocus(event: Event) {
+    event.preventDefault();
+    const { el, taskId } = opener.current;
+    const title = taskId
+      ? document.querySelector<HTMLElement>(`[data-task-id="${taskId}"] [data-testid="task-title"]`)
+      : null;
+    const target =
+      title ?? (el?.isConnected ? el : null) ?? document.getElementById("percorso-title");
+    target?.focus();
+  }
 
   const view = useMemo(
     () => buildPercorsoView({ data: { ...data, tasks }, today, previewId, filters }),
@@ -131,16 +157,37 @@ export function PercorsoScreen({
     return { kind: "none" };
   }, [sheet, tasks]);
 
+  /**
+   * Versions written by this session. Two quick edits of the same task (tick, then untick) must
+   * not use the stale version the screen still holds while the server refresh is on its way.
+   */
+  const known = useRef(new Map<string, number>());
+  const chain = useRef(new Map<string, Promise<unknown>>());
+  function serial<T>(id: string, fn: () => Promise<T>): Promise<T> {
+    const next = (chain.current.get(id) ?? Promise.resolve()).then(fn, fn);
+    chain.current.set(
+      id,
+      next.catch(() => undefined),
+    );
+    return next;
+  }
+  const versionOf = (task: TaskView) => Math.max(task.version, known.current.get(task.id) ?? 0);
+  const latest = (id: string, fallback: number) => Math.max(fallback, known.current.get(id) ?? 0);
+
   /** Runs a versioned write; on conflict opens the dialog and returns null. */
   async function write(
     task: TaskView,
     mine: TaskFields,
     run: (version: number) => Promise<ActionResult<TaskSaved>>,
-    version: number = task.version,
+    version?: number,
     fromSheet = false,
   ): Promise<TaskSaved | null> {
-    const result = await run(version);
-    if (result.ok) return result.data;
+    // Writes of the same task go one after the other: the version is read when its turn comes.
+    const result = await serial(task.id, () => run(version ?? versionOf(task)));
+    if (result.ok) {
+      known.current.set(result.data.id, result.data.version);
+      return result.data;
+    }
     if (result.conflict) {
       setConflict({ task, info: result.conflict, mine, retry: run });
       return null;
@@ -151,10 +198,13 @@ export function PercorsoScreen({
   }
 
   /** Runs an "Annulla": a failure is shown and the real state is reloaded (AC31). */
-  function undoWrite(run: () => Promise<ActionResult<unknown>>) {
+  function undoWrite(run: () => Promise<ActionResult<unknown>>, taskId?: string) {
     startTransition(async () => {
-      const result = await run();
-      if (!result.ok) {
+      const result = await (taskId ? serial(taskId, run) : run());
+      if (result.ok) {
+        const saved = result.data as Partial<TaskSaved> | null;
+        if (saved?.id && saved.version) known.current.set(saved.id, saved.version);
+      } else {
         toast.error(
           result.conflict
             ? "Nel frattempo qualcosa è cambiato: ho ricaricato la versione attuale."
@@ -181,8 +231,14 @@ export function PercorsoScreen({
       const saved = await write(task, mine, run);
       if (saved && done) {
         undoToast("Compito completato.", () =>
-          undoWrite(() =>
-            setTaskStatusAction({ id: taskId, expectedVersion: saved.version, done: false }),
+          undoWrite(
+            () =>
+              setTaskStatusAction({
+                id: taskId,
+                expectedVersion: latest(taskId, saved.version),
+                done: false,
+              }),
+            taskId,
           ),
         );
       }
@@ -198,8 +254,11 @@ export function PercorsoScreen({
         undoToast(`«${task.title}» eliminato.`, () =>
           undoWrite(async () => {
             applyOptimistic({ type: "restore", id: task.id });
-            return restoreTaskAction({ id: task.id, expectedVersion: saved.version });
-          }),
+            return restoreTaskAction({
+              id: task.id,
+              expectedVersion: latest(task.id, saved.version),
+            });
+          }, task.id),
         );
       }
     });
@@ -209,7 +268,10 @@ export function PercorsoScreen({
     setBusy(task.id);
     startTransition(async () => {
       applyOptimistic({ type: "restore", id: task.id });
-      const result = await restoreTaskAction({ id: task.id, expectedVersion: task.version });
+      const result = await serial(task.id, () =>
+        restoreTaskAction({ id: task.id, expectedVersion: versionOf(task) }),
+      );
+      if (result.ok) known.current.set(result.data.id, result.data.version);
       if (!result.ok && !result.conflict) toast.error(result.message);
       if (!result.ok && result.conflict) {
         setConflict({
@@ -241,7 +303,7 @@ export function PercorsoScreen({
         task,
         mine,
         (version) => updateTaskAction({ id: task.id, expectedVersion: version, fields }),
-        task.version,
+        undefined,
         true,
       );
       if (saved) toast("Modifiche salvate.");
@@ -281,8 +343,11 @@ export function PercorsoScreen({
         undoToast(`«${task.title}» tolta dal Percorso.`, () =>
           undoWrite(async () => {
             applyOptimistic({ type: "restore", id: task.id });
-            return restoreTaskAction({ id: task.id, expectedVersion: saved.version });
-          }),
+            return restoreTaskAction({
+              id: task.id,
+              expectedVersion: latest(task.id, saved.version),
+            });
+          }, task.id),
         );
       }
       setBusy(null);
@@ -348,7 +413,7 @@ export function PercorsoScreen({
     partners: data.partners,
     preview: previewing,
     onToggle: toggle,
-    onOpen: (id: string) => setSheet({ kind: "task", id }),
+    onOpen: (id: string) => openSheet({ kind: "task", id }),
   };
 
   return (
@@ -399,7 +464,7 @@ export function PercorsoScreen({
         <EmptyState
           title={COPY.emptyTasksTitle}
           action={
-            <Button type="button" onClick={() => setSheet({ kind: "new" })}>
+            <Button type="button" onClick={() => openSheet({ kind: "new" })}>
               Aggiungi compito
             </Button>
           }
@@ -499,7 +564,7 @@ export function PercorsoScreen({
           size="icon"
           aria-label="Aggiungi un compito"
           data-testid="task-add"
-          onClick={() => setSheet({ kind: "new" })}
+          onClick={() => openSheet({ kind: "new" })}
           className="fixed right-4 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-30 size-14 rounded-full shadow-lg md:right-8 md:bottom-8"
         >
           <Plus aria-hidden className="size-6!" />
@@ -521,6 +586,7 @@ export function PercorsoScreen({
         onSave={save}
         onDelete={remove}
         onAcknowledge={(task) => acknowledge(task.id)}
+        onCloseAutoFocus={restoreFocus}
         readOnly={previewing}
       />
 
