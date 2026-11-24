@@ -1,6 +1,6 @@
 "use server";
 
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { validateAccessCode } from "@/lib/access-code";
 import { readSiteUrl } from "@/lib/app-config";
@@ -83,6 +83,9 @@ export async function signInAction(_prev: FormState, formData: FormData): Promis
   const { email, code } = parsed.data;
 
   // The first user is created here when the typed email is the bootstrap one (create-only).
+  // Known, accepted residual (code-14 REV-5): this runs BEFORE the gate, so for that one email the
+  // first attempt costs an extra RPC (a timing difference) and blocked attempts still reach it.
+  // Bounded to one known address while the variables exist; to be listed in the runbook (T18).
   if (isBootstrapEmail(email)) await ensureBootstrapUser().catch(() => undefined);
 
   const supabase = await createClient();
@@ -99,9 +102,17 @@ export async function signInAction(_prev: FormState, formData: FormData): Promis
 export async function signOutAction(): Promise<void> {
   const supabase = await createClient();
   try {
-    await supabase.auth.signOut();
+    // `local`: only THIS device signs out (REV-12). A temporary code set by the partner already
+    // closes every session through the admin API.
+    await supabase.auth.signOut({ scope: "local" });
   } catch {
-    // Offline backend: the cookies are cleared by the client anyway.
+    // Backend unreachable: handled below, the cookies go away anyway.
+  }
+  // `signOut()` RETURNS an error on a network failure instead of throwing: whatever happened, the
+  // session cookies are removed here, so "Esci" never leaves a live session on a shared device.
+  const store = await cookies();
+  for (const { name } of store.getAll()) {
+    if (name.startsWith("sb-")) store.delete(name);
   }
   redirect("/accesso");
 }
@@ -158,7 +169,11 @@ export async function confirmRecoveryAction(
   }
 
   const changed = await changeOwnCode(supabase, user.id, newCode);
-  if (!changed.ok) return error(changed.error === "unavailable" ? UNAVAILABLE : GENERIC_FAILURE);
+  if (!changed.ok) {
+    // Clean state: no live recovery session without a code the person could type (REV-10).
+    await supabase.auth.signOut().catch(() => undefined);
+    return error(changed.error === "unavailable" ? UNAVAILABLE : GENERIC_FAILURE);
+  }
 
   // The admin update closed every session of the user, this one included: sign in again.
   const relogin = await supabase.auth.signInWithPassword({ email, password: newCode });

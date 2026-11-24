@@ -26,12 +26,20 @@ type HeaderReader = { get(name: string): string | null };
 const IP_SHAPE = /^[0-9a-fA-F:.]{2,45}$/;
 
 /**
+ * ASSUMPTION (code-14 REV-6, runbook): VALID ONLY BEHIND VERCEL, which overwrites these headers
+ * with the real client address. Behind any other proxy or CDN they can be spoofed (the per-IP key
+ * escaped or aimed at a victim); do not put another proxy in front without revisiting this. The
+ * per-email key does not depend on the IP. IPv6: an attacker can rotate inside a /64, so the IP
+ * key is weaker there.
+ *
  * Client IP as set by Vercel (`x-forwarded-for` first hop, else `x-real-ip`). `null` when it is
  * missing or not shaped like an address: then only the email key applies (a shared "unknown"
  * bucket would let one visitor lock everyone out).
  */
 export function clientIp(headers: HeaderReader): string | null {
-  const forwarded = headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+  const forwarded = (headers.get("x-vercel-forwarded-for") ?? headers.get("x-forwarded-for"))
+    ?.split(",")[0]
+    ?.trim();
   const candidate = forwarded || headers.get("x-real-ip")?.trim();
   return candidate && IP_SHAPE.test(candidate) ? candidate.toLowerCase() : null;
 }

@@ -1,5 +1,15 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ensureBootstrapUser, isBootstrapEmail } from "./bootstrap";
+import { ensureBootstrapUser, isBootstrapEmail, supabaseTarget } from "./bootstrap";
+
+describe("supabaseTarget (the script refuses a remote target without --remote)", () => {
+  it("is local only for loopback hosts", () => {
+    expect(supabaseTarget("http://127.0.0.1:54421")).toBe("local");
+    expect(supabaseTarget("http://localhost:54421")).toBe("local");
+    expect(supabaseTarget("https://abcdefgh.supabase.co")).toBe("remote");
+    expect(supabaseTarget("http://127.0.0.1.evil.test")).toBe("remote");
+    expect(supabaseTarget("not a url")).toBe("remote");
+  });
+});
 
 const ENV = {
   R2Y_BOOTSTRAP_EMAIL: "Tony@Example.test",

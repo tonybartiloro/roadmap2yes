@@ -35,6 +35,16 @@ type AdminLike = {
   };
 };
 
+/** `local` for 127.0.0.1 / localhost / ::1, `remote` for anything else (or an unparsable URL). */
+export function supabaseTarget(url: string): "local" | "remote" {
+  try {
+    const host = new URL(url).hostname;
+    return host === "127.0.0.1" || host === "localhost" || host === "[::1]" ? "local" : "remote";
+  } catch {
+    return "remote";
+  }
+}
+
 /** True when the typed email is the bootstrap one (normalized comparison). */
 export function isBootstrapEmail(email: string, env: Env = process.env): boolean {
   const config = readBootstrapConfig(env);

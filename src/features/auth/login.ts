@@ -90,16 +90,22 @@ export async function limitedPasswordLogin(
     return { status: "unavailable", kind: classifyDbError(error) };
   }
 
-  const record = (success: boolean) =>
-    deps.limiter.rpc("login_record", {
-      p_email_key: emailKey,
-      p_ip_key: ipKey,
-      p_success: success,
-      p_max_email: deps.limits.maxFailuresPerEmail,
-      p_max_ip: deps.limits.maxFailuresPerIp,
-      p_window_minutes: deps.limits.windowMinutes,
-      p_lock_minutes: deps.limits.lockMinutes,
-    });
+  // An exception from the RPC must not turn a login (right or wrong) into a 500 (REV-8).
+  const record = async (success: boolean): Promise<void> => {
+    try {
+      await deps.limiter.rpc("login_record", {
+        p_email_key: emailKey,
+        p_ip_key: ipKey,
+        p_success: success,
+        p_max_email: deps.limits.maxFailuresPerEmail,
+        p_max_ip: deps.limits.maxFailuresPerIp,
+        p_window_minutes: deps.limits.windowMinutes,
+        p_lock_minutes: deps.limits.lockMinutes,
+      });
+    } catch {
+      // Not recorded: the answer to the person is unchanged.
+    }
+  };
 
   if (!result.error && result.data.user) {
     // A success never shortens an active block (the DB decides); a failure to record is not fatal.

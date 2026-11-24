@@ -27,6 +27,17 @@ beforeEach(() => {
   getClaims.mockResolvedValue({ data: null, error: null });
 });
 
+describe("proxy: session cookies", () => {
+  it("creates the Supabase client with httpOnly, lax, site-wide cookies", async () => {
+    const { createServerClient } = await import("@supabase/ssr");
+    vi.mocked(createServerClient).mockClear();
+    await proxy(request("/percorso"));
+    expect(vi.mocked(createServerClient).mock.calls[0]?.[2]).toMatchObject({
+      cookieOptions: { httpOnly: true, sameSite: "lax", path: "/" },
+    });
+  });
+});
+
 describe("proxy: session resolution", () => {
   it("passes verified claims to the guards", async () => {
     getClaims.mockResolvedValue({ data: { claims: { sub: "u1" } }, error: null });

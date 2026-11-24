@@ -2,6 +2,7 @@ import "server-only";
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import { readSupabasePublicConfig } from "@/lib/app-config";
+import { authCookieOptions } from "./cookie-options";
 
 /**
  * Supabase client for server components and server actions: runs with the USER'S JWT (session
@@ -13,6 +14,7 @@ export async function createClient() {
   const cookieStore = await cookies();
 
   return createServerClient(url, publishableKey, {
+    cookieOptions: authCookieOptions(),
     cookies: {
       getAll() {
         return cookieStore.getAll();

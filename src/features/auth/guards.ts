@@ -129,7 +129,9 @@ export async function evaluateGuards(ctx: GuardContext): Promise<GuardDecision> 
     return found === "member" ? { action: "redirect", to: HOME_PATH } : { action: "next" };
   }
 
-  // Private page.
+  // Private page. NOTE (code-14 REV-9): the forced change is a ROUTING rule for navigation. A user
+  // with the flag can still call another server action by id; there is no authorization hole (RLS
+  // owns authorization, the flag only forces replacing a code the partner knows).
   if (
     mustChangeCode(claims.app_metadata) &&
     !(isPlainPath(pathname) && under(pathname, ACCOUNT_PATH))

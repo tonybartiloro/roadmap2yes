@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { readSupabasePublicConfig } from "@/lib/app-config";
+import { authCookieOptions } from "@/lib/supabase/cookie-options";
 import { classifyDbError } from "@/lib/supabase/errors";
 import {
   evaluateGuards,
@@ -79,6 +80,7 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
 
   const { url, publishableKey } = readSupabasePublicConfig();
   const supabase = createServerClient(url, publishableKey, {
+    cookieOptions: authCookieOptions(),
     cookies: {
       getAll() {
         return request.cookies.getAll();

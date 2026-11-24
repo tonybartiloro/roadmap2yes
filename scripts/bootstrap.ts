@@ -4,7 +4,7 @@
  * an email, a code or a key. Exit code 1 on a configuration error or a failure.
  */
 import { createClient } from "@supabase/supabase-js";
-import { ensureBootstrapUser } from "@/features/auth/bootstrap";
+import { ensureBootstrapUser, supabaseTarget } from "@/features/auth/bootstrap";
 
 try {
   process.loadEnvFile(".env.local");
@@ -18,6 +18,14 @@ if (!url || !secretKey) {
   console.error("Missing Supabase configuration: NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SECRET_KEY");
   process.exit(1);
 }
+
+// `vercel env pull` writes production values into .env.local: a remote target must be asked for.
+const target = supabaseTarget(url);
+if (target === "remote" && !process.argv.includes("--remote")) {
+  console.error("bootstrap: the target is remote; pass --remote explicitly to run against it");
+  process.exit(1);
+}
+console.log(`bootstrap: target ${target}`);
 
 const admin = createClient(url, secretKey, {
   auth: { autoRefreshToken: false, persistSession: false },

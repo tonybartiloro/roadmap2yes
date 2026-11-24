@@ -43,6 +43,18 @@ export function ChangeCodeForm({
   return (
     <form action={action} className="flex flex-col gap-5" data-testid="change-code-form">
       {forced ? <input type="hidden" name="forced" value="1" /> : null}
+      {/* Lets password managers update the right entry (REV-13). */}
+      <input
+        type="text"
+        name="username"
+        autoComplete="username"
+        value={subject.email ?? ""}
+        readOnly
+        tabIndex={-1}
+        aria-hidden
+        className="sr-only"
+      />
+
       <AccessCodeField
         label={forced ? "Il codice temporaneo" : "Il codice di adesso"}
         name="currentCode"
