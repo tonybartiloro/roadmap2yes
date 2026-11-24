@@ -45,3 +45,11 @@ AC1 ✅ (`auth.login.test.ts`, `login.test.ts`) · AC2 ✅ (neutral outcome test
 1. REV-12: is a global sign-out ("Esci" ends every device) intended?
 2. REV-1: do you want `httpOnly` cookies set in T1's files (`server.ts`, `proxy.ts`) as part of this round, or recorded as an accepted part of R26?
 3. REV-5/REV-6: are you comfortable with writing "Vercel only" and the bootstrap timing residual into `sicurezza.md`?
+
+## Round 2 (commit 05025f7)
+
+Verdict: approved. Run: vitest src/features/auth src/lib/supabase src/proxy.test.ts 143/143; npm run test:integration -- auth 39/39.
+
+Closed (verified in the diff, not just the author responses): REV-1 (cookie-options.ts httpOnly, lax, secure on Vercel or https, wired in server.ts and proxy.ts, unused browser client removed), REV-2 (--remote required for a non-local target, prints only local/remote), REV-3 and REV-12 (scope local plus server-side deletion of every sb-* cookie whatever signOut returns), REV-4 (actions, verifyCurrentCode and /auth/avanti tests), REV-8, REV-10, REV-13. Accepted and closed: REV-5, REV-6 (x-vercel-forwarded-for preferred, Vercel-only documented), REV-7 (secret key stays as HMAC key for R1, per coordinator), REV-9, REV-11.
+
+Reopened: none. New findings: none.
