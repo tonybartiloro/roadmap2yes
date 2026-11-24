@@ -1,6 +1,6 @@
 "use client";
 
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, TriangleAlert } from "lucide-react";
 import { DateField } from "@/components/DateField";
 import { MonthYearField } from "@/components/MonthYearField";
 import { Button } from "@/components/ui/button";
@@ -148,7 +148,13 @@ export function ScenarioEditor({
                     error={problem ?? undefined}
                   />
                   {scenario.dateFrom < DEFAULT_SCENARIO_DATE ? (
-                    <p className="text-warning text-sm sm:col-span-2">{SOFT_MIN_MESSAGE}</p>
+                    <p
+                      className="text-warning flex items-start gap-1.5 text-sm sm:col-span-2"
+                      data-testid="scenario-soft-warning"
+                    >
+                      <TriangleAlert aria-hidden className="mt-0.5 size-4 shrink-0" />
+                      <span>{SOFT_MIN_MESSAGE}</span>
+                    </p>
                   ) : null}
                 </div>
               )}

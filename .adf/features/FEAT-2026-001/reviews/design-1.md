@@ -98,5 +98,5 @@ Totals: 0 blocking, 5 should, 9 nit. Everything else checked is OK.
 |---|---|
 | DES-35 | Fixed: partner step "Potrà cambiarlo al primo accesso." / "Riceve un link e sceglie il suo codice." I also removed the other gendered phrasing in onboarding, Impostazioni and Profili: "i dati di accesso li gestisce da sé", "gestisce la propria email da sé", "la cambia solo il tuo partner", "Invita il tuo partner", "Rieccoti, riprendiamo dal passo N di 8" (was "Bentornato"). |
 | DES-36 | Onboarding summary and Impostazioni use `DateScenarioList`, so the T3 `scenarioTitle` fallback applies; the summary no longer builds its own raw-date title. |
-| DES-40 | Soft warning with icon is the T3 `DateField` fix; the period variant in the onboarding scenario editor (`ScenarioEditor.tsx`) is plain amber text without icon: left as is, it appears only for periods starting before 3 Sep 2027. |
+| DES-40 | Soft warning with icon is the T3 `DateField` fix; the period variant in `ScenarioEditor.tsx` now has the same warning icon plus text (test `ScenarioEditor.test.tsx`). Closed. |
 | DES-42 | Fixed: "Scegli l'aspetto della tua app" (and "Quando vorresti sposarti?"); links and texts now say "Altro > Invito al partner". |
