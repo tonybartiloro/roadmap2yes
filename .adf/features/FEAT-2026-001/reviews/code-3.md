@@ -46,3 +46,22 @@ Developer choices evaluated: names/email parts < 3 chars ignored (ok), 72 limit 
 | Q1 | Not intended; deduped as in 3. |
 | Q2 | Not intended; now accepted. |
 | Q3 | Not intended; null-actor rows are skipped, except a system `reference_auto` shown with a neutral, unattributed phrase. |
+
+## Round 2
+
+Diff f40a436 read. `vitest run src/lib src/domain/budget src/domain/export src/domain/news`: 268 pass, 2 fail, both in `src/lib/hooks/use-form-draft.test.ts` ("options undefined"), a different task's file untouched by f40a436; none in T5 modules.
+
+| # | Status |
+|---|---|
+| 1 | Closed (Assegnato column, rows aligned) |
+| 2 | Closed (itemPaidCents/itemAgreedCents, deleted categories skipped) |
+| 3 | Closed (weddings audit case removed; decision event with `referenceDate` is the single source) |
+| 4 | Closed |
+| 5 | Closed (compact comparison; byte limit documented) |
+| 6 | Closed (caps throw) |
+| 7 | Closed (",50" accepted, leading zeros) |
+| Q1-Q3 | Closed per coordinator decisions; null-actor audit and decision events skipped except `reference_auto` |
+
+Residual (not blocking, for T7/T8 owner): the `use-form-draft` failures need a look by whoever owns the hooks task.
+
+Verdict: **approved** (T5).
