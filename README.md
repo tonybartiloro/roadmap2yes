@@ -1,46 +1,38 @@
 # roadmap2yes
 
-Web app per organizzare e tracciare il nostro matrimonio, passo dopo passo.
+Web app per organizzare e tracciare il nostro matrimonio, passo dopo passo: onboarding, Percorso con le scadenze, scelte (data e location), budget ed esportazione.
 
-> Repository pubblico: non committare mai dati reali degli invitati, segreti o file `.env`.
+> **Repository pubblico.** Non committare mai dati reali di invitati, segreti, codici d'accesso, email vere o file `.env`. Ogni dato di esempio è finto e usa `@example.test`. Lo controllano `npm run check:test-emails` e gitleaks in CI.
 
-## Sviluppo locale
+## Setup locale
 
-Requisiti: Node 24 (`.nvmrc`), npm 11, Docker. La CLI di Supabase è una devDependency: nessuna installazione globale.
+Requisiti: Node 24 (`.nvmrc`), npm 11, Docker. La CLI di Supabase è una devDependency.
 
 ```bash
 npm ci
-npm run db:start      # stack Supabase locale in Docker + catcher email (Mailpit)
-npm run db:reset      # applica migrazioni e seed (dati finti)
+npm run db:start              # stack Supabase locale in Docker, più Mailpit per le email dell'app
+npm run db:reset              # migrazioni e seed con dati finti (solo locale)
 cp .env.example .env.local
-npm run -s db:env >> .env.local   # aggiunge URL e chiavi dello stack locale (valori solo tuoi, mai nel repo)
-npm run dev           # http://127.0.0.1:3000
+npm run -s db:env >> .env.local   # aggiunge le chiavi dello stack locale, solo sul tuo computer
+npm run dev                   # http://127.0.0.1:3000
 ```
 
-Per fermare lo stack: `npm run db:stop`.
+Per fermare lo stack: `npm run db:stop`. Il primo utente si crea dalle variabili `R2Y_BOOTSTRAP_*` in `.env.local` (solo valori finti): al primo accesso con quell'email, oppure a mano con `npm run bootstrap`.
 
-Porte locali (diverse dai default di Supabase, per convivere con altri progetti): API `54421`, DB `54422`, Mailpit web `54426` (Auth: `54424`), SMTP app `54425`.
+Comandi principali: `npm run lint`, `npm run typecheck`, `npm test`, `npm run test:integration`, `npm run db:test`, `npm run e2e`. L'elenco completo e i limiti locali sono in [sviluppo locale e test](docs/technical/sviluppo-locale-e-test.md).
 
-Email dell'app in locale e in CI (Mailpit): `SMTP_HOST=127.0.0.1`, `SMTP_PORT=54425`, `MAILPIT_API_URL=http://127.0.0.1:54426` (UI e API, usate dagli e2e).
+## Documentazione
 
-Il primo utente si crea dalle variabili `R2Y_BOOTSTRAP_*` (vedi `.env.example`, solo valori finti `@example.test`): al primo accesso con quell'email oppure a mano con `npm run bootstrap`.
+- **Uso dell'app**: [`docs/functional`](docs/functional/README.md). Accesso e codici, onboarding, Percorso, Scelte, Budget, Home, Altro, promemoria email, esportazione.
+- **Tecnica**: [`docs/technical`](docs/technical/README.md). [Architettura](docs/technical/architettura.md), [modello dati](docs/technical/modello-dati.md), [sicurezza](docs/technical/sicurezza.md), [email e job](docs/technical/email-e-job.md), [ambienti e rilascio (runbook)](docs/technical/ambienti-e-rilascio.md), [sviluppo locale e test](docs/technical/sviluppo-locale-e-test.md).
+- **Decisioni**: [`docs/adr`](docs/adr/0001-stack-auth-ambienti.md). Stack, accesso con codice e ambienti.
 
-### Comandi
+## Stack
 
-| Comando | Cosa fa |
-|---|---|
-| `npm run dev` / `build` / `start` | Next.js |
-| `npm run lint` | ESLint (guardie: `use cache`, `text-accent`, import di `admin.ts`) + controllo email `@example.test` su tutto il repo |
-| `npm run typecheck` | `next typegen` + `tsc --noEmit` |
-| `npm test` | Vitest, progetto `unit` (nessun DB). `npm run test:tz` lo ripete con `TZ=UTC` e `TZ=America/Los_Angeles` |
-| `npm run test:integration` | Vitest, progetto `integration` (richiede `db:start`; cartelle `tests/integration` e `tests/acceptance`) |
-| `npm run db:test` | pgTAP (`supabase/tests`) |
-| `npm run db:types` | rigenera `src/lib/supabase/database.types.ts` (non si modifica a mano) |
-| `npm run e2e` | Playwright; richiede `npm run build` e le variabili in `.env.local`. Progetti: `mobile`, `desktop`, `webkit-smoke`, `time`, `degraded`, `email-off` (convenzione dei nomi dei file in `playwright.config.ts`) |
-| `npm run bootstrap`, `gen:themes`, `check:fonts`, `keepalive:check` | script dichiarati in anticipo: i file `scripts/*.ts` corrispondenti arrivano con i rispettivi task |
+Next.js 16 (App Router) con React 19 e TypeScript su Vercel; Supabase per Postgres, Auth e RLS; Tailwind CSS e shadcn/ui. Email con Resend solo quando esiste un dominio: senza, l'app funziona e mostra un avviso.
 
-### Sicurezza del repository
+## Storico delle modifiche
 
-- Solo email `@example.test`: lo verifica `npm run check:test-emails` (anche in CI).
-- Scansione segreti con gitleaks su tutta la cronologia (CI, `.gitleaks.toml`).
-- La chiave segreta di Supabase è importabile solo da `src/lib/supabase/admin.ts`, a sua volta importabile solo da 4 ambiti (regola ESLint).
+| Data | Feature | Modifica |
+|---|---|---|
+| 2026-11-24 | FEAT-2026-001 | Setup essenziale che rimanda alla documentazione (F4, T18) |

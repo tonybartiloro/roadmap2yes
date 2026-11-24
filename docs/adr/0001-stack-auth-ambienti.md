@@ -104,6 +104,13 @@
   - riverifica dei limiti dei piani gratuiti;
   - eventuale CAPTCHA;
   - CSP con nonce.
+- **Conseguenze emerse in F3** (implementazione e revisioni di sicurezza; la decisione sopra non cambia):
+  - La funzione di autorizzazione è `public.has_permission(p_wedding_id, p_area, p_action)`, nello schema `public` e non in `private` come scritto sopra. Lo schema `private` resta non esposto e contiene le funzioni di supporto.
+  - Le operazioni sugli account seguono l'ordine DB-prima con il predicato `account_reusable` e un ordine unico dei lock (`docs/technical/sicurezza.md`). Le tre impostazioni di indurimento di Supabase Auth sono approvate il 2026-11-24 (P2), e il rischio residuo R26 è accettato per R1.
+  - Il limitatore legge l'IP da `x-vercel-forwarded-for` prima di `x-forwarded-for`: vale solo dietro Vercel (R27). I cookie di sessione sono `httpOnly`, e `secure` quando il sito è su https.
+  - `smtp` è rifiutato quando `VERCEL_ENV=production`: è un trasporto solo locale e di CI.
+  - Gli environment GitHub `production`, `staging` e `production-keepalive` devono accettare il deployment solo da `main`. È una configurazione fuori dal codice, da verificare a mano (`docs/technical/ambienti-e-rilascio.md`).
+  - Lo staging riceve le migrazioni solo con l'avvio manuale da `main`: le migrazioni di una PR arrivano allo staging dopo il merge. La procedura è da decidere.
 
 ## Compliance
 - **pgTAP e test di accettazione** (generati dal catalogo, eseguiti anche via PostgREST con JWT reali):
