@@ -459,3 +459,13 @@ Developer's answers to the 4 remaining questions: 1. OK (min 10 characters, lett
 ## F3 — T4 review closed — 2026-11-24
 - code-2 round 1: 1 blocking, 3 should, 5 nits. Fixed in 6bb86c0; round 2 approved with 0 open findings.
 - Follow-up recorded in the plan change log: T8/T11/T14 must use the same rule for the automatic reference, namely the earliest open scenario whose date is not past.
+
+## F3 — T3 and T5 done — 2026-11-24
+- T3 (774ba95, ebfa696): 12 themes, generated themes.css, WCAG gate (12×2 modes), font budget (≤72 KB per theme), shell, /servizio, shared components. CI `hashFiles` skips removed for gen:themes/check:fonts.
+- T3 left for later tasks:
+  - wire T5's money parser into MoneyInput (T13);
+  - T7a (proxy/guards) must set the `x-r2y-backend` header on outage rewrites so the layout skips the DB theme lookup;
+  - the designer must visually check the list T3 provided.
+- T5 (bee42d9): ~130 tests. The location linked to a date scenario goes in the JSON export only, with no extra CSV column; AC42 requires CSV only for tasks and budget (coordinator decision).
+- Integrated tree: typecheck OK; 504 unit tests green across 28 files.
+- Committed AGENTS.md, which `next dev` generates.
