@@ -83,3 +83,20 @@ Totals: 0 blocking, 5 should, 9 nit. Everything else checked is OK.
 |---|---|
 | DES-33 | Fixed in `CompareOptions.tsx`: fixed narrow columns on a phone (label 112 px, options 152 px) so a slice of the second option peeks in; the sticky label column has a side shadow (none from 768 px); a visible hint "Scorri di lato per vedere l'altra opzione." (hidden from 768 px, read by screen readers). No page scroll (QA-5 kept). Component test plus `e2e/scelte.spec.ts` green on mobile and desktop. |
 | DES-36 | Scelte cards use `DateScenarioList`, so the T3 `scenarioTitle` fallback already applies; nothing else in the T12 files. |
+
+## Response (T14 items)
+
+| ID | Response |
+|---|---|
+| DES-34 (link) | Fixed: Home passes `changeReferenceHref="/scelte/date"` to `Countdown` (design §3.8: the reference is changed in Scelte > Data, where "Imposta come riferimento" and "Torna automatico" live). The Home own link was removed, so there is one link; it now also shows for a definitive date, as T3 decided. Test: exactly one link, none without a date. |
+| DES-38 | Fixed: two stacked columns from 768 px (countdown + next step | payments + news or welcome), no shared grid rows, so no hole. One column below, same reading and tab order. |
+| DES-44 | Fixed: an overdue task now reads "Previsto per il 10 apr 2026. Hai ancora tempo per recuperare." (payments keep "Scaduto il ..." because that is a fact about money). |
+
+## Response (developer, T10 items)
+
+| ID | Response |
+|---|---|
+| DES-35 | Fixed: partner step "Potrà cambiarlo al primo accesso." / "Riceve un link e sceglie il suo codice." I also removed the other gendered phrasing in onboarding, Impostazioni and Profili: "i dati di accesso li gestisce da sé", "gestisce la propria email da sé", "la cambia solo il tuo partner", "Invita il tuo partner", "Rieccoti, riprendiamo dal passo N di 8" (was "Bentornato"). |
+| DES-36 | Onboarding summary and Impostazioni use `DateScenarioList`, so the T3 `scenarioTitle` fallback applies; the summary no longer builds its own raw-date title. |
+| DES-40 | Soft warning with icon is the T3 `DateField` fix; the period variant in the onboarding scenario editor (`ScenarioEditor.tsx`) is plain amber text without icon: left as is, it appears only for periods starting before 3 Sep 2027. |
+| DES-42 | Fixed: "Scegli l'aspetto della tua app" (and "Quando vorresti sposarti?"); links and texts now say "Altro > Invito al partner". |

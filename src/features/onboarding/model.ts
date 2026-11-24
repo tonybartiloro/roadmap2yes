@@ -35,11 +35,11 @@ export const STEP_TITLES: Readonly<Record<StepId, string>> = {
   you: "Iniziamo da te: come ti chiami?",
   partner: "Ora il tuo partner. Gli mandiamo un invito per entrare con te.",
   rite: "Che tipo di cerimonia avete in mente?",
-  dates: "Quando vorreste sposarvi?",
+  dates: "Quando vorresti sposarti?",
   guests: "Quanti invitati pensate di avere?",
   budget: "Quanto pensate di spendere in tutto?",
   style: "Che stile e che luogo sognate?",
-  theme: "Scegli l'aspetto della vostra app",
+  theme: "Scegli l'aspetto della tua app",
 };
 
 /** 1-based number shown as "Passo 3 di 8". */

@@ -115,7 +115,7 @@ describe("Profili (AC46, AC58)", () => {
     expect(emails.every((input) => input.readOnly)).toBe(true);
     expect(screen.getByTestId("profile-account-link").getAttribute("href")).toBe("/altro/account");
     expect(screen.getByText("L'email è il tuo accesso.")).toBeTruthy();
-    expect(screen.getByText(/cambia la sua email da solo/)).toBeTruthy();
+    expect(screen.getByText(/gestisce la propria email da sé/)).toBeTruthy();
     // A partner who has entered: no way to change their email here.
     expect(screen.queryByTestId("profile-partner-email-section")).toBeNull();
     expect(screen.queryByText(/nascita/i)).toBeNull();

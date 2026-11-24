@@ -38,7 +38,7 @@ export function ProfilesView({ view, scope }: { view: View; scope: string }) {
       ) : (
         <EmptyState
           title="Il tuo partner non c'è ancora"
-          description="Invitalo: potrai poi sistemare qui i suoi dati."
+          description="Invita il tuo partner: potrai poi sistemare qui i dati."
           action={
             <Button asChild>
               <Link href="/altro/invito">Invita il tuo partner</Link>
@@ -158,7 +158,7 @@ function CardForm({
   const emailHint = person.isMe
     ? "L'email è il tuo accesso."
     : person.joined
-      ? `${title} cambia la sua email da solo, con il suo accesso.`
+      ? `${title} gestisce la propria email da sé, con il proprio accesso.`
       : undefined;
 
   return (

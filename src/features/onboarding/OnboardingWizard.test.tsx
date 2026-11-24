@@ -164,7 +164,7 @@ describe("OnboardingWizard (AC12, AC13)", () => {
       "Passo 4 di 8",
     );
     expect(screen.getByTestId("onboarding-resume").textContent).toBe(
-      "Bentornato, riprendiamo dal passo 4 di 8.",
+      "Rieccoti, riprendiamo dal passo 4 di 8.",
     );
     // The date step starts with the prefilled scenario of 3 September 2027 (AC12).
     const date = (await screen.findByLabelText("Data", { selector: "input" })) as HTMLInputElement;

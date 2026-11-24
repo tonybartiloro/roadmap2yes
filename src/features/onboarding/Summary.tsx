@@ -5,7 +5,7 @@ import { forwardRef } from "react";
 import { DateScenarioList, type DateScenarioItem } from "@/components/DateScenarioList";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { buttonVariants } from "@/components/ui/button";
-import { formatLongDate, formatShortDate, plural } from "@/components/format";
+import { formatLongDate, plural } from "@/components/format";
 import { styleTipFor } from "@/content/style-tips";
 import { LinkBox } from "@/features/invitations/InviteForms";
 import { displayName } from "@/lib/display-name";
@@ -22,9 +22,7 @@ function scenarioItems(summary: OnboardingSummary): DateScenarioItem[] {
       summary.referenceStatus !== null;
     return {
       id: scenario.id,
-      label:
-        scenario.label ??
-        (scenario.kind === "fixed" ? formatShortDate(scenario.dateFrom) : "Periodo"),
+      label: scenario.label ?? "",
       kind: scenario.kind,
       dateFrom: scenario.dateFrom,
       ...(scenario.dateTo ? { dateTo: scenario.dateTo } : {}),
@@ -40,23 +38,23 @@ function inviteText(invite: InviteOutcome, summary: OnboardingSummary): string {
   const name = displayName(partner ? { firstName: partner.firstName, label: partner.label } : null);
   switch (invite.kind) {
     case "none":
-      return "Non hai ancora aggiunto il tuo partner: puoi invitarlo quando vuoi da Altro > Invito.";
+      return "Non hai ancora aggiunto il tuo partner: puoi invitarlo quando vuoi da Altro > Invito al partner.";
     case "joined":
       return `${name} è già dentro.`;
     case "later":
-      return `L'invito a ${name} è da fare: lo trovi in Altro > Invito.`;
+      return `L'invito a ${name} è da fare: lo trovi in Altro > Invito al partner.`;
     case "code_ready":
       return `L'accesso di ${name} è pronto: consegnagli il codice di persona.`;
     case "email_pending":
-      return `L'invito a ${partner?.email ?? name} è già partito: lo trovi in Altro > Invito.`;
+      return `L'invito a ${partner?.email ?? name} è già partito: lo trovi in Altro > Invito al partner.`;
     case "email_off":
-      return "Le email dell'app sono spente, quindi l'invito non è partito. Da Altro > Invito puoi dargli un codice di persona.";
+      return "Le email dell'app sono spente, quindi l'invito non è partito. Da Altro > Invito al partner puoi dargli un codice di persona.";
     case "sent":
       return `Invito inviato a ${partner?.email ?? name}.`;
     case "not_sent":
       return "L'email non è partita. L'invito è in attesa: copia il link e mandalo tu.";
     case "failed":
-      return `${invite.message} Puoi riprovare da Altro > Invito.`;
+      return `${invite.message} Puoi riprovare da Altro > Invito al partner.`;
   }
 }
 

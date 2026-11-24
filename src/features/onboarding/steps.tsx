@@ -261,7 +261,8 @@ function PartnerForm({
         }}
       >
         <p data-testid="partner-joined">
-          {partner.firstName?.trim() || "Il tuo partner"} è già entrato: i suoi dati li cambia lui.
+          {partner.firstName?.trim() || "Il tuo partner"} è già entrato: i dati di accesso li
+          gestisce da sé.
         </p>
         <Actions busy={ctx.busy} onBack={ctx.onBack} />
       </StepForm>
@@ -278,18 +279,22 @@ function PartnerForm({
     {
       value: "code",
       label: "Con un codice che gli dai di persona",
-      hint: "Funziona sempre. Lui potrà cambiarlo al primo accesso.",
+      hint: "Funziona sempre. Potrà cambiarlo al primo accesso.",
     },
     ...(ctx.emailOn
       ? [
           {
             value: "email" as const,
             label: "Con un invito via email",
-            hint: "Riceve un link e sceglie lui il suo codice.",
+            hint: "Riceve un link e sceglie il suo codice.",
           },
         ]
       : []),
-    { value: "later", label: "Più tardi", hint: "Salviamo i suoi dati; l'invito lo fai da Altro." },
+    {
+      value: "later",
+      label: "Più tardi",
+      hint: "Salviamo i dati; l'invito lo fai da Altro > Invito al partner.",
+    },
   ];
 
   return (

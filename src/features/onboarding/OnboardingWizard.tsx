@@ -155,7 +155,7 @@ export function OnboardingWizard({
         </div>
         {resumedFrom === step ? (
           <p className="text-muted-foreground" data-testid="onboarding-resume">
-            Bentornato, riprendiamo dal passo {number} di {STEP_COUNT}.
+            Rieccoti, riprendiamo dal passo {number} di {STEP_COUNT}.
           </p>
         ) : null}
       </header>

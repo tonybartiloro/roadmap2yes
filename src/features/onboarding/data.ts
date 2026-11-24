@@ -317,7 +317,7 @@ export async function savePartnerRow(
     return {
       ok: false,
       code: "forbidden",
-      message: "Il tuo partner è già entrato: i suoi dati li cambia lui.",
+      message: "Il tuo partner è già entrato: i dati di accesso li gestisce da sé.",
     };
   }
   if (existing.data && existing.data.email.trim().toLowerCase() !== input.email) {

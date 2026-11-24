@@ -38,7 +38,8 @@ export function PartnerEmailForm({ currentEmail }: { currentEmail: string }) {
   return (
     <form action={action} className="flex flex-col gap-4" data-testid="profile-email-form">
       <p className="text-muted-foreground">
-        Finché non entra puoi cambiare la sua email. Dopo il primo accesso la cambia solo lui.
+        Finché non entra puoi cambiare la sua email. Dopo il primo accesso la cambia solo il tuo
+        partner.
       </p>
       <TextField
         id="profile-partner-email"
