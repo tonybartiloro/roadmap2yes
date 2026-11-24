@@ -51,14 +51,12 @@ jobs:
         env:
           NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54421
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_ci_placeholder
-      # The next steps activate themselves when the scripts they need exist (T3 adds them).
+      # Theme and font gates (T3). `check:fonts` reads the build output of the step above.
       - name: themes.css is up to date
-        if: ${{ hashFiles('scripts/gen-themes-css.ts') != '' }}
         run: |
           npm run gen:themes
           git diff --exit-code -- src/app/themes.css
       - name: Font budget per theme
-        if: ${{ hashFiles('scripts/check-font-budget.ts') != '' }}
         run: npm run check:fonts
 
   # ---------------------------------------------------------------------------------------------
