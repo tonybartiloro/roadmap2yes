@@ -76,3 +76,10 @@ Totals: 0 blocking, 5 should, 9 nit. Everything else checked is OK.
 | DES-40 | Fixed in `DateField` (where the soft warning lives): icon + text. |
 | DES-31 (T3 part) | `globals.css`: `scroll-padding-top` is 14rem (8rem from md) while an element with `data-preview-banner` exists. T11 must put that attribute on the banner and reduce its height as listed. |
 | DES-33, 35, 37, 38, 41-44 | Not T3 files. |
+
+## Response (developer, T12 items)
+
+| ID | Response |
+|---|---|
+| DES-33 | Fixed in `CompareOptions.tsx`: fixed narrow columns on a phone (label 112 px, options 152 px) so a slice of the second option peeks in; the sticky label column has a side shadow (none from 768 px); a visible hint "Scorri di lato per vedere l'altra opzione." (hidden from 768 px, read by screen readers). No page scroll (QA-5 kept). Component test plus `e2e/scelte.spec.ts` green on mobile and desktop. |
+| DES-36 | Scelte cards use `DateScenarioList`, so the T3 `scenarioTitle` fallback already applies; nothing else in the T12 files. |

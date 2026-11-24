@@ -1,11 +1,15 @@
 "use client";
 
 import { useId } from "react";
-import { X } from "lucide-react";
+import { MoveRight, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { comparisonRows, type CompareCell } from "./model";
 import { ProConList, SafeLink } from "./OptionCard";
 import type { OptionView, ReferenceView } from "./types";
+
+/** Sticky label column with a visible right edge while the table scrolls (none from 768 px). */
+const STICKY =
+  "bg-card sticky left-0 z-10 shadow-[4px_0_6px_-4px_var(--foreground)] md:shadow-none";
 
 function Cell({ cell }: { cell: CompareCell }) {
   switch (cell.kind) {
@@ -59,26 +63,36 @@ export function CompareOptions({
           Chiudi il confronto
         </Button>
       </div>
+      {/* Visible and read out: on a phone the second option is off to the right (DES-33). */}
+      <p
+        data-testid="compare-hint"
+        className="text-muted-foreground flex items-center gap-1.5 text-sm md:hidden"
+      >
+        <MoveRight aria-hidden className="size-4 shrink-0" />
+        Scorri di lato per vedere l&apos;altra opzione.
+      </p>
       <div
         role="region"
         aria-labelledby={headingId}
         tabIndex={0}
         className="border-border focus-visible:ring-ring relative max-w-full overflow-x-auto rounded-lg border focus-visible:ring-2 focus-visible:outline-none"
       >
-        <table className="w-full min-w-[34rem] border-collapse text-left text-base md:min-w-0">
+        {/* Fixed narrow columns on a phone so a slice of the next option peeks in; the sticky
+            label column has a side shadow as its edge. From 768 px: two equal columns. */}
+        <table className="w-[calc(7rem+19rem)] table-fixed border-collapse text-left text-base md:w-full">
           <caption className="sr-only">
             Confronto tra {a.title} e {b.title}. Su schermi stretti scorri in orizzontale.
           </caption>
           <thead>
             <tr>
-              <th scope="col" className="bg-card sticky left-0 z-10 w-32 p-3">
+              <th scope="col" className={`${STICKY} w-28 p-3 md:w-32`}>
                 <span className="sr-only">Voce</span>
               </th>
               {[a, b].map((option) => (
                 <th
                   key={option.id}
                   scope="col"
-                  className="min-w-48 p-3 align-top text-[18px] leading-6 break-words md:w-1/2"
+                  className="w-[9.5rem] p-3 align-top text-[18px] leading-6 break-words md:w-1/2"
                 >
                   {option.title}
                 </th>
@@ -90,7 +104,7 @@ export function CompareOptions({
               <tr key={row.label} className="border-border border-t align-top">
                 <th
                   scope="row"
-                  className="bg-card text-muted-foreground sticky left-0 z-10 w-32 p-3 font-normal"
+                  className={`${STICKY} text-muted-foreground w-28 p-3 font-normal md:w-32`}
                 >
                   {row.label}
                 </th>

@@ -247,6 +247,24 @@ describe("CompareOptions (AC17)", () => {
     expect(region.className).toContain("overflow-x-auto");
   });
 
+  it("tells the user to scroll sideways on a phone and gives the sticky column an edge (DES-33)", () => {
+    render(
+      <CompareOptions
+        a={locationOption()}
+        b={locationOption({ id: "b" })}
+        type="location"
+        reference={null}
+        onClose={() => {}}
+      />,
+    );
+    const hint = screen.getByTestId("compare-hint");
+    expect(hint.textContent).toContain("Scorri di lato");
+    expect(hint.className).toContain("md:hidden");
+    const rowHeader = screen.getAllByRole("rowheader")[0]!;
+    expect(rowHeader.className).toContain("sticky");
+    expect(rowHeader.className).toContain("shadow-");
+  });
+
   it("closes", async () => {
     const onClose = vi.fn();
     render(
