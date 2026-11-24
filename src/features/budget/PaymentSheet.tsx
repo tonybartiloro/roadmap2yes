@@ -82,7 +82,8 @@ export function PaymentSheet({
     .filter((p) => p.paid && p.id !== payment?.id)
     .reduce((sum, p) => sum + p.amountCents, 0);
   const paidAfter = paidOthers + (preview.ok && preview.input.paid ? preview.input.amountCents : 0);
-  const overCents = Math.max(0, paidAfter - (item.agreedCents ?? 0));
+  // Same rule as the domain warning: only an agreed item has something to be overpaid against.
+  const overCents = item.status === "agreed" ? Math.max(0, paidAfter - (item.agreedCents ?? 0)) : 0;
 
   function finish(result: VersionedResult) {
     if (result.ok) {

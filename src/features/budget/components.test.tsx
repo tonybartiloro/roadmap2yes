@@ -606,3 +606,126 @@ describe("CategoryDetail (AC34, AC35)", () => {
     expect(mocks.push).not.toHaveBeenCalled();
   });
 });
+
+describe("T13 review round 1", () => {
+  it("REV-2: a failure after the move refreshes and says the items were moved", async () => {
+    mocks.actions.moveAndDeleteCategoryAction.mockResolvedValue({
+      ok: false,
+      code: "moved_not_deleted",
+      message: "Ho spostato le voci, ma non sono riuscito a eliminare la categoria. Riprova.",
+    });
+    render(
+      <CategoryDetail snapshot={snapshot({ items: [menu] })} categoryId="cat" today={TODAY} />,
+    );
+    await userEvent.click(screen.getByTestId("category-delete"));
+    await userEvent.selectOptions(screen.getByLabelText("Sposta in…"), "loc");
+    await userEvent.click(screen.getByRole("button", { name: "Sposta ed elimina" }));
+    await screen.findByText(/Ho spostato le voci/);
+    expect(mocks.refresh).toHaveBeenCalled();
+    expect(mocks.push).not.toHaveBeenCalled();
+  });
+
+  it("REV-3: undoing a move says the category is back empty and where the items stay", async () => {
+    mocks.actions.moveAndDeleteCategoryAction.mockResolvedValue({
+      ok: true,
+      data: { moved: 1, version: 9 },
+    });
+    mocks.actions.restoreCategoryAction.mockResolvedValue({ ok: true, data: { version: 10 } });
+    render(
+      <CategoryDetail snapshot={snapshot({ items: [menu] })} categoryId="cat" today={TODAY} />,
+    );
+    await userEvent.click(screen.getByTestId("category-delete"));
+    await userEvent.selectOptions(screen.getByLabelText("Sposta in…"), "loc");
+    await userEvent.click(screen.getByRole("button", { name: "Sposta ed elimina" }));
+    await waitFor(() => expect(mocks.push).toHaveBeenCalled());
+    const [, options] = mocks.toast.mock.calls.at(-1)!;
+    await options.action.onClick();
+    expect(mocks.toast).toHaveBeenLastCalledWith(
+      "«Catering» è tornata, vuota. Le voci restano in «Location».",
+    );
+  });
+
+  it("REV-4: no overpayment notice for an item that is not agreed", async () => {
+    const planned: ItemView = { ...menu, status: "planned", agreedCents: null };
+    render(
+      <PaymentSheet
+        open
+        onOpenChange={() => {}}
+        item={planned}
+        payment={null}
+        siblings={[]}
+        today={TODAY}
+        partnerName="Jessica"
+        onStale={() => {}}
+      />,
+    );
+    await userEvent.type(screen.getByLabelText("Importo"), "300");
+    await userEvent.click(screen.getByLabelText("Già pagato"));
+    expect(screen.queryByTestId("overpaid-warning")).toBeNull();
+    expect(screen.getByRole("button", { name: "Registra" })).toBeTruthy();
+  });
+
+  it("REV-5: the typed agreed amount survives a status change but is saved only when agreed", async () => {
+    mocks.actions.updateItemAction.mockResolvedValue({ ok: true, data: { version: 3 } });
+    render(
+      <ItemSheet
+        open
+        onOpenChange={() => {}}
+        categoryId="cat"
+        item={menu}
+        partnerName="Jessica"
+        onStale={() => {}}
+      />,
+    );
+    await userEvent.click(screen.getByRole("radio", { name: "Previsto" }));
+    expect(screen.queryByLabelText("Importo concordato")).toBeNull();
+    await userEvent.click(screen.getByRole("radio", { name: "Concordato" }));
+    expect((screen.getByLabelText("Importo concordato") as HTMLInputElement).value).toBe(
+      "5.200,00",
+    );
+    await userEvent.click(screen.getByRole("radio", { name: "Annullata" }));
+    await userEvent.click(screen.getByRole("button", { name: "Salva" }));
+    expect(mocks.actions.updateItemAction).toHaveBeenCalledWith({
+      itemId: "item-menu",
+      version: 2,
+      item: expect.objectContaining({ status: "cancelled", agreedCents: null }),
+    });
+  });
+
+  it("'Segna pagato' on a stale payment opens the conflict dialog and retries on the new version", async () => {
+    mocks.actions.updatePaymentAction
+      .mockResolvedValueOnce({
+        ok: false,
+        code: "conflict",
+        message: "Qualcuno ha modificato questo elemento mentre lo guardavi.",
+        conflict: {
+          current: {
+            kind: "deposit",
+            amountCents: 120_000,
+            dueDate: "2026-12-01",
+            paid: false,
+            paidOn: null,
+            version: 4,
+          },
+          changedByName: "Jessica",
+          changedAt: new Date().toISOString(),
+        },
+      })
+      .mockResolvedValueOnce({ ok: true, data: { version: 5 } });
+    render(
+      <BudgetOverview
+        snapshot={snapshot({ ...withTotal(2_500_000), items: [menu], payments: [pay()] })}
+        today={TODAY}
+      />,
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Segna pagato" }));
+    await screen.findByText(/Jessica ha modificato questo elemento/);
+    await userEvent.click(screen.getByRole("button", { name: "Salva comunque" }));
+    await waitFor(() =>
+      expect(mocks.actions.updatePaymentAction).toHaveBeenLastCalledWith(
+        expect.objectContaining({ paymentId: "pay-1", version: 4 }),
+      ),
+    );
+    await waitFor(() => expect(mocks.toast).toHaveBeenCalledWith("Pagamento segnato come pagato."));
+  });
+});

@@ -53,10 +53,17 @@ export async function currentWeddingId(db: Db): Promise<string> {
 
 /**
  * Seeds the 11 predefined categories (AC34) that are still missing, idempotently by `default_key`
- * (a deleted one still counts as present, so it never comes back by itself). A concurrent seed by
- * the other partner (23505) or a read-only role (42501) is not an error: the page shows what exists.
+ * (a deleted one still counts as present, so it never comes back by itself). Called by T10 right
+ * after `complete_onboarding`; `/budget` keeps a lazy fallback for weddings that predate it.
+ * Only a concurrent seed by the other partner (23505) is tolerated; every other failure
+ * (a role without `budget:write` = 42501 included) is thrown as a `BudgetLoadError`.
  */
-export async function ensureDefaultCategories(db: Db, weddingId: string): Promise<void> {
+export async function seedDefaultCategories(db: Db, weddingId?: string): Promise<void> {
+  const wedding = weddingId ?? (await currentWeddingId(db));
+  return seedFor(db, wedding);
+}
+
+async function seedFor(db: Db, weddingId: string): Promise<void> {
   const existing = must(
     await db
       .from("budget_categories")
@@ -76,7 +83,7 @@ export async function ensureDefaultCategories(db: Db, weddingId: string): Promis
       sort_order: c.sortOrder,
     })),
   );
-  if (inserted.error && inserted.error.code !== "23505" && inserted.error.code !== "42501") {
+  if (inserted.error && inserted.error.code !== "23505") {
     throw new BudgetLoadError("Budget: categorie predefinite", inserted.error);
   }
 }
@@ -89,10 +96,16 @@ async function loadPartners(db: Db): Promise<PartnerRow[]> {
   return rows as PartnerRow[];
 }
 
-/** Everything the Budget screens show: total history, live categories, items and payments. */
-export async function loadBudget(db: Db, context: { userId: string }): Promise<BudgetSnapshot> {
+/**
+ * Everything the Budget screens show: total history, live categories, items and payments.
+ * `seedMissing` (only the `/budget` overview) is the lazy fallback of `seedDefaultCategories`.
+ */
+export async function loadBudget(
+  db: Db,
+  context: { userId: string; seedMissing?: boolean },
+): Promise<BudgetSnapshot> {
   const weddingId = await currentWeddingId(db);
-  await ensureDefaultCategories(db, weddingId);
+  if (context.seedMissing) await seedFor(db, weddingId);
   const [versions, categories, items, payments, partners] = await Promise.all([
     db.from("budget_versions").select("*").eq("wedding_id", weddingId),
     db.from("budget_categories").select("*").eq("wedding_id", weddingId).is("deleted_at", null),
@@ -324,27 +337,28 @@ export async function moveAndDeleteCategory(
 ): Promise<ActionResult<{ moved: number; version: number }>> {
   const moved = await db.rpc("move_budget_items", { p_from: input.fromId, p_to: input.toId });
   if (moved.error) return failure(moved.error);
+  const count = moved.data ?? 0;
+  // The move is done and cannot be undone here: any later failure must say so (the caller refreshes).
+  const half = (): ActionResult<never> => ({
+    ok: false,
+    code: "moved_not_deleted",
+    message:
+      count > 0
+        ? "Ho spostato le voci, ma non sono riuscito a eliminare la categoria. Riprova."
+        : "Non sono riuscito a eliminare la categoria. Riprova.",
+  });
   const row = await db
     .from("budget_categories")
     .select("version")
     .eq("id", input.fromId)
     .maybeSingle();
-  if (row.error) return failure(row.error);
-  if (!row.data) return failure({ message: "not_found" });
+  if (row.error || !row.data) return half();
   const deleted = await removeCategory(db, userId, {
     categoryId: input.fromId,
     version: row.data.version,
   });
-  if (deleted.ok)
-    return { ok: true, data: { moved: moved.data ?? 0, version: deleted.data.version } };
-  if (deleted.code === "conflict") {
-    return {
-      ok: false,
-      code: "category_changed",
-      message: "Qualcuno ha modificato questa categoria mentre la spostavi. Riprova.",
-    };
-  }
-  return { ok: false, code: deleted.code, message: deleted.message };
+  if (deleted.ok) return { ok: true, data: { moved: count, version: deleted.data.version } };
+  return half();
 }
 
 export async function addItem(

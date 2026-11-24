@@ -5,7 +5,7 @@ import {
   addCategory,
   addItem,
   addPayment,
-  ensureDefaultCategories,
+  BudgetLoadError,
   loadBudget,
   moveAndDeleteCategory,
   removeCategory,
@@ -13,7 +13,9 @@ import {
   removePayment,
   restoreCategory,
   restoreItem,
+  seedDefaultCategories,
   setTotal,
+  type Db,
   updateCategory,
   updateItem,
   updatePayment,
@@ -63,16 +65,16 @@ describe("budget data", () => {
   beforeAll(async () => {
     wedding = await createWedding();
     partnerB = await addPartnerB(wedding);
+    await seedDefaultCategories(wedding.founderClient);
   });
 
-  it("seeds the 11 defaults once, even when two people open the page together", async () => {
-    const [a, b] = await Promise.all([
-      loadBudget(db(), me()),
-      loadBudget(partnerB.client, { userId: partnerB.user.id }),
+  it("seedDefaultCategories is idempotent, even when both partners run it together", async () => {
+    await Promise.all([
+      seedDefaultCategories(db()),
+      seedDefaultCategories(partnerB.client),
+      seedDefaultCategories(db()),
     ]);
-    expect(a.categories.length).toBeGreaterThanOrEqual(DEFAULT_BUDGET_CATEGORIES.length);
-    expect(b.categories.length).toBeGreaterThanOrEqual(DEFAULT_BUDGET_CATEGORIES.length);
-    await ensureDefaultCategories(db(), a.weddingId);
+    const a = await loadBudget(db(), me());
     const rows = await db()
       .from("budget_categories")
       .select("default_key")
@@ -81,6 +83,42 @@ describe("budget data", () => {
     expect(keys).toHaveLength(DEFAULT_BUDGET_CATEGORIES.length);
     expect(new Set(keys).size).toBe(keys.length);
     expect(a.categories.map((c) => c.name)).toContain("Catering");
+  });
+
+  it("a plain read writes nothing; only the overview's lazy fallback seeds an old wedding", async () => {
+    const old = await createWedding();
+    const ctx = { userId: old.founder.id };
+    expect((await loadBudget(old.founderClient, ctx)).categories).toEqual([]);
+    const seeded = await loadBudget(old.founderClient, { ...ctx, seedMissing: true });
+    expect(seeded.categories).toHaveLength(DEFAULT_BUDGET_CATEGORIES.length);
+  });
+
+  it("a seed refused by the database is an error, not an empty page", async () => {
+    const refusing = {
+      from: () => ({
+        select: () => ({
+          eq: () => ({ not: async () => ({ data: [], error: null }) }),
+        }),
+        insert: async () => ({ error: { code: "42501", message: "denied" } }),
+      }),
+    } as unknown as Db;
+    await expect(seedDefaultCategories(refusing, "w")).rejects.toBeInstanceOf(BudgetLoadError);
+  });
+
+  it("after the move, a failure says the items were moved and asks for a refresh", async () => {
+    const failing = {
+      rpc: async () => ({ data: 2, error: null }),
+      from: () => ({
+        select: () => ({
+          eq: () => ({
+            maybeSingle: async () => ({ data: null, error: { message: "fetch failed" } }),
+          }),
+        }),
+      }),
+    } as unknown as Db;
+    const result = await moveAndDeleteCategory(failing, "u", { fromId: "a", toId: "b" });
+    expect(result).toMatchObject({ ok: false, code: "moved_not_deleted" });
+    if (!result.ok) expect(result.message).toContain("Ho spostato le voci");
   });
 
   it("a total is a new version: nothing is overwritten, newest first, author and reason kept", async () => {

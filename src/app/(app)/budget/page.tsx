@@ -7,6 +7,6 @@ export const metadata: Metadata = { title: "Budget" };
 
 export default async function BudgetRoute() {
   const { db, userId, today } = await pageContext();
-  const snapshot = await loadBudget(db, { userId });
+  const snapshot = await loadBudget(db, { userId, seedMissing: true });
   return <BudgetOverview snapshot={snapshot} today={today} />;
 }

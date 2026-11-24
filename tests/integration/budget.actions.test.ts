@@ -1,5 +1,5 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { loadBudget } from "@/features/budget/data";
+import { loadBudget, seedDefaultCategories } from "@/features/budget/data";
 import type { BudgetSnapshot } from "@/features/budget/types";
 import { anonClient, createWedding, type TestClient, type TestWedding } from "../support/supabase";
 
@@ -43,6 +43,7 @@ describe("budget server actions", () => {
 
   beforeAll(async () => {
     wedding = await createWedding();
+    await seedDefaultCategories(wedding.founderClient);
     await reload();
     categoryId = snapshot.categories.find((c) => c.defaultKey === "catering")!.id;
   });

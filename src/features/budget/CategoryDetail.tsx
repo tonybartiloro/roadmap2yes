@@ -92,10 +92,11 @@ export function CategoryDetail({
     });
   }
 
-  async function undoCategory(version: number, name: string) {
+  async function undoCategory(version: number, name: string, movedTo?: string) {
     const restored = await restoreCategoryAction({ categoryId: category!.id, version });
-    if (restored.ok) toast(`«${name}» è tornata.`);
-    else toast.error(restored.message);
+    if (!restored.ok) toast.error(restored.message);
+    else if (movedTo) toast(`«${name}» è tornata, vuota. Le voci restano in «${movedTo}».`);
+    else toast(`«${name}» è tornata.`);
   }
 
   async function deleteCategory() {
@@ -127,14 +128,24 @@ export function CategoryDetail({
     const target = snapshot.categories.find((c) => c.id === toId)?.name ?? "l'altra categoria";
     const result = await moveAndDeleteCategoryAction({ fromId: category.id, toId });
     if (!result.ok) {
-      if (result.code === "category_deleted" || result.code === "category_not_found") refresh();
+      // After a partial success the page must show the items where they are now.
+      if (
+        result.code === "moved_not_deleted" ||
+        result.code === "category_deleted" ||
+        result.code === "category_not_found"
+      ) {
+        refresh();
+      }
       return result;
     }
     toast(
       `${plural(result.data.moved, "voce spostata", "voci spostate")} in «${target}». «${name}» è stata eliminata.`,
       {
         duration: UNDO_MS,
-        action: { label: "Annulla", onClick: () => undoCategory(result.data.version, name) },
+        action: {
+          label: "Annulla",
+          onClick: () => undoCategory(result.data.version, name, target),
+        },
       },
     );
     router.push("/budget");
