@@ -24,3 +24,16 @@ Test gaps (note, not blocking): no test for the `markPaid` conflict path in `use
 ## Questions for the developer
 1. REV-1: is lazy seeding on first visit intentional because already-created weddings (T8/T10) have no categories? If so, say it in plan §6; if not, seed at wedding creation.
 2. REV-4: is the single-tap "Registra comunque" the intended reading of plan §6 "Pagato > Concordato (conferma)"?
+
+## Round 2
+
+Verdict: approved. Verified `git show bc5a87d`; `npx vitest run src/features/budget` 43/43 green.
+
+| ID | Result |
+|---|---|
+| REV-1 | Closed. `seedDefaultCategories` is exported (`data.ts`, `seed.ts` server-only) for T10; `loadBudget` seeds only with `seedMissing`, passed by `/budget` alone; `[id]` no longer writes; 42501 is thrown, only 23505 tolerated. Follow-up for T10: call it after `complete_onboarding`, and record the lazy fallback in plan §6. Note: a role without write access now sees the `/budget` error page, as decided. |
+| REV-2 | Closed. Any failure after the move returns `moved_not_deleted` with the explicit message; the UI refreshes; data and component tests added. |
+| REV-3 | Closed. Undo toast says the category is back empty and the items stay in the destination. |
+| REV-4 | Closed. `overCents` is 0 for a non-agreed item; single-tap confirmation accepted by the coordinator. |
+| REV-5 | Closed. The typed agreed amount is kept in form state across status changes and saved only when the status is agreed. |
+| REV-6 | Closed. Follow-up outside T13: move `form-bits` to `src/components`. |
