@@ -21,7 +21,7 @@ import {
   strayAccount,
   test,
 } from "./support/fixtures";
-import { clearMailbox, listMessagesTo } from "./support/mailbox";
+import { listMessagesTo } from "./support/mailbox";
 import { seedWedding } from "./support/seed";
 import { uniqueEmail } from "../tests/support/supabase";
 
@@ -144,7 +144,6 @@ test.describe("neutral errors and temporary block (AC2, AC54)", () => {
     page,
     ip,
   }) => {
-    await clearMailbox();
     const founder = await newFounder();
     const unknown = uniqueEmail("nobody");
     await openLogin(page, ip);

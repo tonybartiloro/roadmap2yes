@@ -27,9 +27,18 @@ const skip = (page: Page) => page.getByTestId("step-skip");
 async function landOnHome(page: Page) {
   const summary = page.getByTestId("onboarding-summary");
   const home = page.getByRole("heading", { name: /^Ciao/ });
-  await expect(summary.or(home).first()).toBeVisible({ timeout: 30_000 });
-  if (await summary.isVisible().catch(() => false)) await page.getByTestId("summary-home").click();
-  await expect(home).toBeVisible({ timeout: 30_000 });
+  // (the summary may flash for a few ms before the redirect, see QA-2: never click it blindly)
+  const deadline = Date.now() + 30_000;
+  while (Date.now() < deadline && !(await home.isVisible().catch(() => false))) {
+    if (await summary.isVisible().catch(() => false)) {
+      await page
+        .getByTestId("summary-home")
+        .click({ timeout: 1_000 })
+        .catch(() => undefined);
+    }
+    await page.waitForTimeout(100);
+  }
+  await expect(home).toBeVisible({ timeout: 5_000 });
   await expect(page).toHaveURL(/\/$/);
 }
 

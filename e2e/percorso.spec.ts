@@ -16,7 +16,7 @@
  */
 import type { Page } from "@playwright/test";
 import { loginAs } from "./support/auth";
-import { expect, serviceClient, test, uniqueIp } from "./support/fixtures";
+import { expect, newSession, serviceClient, test, uniqueIp } from "./support/fixtures";
 import { addTask, decisionId, romeDate, seedWedding } from "./support/seed";
 
 test.describe.configure({ timeout: 60_000 });
@@ -208,6 +208,23 @@ test.describe("filters (AC30)", () => {
   });
 });
 
+// [QA-3 DEFECT, copy] With a partner who has no name the quick filter reads "Di il tuo partner"
+// (ungrammatical Italian). Expected e.g. "Del tuo partner". Kept failing until fixed.
+test("[QA-3] the 'Di {partner}' shortcut reads correctly when the partner has no name", async ({
+  page,
+}) => {
+  const w = await seedWedding({ templateTasks: false });
+  await serviceClient()
+    .from("wedding_partners")
+    .update({ first_name: null, label: null })
+    .eq("wedding_id", w.weddingId)
+    .eq("slot", "B");
+  await loginAs(page, w.wedding.founder, uniqueIp());
+  await page.goto("/percorso");
+  const label = await page.getByTestId("assignee-shortcut-partner").innerText();
+  expect(label).not.toMatch(/\bDi il\b/);
+});
+
 test.describe("tasks (AC31)", () => {
   test("add, edit, complete, reopen, delete with Annulla >= 8 s, restore from 'Eliminati di recente'", async ({
     page,
@@ -332,6 +349,65 @@ test.describe("tasks (AC31)", () => {
     await page.reload();
     await openAllGroups(page);
     await expect(row(page, title)).toHaveCount(0);
+  });
+});
+
+test.describe("two partners on the same task (AC40)", () => {
+  test("the second save does not overwrite silently: a dialog names the partner and offers the three actions", async ({
+    page,
+    browser,
+  }, testInfo) => {
+    const w = await seedWedding({ templateTasks: false, names: { a: "Tony", b: "Jessica" } });
+    await addTask(w, { title: "Prenotare il fotografo", due: romeDate(10) });
+    await loginAs(page, w.wedding.founder, uniqueIp());
+    await page.goto("/percorso");
+    const b = await newSession(browser, testInfo);
+    await loginAs(b.page, w.partnerB!.user, uniqueIp());
+    await b.page.goto("/percorso");
+
+    // both open the same task in edit mode
+    for (const p of [page, b.page]) {
+      await row(p, "Prenotare il fotografo").getByTestId("task-title").click();
+      await p.getByTestId("task-edit").click();
+    }
+    // Jessica saves first
+    await b.page.getByTestId("task-form").getByLabel("Note").fill("Chiedere il listino a Jessica");
+    await b.page.getByTestId("task-form").getByRole("button", { name: "Salva" }).click();
+    await expect(b.page.getByText("Modifiche salvate.")).toBeVisible();
+    // Tony saves a different change on the old version
+    await page.getByTestId("task-form").getByLabel("Note").fill("Nota di Tony");
+    await page.getByTestId("task-form").getByRole("button", { name: "Salva" }).click();
+
+    const dialog = page.getByRole("alertdialog");
+    await expect(dialog).toContainText("Jessica ha modificato questo elemento");
+    await expect(dialog.getByRole("button", { name: "Vedi cosa è cambiato" })).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "Salva comunque" })).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "Annulla" })).toBeVisible();
+    await dialog.getByRole("button", { name: "Vedi cosa è cambiato" }).click();
+    await expect(dialog).toContainText("Note"); // the field is named in words, not by its column
+    await expect(dialog).toContainText("Chiedere il listino a Jessica");
+    // nothing was overwritten yet
+    const mid = await serviceClient()
+      .from("tasks")
+      .select("notes")
+      .eq("wedding_id", w.weddingId)
+      .single();
+    expect(mid.data?.notes).toBe("Chiedere il listino a Jessica");
+
+    await dialog.getByRole("button", { name: "Salva comunque" }).click();
+    await expect
+      .poll(
+        async () =>
+          (
+            await serviceClient()
+              .from("tasks")
+              .select("notes")
+              .eq("wedding_id", w.weddingId)
+              .single()
+          ).data?.notes,
+      )
+      .toBe("Nota di Tony");
+    await b.context.close();
   });
 });
 

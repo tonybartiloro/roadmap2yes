@@ -187,3 +187,42 @@ test("Info: version and the heartbeat of the daily job (AC44)", async ({ page })
   await expect(page.getByTestId("info-version")).toHaveText(/^\d+\.\d+\.\d+/);
   await expect(page.getByTestId("info-heartbeat")).toBeVisible();
 });
+
+test("offline: the banner appears and what was typed survives a reload once back online (AC39)", async ({
+  page,
+  context,
+}) => {
+  const w = await seedWedding({ names: { a: "Tony", b: "Jessica" } });
+  await loginAs(page, w.wedding.founder, uniqueIp());
+  await page.goto("/altro/profili");
+  const lastName = page.getByTestId("profile-me-form").getByLabel("Cognome");
+  await expect(lastName).toBeVisible();
+
+  await context.setOffline(true);
+  await page.evaluate(() => window.dispatchEvent(new Event("offline")));
+  await expect(page.getByText("Sei offline. Le modifiche non sono ancora salvate.")).toBeVisible();
+  await lastName.fill("Bozza offline");
+  await context.setOffline(false);
+  await page.evaluate(() => window.dispatchEvent(new Event("online")));
+  await expect(page.getByText("Sei offline")).toHaveCount(0);
+
+  // the draft is kept on this device: a reload shows it, and nothing was saved on the server
+  await page.reload();
+  await expect(page.getByTestId("profile-me-form").getByLabel("Cognome")).toHaveValue(
+    "Bozza offline",
+  );
+  const row = await serviceClient()
+    .from("wedding_partners")
+    .select("last_name")
+    .eq("wedding_id", w.weddingId)
+    .eq("slot", "A")
+    .single();
+  expect(row.data?.last_name).not.toBe("Bozza offline");
+  // saving then clears the draft
+  await page.getByTestId("profile-me-save").click();
+  await expect(page.getByText("Salvato.").first()).toBeVisible();
+  await page.reload();
+  await expect(page.getByTestId("profile-me-form").getByLabel("Cognome")).toHaveValue(
+    "Bozza offline",
+  );
+});

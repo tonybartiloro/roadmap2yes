@@ -19,13 +19,7 @@
 import type { Page } from "@playwright/test";
 import { LOGIN_TEXTS, loginAs, openLogin, signOut, submitLogin } from "./support/auth";
 import { expect, newSession, serviceClient, test, uniqueIp } from "./support/fixtures";
-import {
-  CLI_MAILPIT_URL,
-  clearMailbox,
-  extractLinks,
-  listMessagesTo,
-  waitForMessage,
-} from "./support/mailbox";
+import { CLI_MAILPIT_URL, extractLinks, listMessagesTo, waitForMessage } from "./support/mailbox";
 import { seedWedding } from "./support/seed";
 import { randomCode, uniqueEmail } from "../tests/support/supabase";
 
@@ -291,11 +285,9 @@ test.describe("email rules (AC58)", () => {
   });
 });
 
+// The catcher is shared by the parallel workers (mobile + desktop): never clear it, every test uses
+// its own unique recipient address.
 test.describe("invite by email (smtp)", () => {
-  test.beforeEach(async () => {
-    await clearMailbox();
-  });
-
   test("link -> B chooses the code -> enters; used link is dead; 'Invia di nuovo' kills the previous link (AC5, AC6, AC7)", async ({
     page,
     browser,
@@ -424,7 +416,6 @@ test.describe("forgot the code, with emails on (AC57, D52)", () => {
     page,
     browser,
   }, testInfo) => {
-    await clearMailbox({ baseUrl: CLI_MAILPIT_URL }).catch(() => undefined);
     const { partnerB } = await seedWedding();
     const b0 = partnerB!;
     await openLogin(page, uniqueIp());
