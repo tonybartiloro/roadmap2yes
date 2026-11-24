@@ -86,7 +86,7 @@ test("on the day itself the countdown says so; after it, it says how long ago (A
   await setNow(context, baseURL!, "2027-09-06T10:00:00Z");
   await page.goto("/");
   await expect(page.getByRole("region", { name: "Conto alla rovescia" })).toContainText(
-    /È passato 3 giorni/,
+    /Sono passati 3 giorni/,
   );
 });
 
