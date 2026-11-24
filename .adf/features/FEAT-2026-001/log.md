@@ -532,3 +532,17 @@ Developer's answers to the 4 remaining questions: 1. OK (min 10 characters, lett
 - Approved: the 3 Supabase Auth settings (`enable_confirmations`, `double_confirm_changes`, `secure_password_change`), locally and on the remote checklist, plus the residual risk R26 for R1.
 - This also approves the architect's plan changes from the T2 security review (§4.8 and the account contract).
 - Next: T7a.
+
+## F3 — exit — 2026-11-24
+- All 24 tasks and T0 are built and reviewed.
+- Security rounds: code-6 (T2), code-13 (T16), code-14 (T7a), code-16 (T7b).
+- QA run 1 found 8 defects, all fixed. The design check (design-1) had 5 should and 9 nits, all fixed or answered.
+- Final integrated run: adf verify pass, pgTAP 956, integration 742, e2e 209/210 (one cold-start flake, since made deterministic).
+- Developer actions in F3: P2 approved; the formatting churn in two generated/helper files was discarded at the developer's request.
+- Follow-ups (not blocking R1):
+  - move `features/decisions` form-bits to `src/components`;
+  - QA to add an e2e for AC25 rite-specific tasks and AC7 (wrong-account link);
+  - real WebKit run in CI;
+  - Resend and AC9 after the domain exists;
+  - a B "change your initial code" hint on Home, if wanted.
+- Next: F4 documentation (T18).
