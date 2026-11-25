@@ -1,42 +1,42 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { useEffect, useRef } from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+
+type Shell = { hasNavigated: (currentPath: string) => boolean };
+
+const GuideShellContext = createContext<Shell | null>(null);
 
 /**
- * True for the instant a FocusHeading was unmounted (cleared right after the commit).
- * A new instance that mounts in the same commit was reached from a Guide page.
+ * Wraps every page of the Guide (`guida/layout.tsx`). The layout stays mounted while the
+ * reader moves between Guide pages and mounts anew when arriving from another section, so
+ * the path it first rendered with is "where this visit to the Guide started" (first load,
+ * or the arrival from elsewhere). No timers, no module state: it does not depend on when a
+ * page mounts (skeletons, late hydration, back/forward).
  */
-let justLeftGuide = false;
+export function GuideShell({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
+  const [shell] = useState<Shell>(() => {
+    let navigated = false;
+    return {
+      // True once a page other than the one the visit started on has been seen.
+      hasNavigated: (path) => (navigated ||= path !== pathname),
+    };
+  });
+  return <GuideShellContext.Provider value={shell}>{children}</GuideShellContext.Provider>;
+}
 
 /**
- * Moves focus to the page title only when the navigation started inside the Guide
- * (/guida -> /guida/x, x -> y, back to the index). Never on the first load of the
- * document and never when arriving from another section. Renders nothing; the title
- * (`id`, `tabIndex={-1}`) is rendered by the server.
+ * Moves focus to the page title once the reader has moved from one Guide page to another.
+ * The first page of a visit (document load, or arrival from another section) is left
+ * alone. Renders nothing; the title (`id`, `tabIndex={-1}`) is rendered by the server.
  */
 export function FocusHeading({ targetId }: { targetId: string }) {
+  const shell = useContext(GuideShellContext);
   const pathname = usePathname();
-  const lastPath = useRef<string | null>(null);
-
   useEffect(() => {
-    const first = lastPath.current === null;
-    const changed = !first && lastPath.current !== pathname;
-    lastPath.current = pathname;
-    if ((first && justLeftGuide) || changed) {
-      document.getElementById(targetId)?.focus();
-    }
-  }, [pathname, targetId]);
-
-  useEffect(
-    () => () => {
-      justLeftGuide = true;
-      setTimeout(() => {
-        justLeftGuide = false;
-      }, 0);
-    },
-    [],
-  );
-
+    if (!shell) return;
+    if (shell.hasNavigated(pathname)) document.getElementById(targetId)?.focus();
+  }, [shell, pathname, targetId]);
   return null;
 }

@@ -115,6 +115,30 @@ test.describe("links, focus and hidden changelog (AC3)", () => {
     await expect(page.locator("h1")).toHaveText(h1Of("home-e-novita"));
   });
 
+  test("focus goes to the title from index to page, not when arriving from another section", async ({
+    page,
+  }) => {
+    await enter(page);
+    // arriving from the options section (href, so the label can change): no focus
+    await page.goto("/altro");
+    await nav(page).getByRole("link", { name: "Guida" }).click();
+    await expect(page).toHaveURL(/\/guida$/);
+    await expect(page.locator("h1")).toHaveText("Guida");
+    await expect(page.locator("h1")).not.toBeFocused();
+
+    // index -> page: focus on the title
+    await page.getByRole("main").locator("ul li a").first().click();
+    await expect(page).toHaveURL(/\/guida\/[a-z0-9-]+$/);
+    await expect(page.locator("h1")).toBeFocused();
+
+    // and back from another section again: no focus
+    await page.goto("/altro");
+    await nav(page).getByRole("link", { name: "Guida" }).click();
+    await expect(page).toHaveURL(/\/guida$/);
+    await page.getByRole("main").locator("ul li a").first().click();
+    await expect(page.locator("h1")).toBeFocused();
+  });
+
   test("no page shows the 'Storico delle modifiche' or a technical reference", async ({ page }) => {
     await enter(page);
     for (const { slug } of readmeRows()) {

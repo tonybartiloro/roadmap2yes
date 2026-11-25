@@ -53,7 +53,9 @@ export function checkIndex(readme: string, slugs: readonly string[]): string[] {
 }
 
 async function readGuide(): Promise<Guide> {
-  const dir = join(process.cwd(), ...DOCS_DIR);
+  // Files are shipped by `outputFileTracingIncludes` (next.config.ts); without the ignore hint
+  // Turbopack would trace the whole project for this dynamic path.
+  const dir = join(/*turbopackIgnore: true*/ process.cwd(), ...DOCS_DIR);
   // A missing folder throws: the error page is better than an empty Guide.
   const files = await readdir(dir);
   const slugs = listSlugs(files);
