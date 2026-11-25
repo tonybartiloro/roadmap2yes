@@ -55,7 +55,7 @@ export function AppNav({ items = NAV_ITEMS }: { items?: readonly NavItem[] }) {
                 href={href}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "text-muted-foreground relative flex min-h-14 flex-col items-center justify-center gap-0.5 px-0.5 text-xs md:min-h-14 md:px-1 md:rounded-md lg:flex-row lg:justify-start lg:gap-3 lg:px-3 lg:text-base",
+                  "text-muted-foreground relative flex min-h-14 flex-col items-center justify-center gap-0.5 px-0.5 text-xs tracking-tight md:min-h-14 md:tracking-normal md:px-1 md:rounded-md lg:flex-row lg:justify-start lg:gap-3 lg:px-3 lg:text-base",
                   active && "text-primary font-semibold",
                   !active && "hover:text-foreground",
                 )}
