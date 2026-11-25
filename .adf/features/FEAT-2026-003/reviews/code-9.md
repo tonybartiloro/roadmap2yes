@@ -32,3 +32,12 @@ Test-only commit 4058f7a (acceptance export keys) is fine.
 - **REV-42**: fatto: alias `E-mail`, `mail`, `Cellulare`, `tel`, `cell` nell'intestazione; in una lista a colonna singola, una prima riga come "Nome e cognome" / "Invitati" / "Nominativo" ... da' un avviso ("sembra un titolo"), senza saltarla in silenzio.
 - **REV-43**: fatto: `line` e' la riga fisica (conta gli a capo dentro le virgolette, CRLF una volta); `source` di una virgoletta non chiusa e' tagliato a 500 caratteri e l'errore dice che il testo seguente e' incluso. Test.
 - **REV-44**: preso, spetta a B (azione di import): nessun log di errori/avvisi/source; risposta con conteggi e testi fissi; test con spia su `console`.
+
+## Closure (reviewer, c22fb95)
+- REV-39 CLOSED, and A's version is the right one: mine was not injective (`''=ok` would have come back as `'=ok`). Checked: export `e(v) = "'" + v` iff `v` matches `^'*T`; import strips one apostrophe iff the cell matches `^'+T`, a strict subset of `^'*T`. Case 1 (v matches): `e(v)` matches `^'+T`, strip gives `v`. Case 2 (v does not match): `e(v) = v` does not match `^'+T`, unchanged. Exact inverse (`csv.ts:14`, `csv-import.ts` `stripFormulaGuard`); a `+` is still neutralised; test with `'=ok` at `csv-import.test.ts:406`. Only trim-level normalisation remains (a leading TAB is trimmed on import, as every text field is).
+- REV-40 CLOSED in `20261202200000_guests_import.sql` (see code-11).
+- REV-41 CLOSED (`decodeCsvBytes` rejects NUL for every encoding; `parseGuestsCsv` drops it).
+- REV-42 CLOSED: aliases and "sembra un titolo" warning (only on the first row of a one-column list). New nit REV-52: `HEADER_ALIASES[name]` is a plain object lookup, so a header cell `constructor` yields a function from the prototype; harmless today (it fails `COLUMN_SET.has` and the line is data) but use `Object.hasOwn` or a `Map`.
+- REV-43 CLOSED: physical lines (CRLF once, quoted breaks counted) with a test (`:103`); unclosed-quote `source` capped at 500 and the message says the rest is included. A single huge, properly closed field still has its full `source` (see REV-48 in code-10, cap it where it is rendered).
+- REV-44 stays with T13: `import-actions.ts` logs nothing and returns fixed texts (checked in code-10); the console-spy test is T13's.
+- `csv-import.test.ts` and `export.test.ts`: 58/58 pass. Verdict for T11: **approved** (REV-52 nit open).
