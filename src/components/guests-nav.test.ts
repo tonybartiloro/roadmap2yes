@@ -33,6 +33,30 @@ describe("shouldShowGuestsNav", () => {
     expect(await shouldShowGuestsNav(fakeDb(ok({ id: "w" }), ok(false)))).toBe(false);
   });
 
+  it("a slow database (aborted by the timeout) keeps the item", async () => {
+    // Never answers; rejects only when the signal passed to `abortSignal` fires.
+    const hanging = (): Record<string, unknown> => {
+      let signal: AbortSignal | undefined;
+      const b: Record<string, unknown> = {};
+      const wait = () =>
+        new Promise<Reply>((_, reject) => {
+          signal?.addEventListener("abort", () => reject(signal?.reason));
+        });
+      b["select"] = () => b;
+      b["limit"] = () => b;
+      b["abortSignal"] = (s: AbortSignal) => {
+        signal = s;
+        return b;
+      };
+      b["maybeSingle"] = wait;
+      b["then"] = (resolve: (r: Reply) => unknown, reject: (e: unknown) => unknown) =>
+        wait().then(resolve, reject);
+      return b;
+    };
+    const db = { from: hanging, rpc: hanging } as unknown as SupabaseClient<Database>;
+    expect(await shouldShowGuestsNav(db, 1)).toBe(true);
+  });
+
   it("is fail-open: errors, a thrown query and no visible wedding keep the item", async () => {
     expect(await shouldShowGuestsNav(fakeDb(fail, ok(false)))).toBe(true);
     expect(await shouldShowGuestsNav(fakeDb(ok({ id: "w" }), fail))).toBe(true);

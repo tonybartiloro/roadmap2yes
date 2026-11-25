@@ -265,11 +265,14 @@ test("'Aiuto' fits at 320 px: 44 px target, beside the title, no sideways scroll
     );
     expect(overflow, `${route}: sideways scroll`).toBeLessThanOrEqual(0);
   }
-  // The Percorso "Cos'è?" popover is a different control with another icon.
+  // The Percorso "Cos'è?" popover is a different control: not named "Aiuto", and only one Aiuto link.
   await page.goto("/percorso");
-  await expect(page.getByTestId("percorso-header").getByRole("link", { name: "Aiuto" })).toHaveCount(
-    1,
-  );
+  const header = page.getByTestId("percorso-header");
+  await expect(header.getByRole("link", { name: "Aiuto" })).toHaveCount(1);
+  // "Cos'è?" only exists once the wedding has a reference date.
+  if ((await header.getByTestId("reference-help").count()) > 0) {
+    await expect(header.getByTestId("reference-help")).not.toHaveAccessibleName(/Aiuto/);
+  }
 });
 
 test.describe("document title and structure (AC6)", () => {

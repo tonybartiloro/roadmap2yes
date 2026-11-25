@@ -187,6 +187,23 @@ describe("Impostazioni nozze (AC16, AC48)", () => {
     expect(screen.queryByTestId("settings-guests")).toBeNull();
   });
 
+  it("while the band is computed, saving sends the stored band, not a restored draft's (REV-21)", async () => {
+    window.localStorage.setItem("r2y-draft:u:w:settings", JSON.stringify({ guestBand: "80_120" }));
+    try {
+      mocks.saveSettingsAction.mockResolvedValue({ ok: true, data: { version: 5 } });
+      render(<SettingsForm view={{ ...view, guestCount: 62 }} scope="u:w" />);
+      const rite = await screen.findByTestId("settings-rite");
+      fireEvent.click(rite.querySelector('[value="religioso"]')!);
+      fireEvent.click(screen.getByTestId("settings-save"));
+      await waitFor(() => expect(mocks.saveSettingsAction).toHaveBeenCalled());
+      expect(mocks.saveSettingsAction.mock.calls.at(-1)?.[0]).toMatchObject({
+        guestBand: "50_80",
+      });
+    } finally {
+      window.localStorage.clear();
+    }
+  });
+
   it("with an empty list (or no table yet) the band stays editable", async () => {
     render(<SettingsForm view={view} scope="u:w" />);
     expect(await screen.findByTestId("settings-guests")).toBeTruthy();

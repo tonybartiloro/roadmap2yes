@@ -123,10 +123,14 @@ function Form({
     router.refresh();
   }
 
+  // While the band is computed from the list it is never edited: send the stored one, not a
+  // value restored from a local draft made when the list was empty (BR6).
+  const guestBand = view.guestCount > 0 ? view.guestBand : value.guestBand;
+
   const body = (version: number) => ({
     version,
     rite: value.rite,
-    guestBand: value.guestBand,
+    guestBand,
     styleLabel: value.styleLabel,
     styleNote: value.styleNote,
     region: value.region,
@@ -140,7 +144,7 @@ function Form({
       const result: VersionedResult = await saveSettingsAction(body(view.version));
       const mine = {
         rite: value.rite,
-        guestBand: value.guestBand,
+        guestBand,
         styleLabel: value.styleLabel,
         styleNote: value.styleNote,
         region: value.region,

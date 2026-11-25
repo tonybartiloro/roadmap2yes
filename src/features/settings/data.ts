@@ -94,8 +94,8 @@ function partnerNameOf(rows: readonly PartnerRow[], userId: string): string {
   return displayName(other ? { firstName: other.first_name, label: other.label } : null);
 }
 
-/** SQLSTATE / PostgREST codes of "the table is not there yet" (migration not applied). */
-const MISSING_TABLE_CODES: ReadonlySet<string> = new Set(["42P01", "PGRST205", "PGRST202"]);
+/** SQLSTATE / PostgREST codes meaning "the table is not there yet" (migration not applied). */
+const MISSING_TABLE_CODES: ReadonlySet<string> = new Set(["42P01", "PGRST205"]);
 
 /**
  * People on the guest list (not deleted, RLS decides what is visible). A missing `guests` table
