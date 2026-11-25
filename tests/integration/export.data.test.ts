@@ -1,5 +1,6 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { gatherExportInput, loadLastExport, prepareExport } from "@/features/export/data";
+import { addDays, todayInRome } from "@/lib/dates/plain-date";
 import {
   addPartnerB,
   createWedding,
@@ -194,7 +195,12 @@ describe("Esportazione (T15) on the local stack", () => {
   });
 
   it("records the export for the person who asked, and only for them", async () => {
-    const mine = await loadLastExport(wedding.founderClient, wedding.founder.id, "2026-11-24");
+    // record_export() stamps with the database clock (now()), so "today" is the real Rome day.
+    const mine = await loadLastExport(
+      wedding.founderClient,
+      wedding.founder.id,
+      todayInRome(new Date()),
+    );
     expect(mine.days).toBe(0);
     const state = await serviceClient()
       .from("user_wedding_state")
@@ -208,7 +214,9 @@ describe("Esportazione (T15) on the local stack", () => {
     const result = await prepareExport(partnerB.client, NOW);
     if (!result.ok) throw new Error(result.message);
     expect(result.bundle.tasksCsv).toContain("Chiamare il comune");
-    const last = await loadLastExport(partnerB.client, partnerB.user.id, "2026-11-25");
+    // The stamp is the real database now(); look at it from exactly one Rome day later.
+    const tomorrow = addDays(todayInRome(new Date()), 1);
+    const last = await loadLastExport(partnerB.client, partnerB.user.id, tomorrow);
     expect(last.label).toBe("ultimo export: 1 giorno fa");
   });
 });
