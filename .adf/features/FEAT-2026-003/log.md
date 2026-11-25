@@ -13,3 +13,9 @@
   - `src/features/export/data.ts` selects columns explicitly: guests must be added to the export.
   - `src/content/milestones/it.ts`: milestone `lista-invitati-preliminare` and the task "Raccogliere le conferme degli invitati" can link to the new section.
   - Nav (`src/components/AppNav.tsx`) already has 6 items on a 320 px mobile bar: a new top-level item needs a decision.
+
+## F1 definition — 2026-11-25
+- Round 1: PO brief (15 AC); architect ARC-1..11 (blocking ARC-1 guest personal data in the permanent audit log, ARC-2 deleted items never purged; ADR-0002 proposed), designer DES-1..16 (blocking DES-1 nav at 320 px). PO accepted all; brief grew to 22 AC in 3 steps.
+- Developer answers: nav B ("Invitati" in the bar, Guida moved into Opzioni plus a help link; reverses the FEAT-2026-002 choice by the developer's decision); no auto-expiry of deleted guests; import skips bad rows; computed guest band; categories adult/child/infant (infant counted, no table seat); +1 as a normal guest; over-capacity allowed with warning; no budget link; Percorso links only; **no cap on guests** (paged reads, no silent truncation).
+- Scope change: developer asked for a visual, rearrangeable room of tables. Agreed as new roadmap item **R-06 "Sala: disposizione visuale dei tavoli"** (M, depends on R-03), roadmap re-approved 2026-11-25. R-03 stores table shape and position (BR10) so R-06 needs no destructive migration.
+- Final brief: 23 AC, steps 1 (AC1-13, AC23), 2 tables (AC14-16), 3 import/export (AC17-22). Gate A recorded via roadmap R-03.
