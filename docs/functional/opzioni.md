@@ -1,6 +1,12 @@
 # Opzioni
 
-Opzioni (l'icona a ingranaggio) raccoglie profili, impostazioni, account, aspetto, promemoria ed esportazione.
+Opzioni (l'icona a ingranaggio) raccoglie la Guida, profili, impostazioni, account, aspetto, promemoria ed esportazione.
+
+Ogni sezione dell'app ha in alto il link **Aiuto**: apre la pagina della Guida di quella sezione. Nelle pagine di Opzioni il link c'è solo dove esiste una pagina della Guida dedicata.
+
+## Guida
+
+In cima a Opzioni c'è la carta **Guida** ("Come si usa roadmap2yes, passo passo"). Apre queste stesse pagine, lette dentro l'app: se non sai dove trovare qualcosa, parti da lì. Non è più una voce della barra in basso.
 
 ## Profili
 
@@ -9,6 +15,8 @@ Il vostro profilo e quello del partner: etichetta, nome, cognome ed email. L'ema
 ## Impostazioni nozze
 
 Le risposte dell'onboarding: rito, scenari di data, fascia di invitati, stile e luogo, budget iniziale. Ogni modifica può far comparire dei "Suggerimenti da rivedere" nel Percorso. L'app non cancella mai nulla da sola.
+
+**Fascia di invitati.** Finché non hai nessun invitato in lista puoi scegliere la fascia come all'inizio. Appena ne aggiungi, la fascia non si scrive più: l'app la calcola dal numero reale e la mostra in sola lettura, per esempio "Sei a 62 persone: fascia 50-80", con il link **Vedi la lista** che porta a [Invitati](invitati.md).
 
 ## Invito
 
@@ -46,3 +54,4 @@ La versione dell'app e quando il servizio ha controllato l'ultima volta che tutt
 |---|---|---|
 | 2026-11-24 | FEAT-2026-001 | Prima stesura (F4, T18) |
 | 2026-11-25 | FEAT-2026-002 | Nuovo nome della sezione (prima "Altro"), con icona a ingranaggio; file rinominato da `altro.md` |
+| 2026-11-25 | FEAT-2026-003 | Carta Guida in cima, al posto della voce in barra; link Aiuto nelle sezioni; fascia di invitati calcolata dalla lista |

@@ -16,8 +16,9 @@ Convenzioni per chi scrive qui:
 | [Percorso](percorso.md) | Le tappe, le scadenze, il riferimento e l'anteprima |
 | [Scelte](scelte.md) | Decisioni, date, location, confronto e riaperture |
 | [Budget](budget.md) | Totale, categorie, voci e pagamenti |
+| [Invitati](invitati.md) | Persone, famiglie, conteggi per lato, filtri, eliminati di recente |
 | [Home e Novità](home-e-novita.md) | Cosa fare adesso e cosa è cambiato |
-| [Opzioni](opzioni.md) | Profili, impostazioni, aspetto, promemoria, esportazione, Esci |
+| [Opzioni](opzioni.md) | Guida, profili, impostazioni, aspetto, promemoria, esportazione, Esci |
 | [Promemoria email](promemoria-email.md) | Email accese e spente |
 | [Temi e aspetto](temi-e-aspetto.md) | I 12 temi e il chiaro/scuro |
 | [Esportazione](esportazione.md) | Scaricare i propri dati |
@@ -29,3 +30,4 @@ Convenzioni per chi scrive qui:
 |---|---|---|
 | 2026-11-24 | FEAT-2026-001 | Prima stesura (F4, T18) |
 | 2026-11-25 | FEAT-2026-002 | Queste pagine sono la Guida nell'app; "Altro" diventa "Opzioni" (`altro.md` → `opzioni.md`); rimandi tecnici tolti; convenzioni per chi scrive |
+| 2026-11-25 | FEAT-2026-003 | Nuova pagina [Invitati](invitati.md) (parte Persone); la Guida esce dalla barra ed è in Opzioni |
