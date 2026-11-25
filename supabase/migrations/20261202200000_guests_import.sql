@@ -124,8 +124,9 @@ begin
       );
       v_guests := v_guests + 1;
     end loop;
-  exception when check_violation or not_null_violation or invalid_text_representation
-    or string_data_right_truncation then
+  -- every row-level data or integrity failure is collapsed: no Postgres message (and no DETAIL with
+  -- the failing row) ever reaches the caller, even for an unlisted SQLSTATE (REV-55)
+  exception when data_exception or integrity_constraint_violation then
     raise exception 'invalid_row' using errcode = 'P0001';
   end;
   return jsonb_build_object('batch_id', v_batch, 'guests', v_guests, 'groups', v_new_groups);
@@ -133,9 +134,13 @@ end;
 $$;
 
 -- undo_guest_import(batch_id) -> { guests, groups }   ("Annulla importazione", AC20, P4)
--- PHYSICALLY deletes the people of that batch (so their personal data does not linger in a
--- "Eliminati di recente" list) and the groups the batch CREATED that are left without any member
--- (a group someone filled meanwhile, or an existing group the import only reused, stays).
+-- Undo reverses a MISTAKEN import; it is not a way to skip "Eliminati di recente" for people the
+-- couple has worked on since (REV-53, decision of the coordinator). So it PHYSICALLY deletes only
+-- the people of the batch that are untouched since the import: live, never updated (`version = 1`:
+-- every edit, seating, group change and soft delete bumps it) and not seated. Anyone edited,
+-- seated or soft deleted stays. It also deletes the groups the batch CREATED that are left without
+-- any member (live or deleted): a group someone filled meanwhile, or an existing group the import
+-- only reused, stays. No time window. The result counts what was really removed.
 -- Scoped to the caller's wedding: a batch of another wedding, or an unknown one, changes nothing.
 -- Needs `guests/delete` (it is a hard delete).
 create function public.undo_guest_import(p_batch_id uuid)
@@ -156,7 +161,9 @@ begin
     return jsonb_build_object('guests', 0, 'groups', 0);
   end if;
 
-  delete from public.guests g where g.wedding_id = v_wedding and g.import_batch_id = p_batch_id;
+  delete from public.guests g
+  where g.wedding_id = v_wedding and g.import_batch_id = p_batch_id
+    and g.version = 1 and g.deleted_at is null and g.table_id is null;
   get diagnostics v_guests = row_count;
 
   delete from public.guest_groups gg

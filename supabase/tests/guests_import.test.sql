@@ -1,7 +1,7 @@
 -- FEAT-2026-003 / T12: import_guests and undo_guest_import (AC19, AC20, P3, P4, ADR-0002). All data is FAKE.
 begin;
 \set su 'reset role; do $x$ begin perform set_config(''request.jwt.claims'','''',true); perform set_config(''request.jwt.claim.sub'','''',true); end $x$;'
-select plan(65);
+select plan(77);
 
 select * from tests.make_wedding('gi1') \gset w1_
 select * from tests.make_wedding('gi2') \gset w2_
@@ -106,6 +106,19 @@ select is((select group_id from public.guests where first_name = 'Deleted'), (se
 select is((select name from public.guest_groups where id = (select group_id from public.guests where first_name = 'Trim')), 'Nuova', 'a new group name is trimmed of NBSP and thin spaces at the ends');
 select is((select group_id from public.guests where first_name = 'Trim'), (select group_id from public.guests where first_name = 'Trim2'), 'and its key matches "nuova"');
 
+-- REV-54: every code point of the whitespace set is whitespace for the key (the set of JS `\s`), U+0085 is not.
+insert into public.guest_groups (id, wedding_id, name) values ('a2000000-0000-4000-8000-000000000007', :'w1_wedding'::uuid, 'ab cd');
+create temp table ws_cp (cp int);
+insert into ws_cp select unnest(array[9, 10, 11, 12, 13, 32, 160, 5760, 8232, 8233, 8239, 8287, 12288, 65279]) union select generate_series(8192, 8202);
+select jsonb_agg(jsonb_build_object('first_name', 'Ws' || cp, 'group', 'ab' || chr(cp) || 'cd')) as wsrows from ws_cp \gset
+select tests.login(:'w1_founder'::uuid);
+select public.import_guests(:'wsrows'::jsonb) as r \gset ws_
+select public.import_guests(jsonb_build_array(jsonb_build_object('first_name', 'WsNel', 'group', 'ab' || chr(133) || 'cd'))) as r \gset nel_
+:su
+select is((:'ws_r'::jsonb ->> 'groups')::int, 0, 'every whitespace code point of the set (TAB LF VT FF CR, NBSP, U+1680, U+2000-200A, U+2028/9, U+202F, U+205F, U+3000, U+FEFF) matches the existing group');
+select is((select count(*)::int from public.guests where first_name like 'Ws%' and first_name <> 'WsNel' and group_id = 'a2000000-0000-4000-8000-000000000007'), (select count(*)::int from ws_cp), 'and all of them were put in it');
+select is((:'nel_r'::jsonb ->> 'groups')::int, 1, 'U+0085 is not whitespace for JS \s, so it does not match: a new group');
+
 -- ===== Undo (AC20, P4) ============================================================================
 -- a person added to a batch group by someone else keeps that group alive
 select tests.login(:'w1_founder'::uuid);
@@ -132,6 +145,30 @@ select is((select count(*)::int from public.guest_groups where id in ('a2000000-
 select is((select count(*)::int from public.guests where first_name = 'Aggiunto dopo'), 1, 'a person added later survives the undo');
 select is((select count(*)::int from public.guest_groups where import_batch_id = (:'imp_r'::jsonb ->> 'batch_id')::uuid), 1, 'the batch group with a member stays');
 
+-- ===== REV-53: undo removes only what is untouched since the import ================================
+insert into public.guest_tables (id, wedding_id, name) values ('b2000000-0000-4000-8000-000000000001', :'w1_wedding'::uuid, 'Tavolo undo');
+select tests.login(:'w1_founder'::uuid);
+select public.import_guests('[
+  {"first_name":"Lot1","group":"Solo Lot1"},
+  {"first_name":"Lot2","group":"Con Lot2"},
+  {"first_name":"Lot3"},
+  {"first_name":"Lot4"},
+  {"first_name":"Lot5","group":"Con Lot2"}
+]') as r \gset lot_
+update public.guests set last_name = 'Modificato' where first_name = 'Lot2';
+update public.guests set deleted_at = now() where first_name = 'Lot3';
+update public.guests set table_id = 'b2000000-0000-4000-8000-000000000001' where first_name = 'Lot4';
+select public.undo_guest_import((:'lot_r'::jsonb ->> 'batch_id')::uuid) as u \gset lotu_
+:su
+select is((:'lotu_u'::jsonb ->> 'guests')::int, 2, 'undo removes only the 2 people untouched since the import (the result counts what was removed)');
+select is((:'lotu_u'::jsonb ->> 'groups')::int, 1, 'and the batch group left without members, not the one that still has one');
+select is((select count(*)::int from public.guests where first_name in ('Lot1', 'Lot5')), 0, 'the untouched people are gone');
+select is((select last_name from public.guests where first_name = 'Lot2'), 'Modificato', 'a person edited since the import stays');
+select isnt((select deleted_at from public.guests where first_name = 'Lot3'), null, 'a soft-deleted person stays (still in "Eliminati di recente")');
+select is((select table_id from public.guests where first_name = 'Lot4'), 'b2000000-0000-4000-8000-000000000001'::uuid, 'a seated person stays');
+select is((select count(*)::int from public.guest_groups where name = 'Con Lot2'), 1, 'the group of a person who stays is kept');
+select is((select count(*)::int from public.guest_groups where name = 'Solo Lot1'), 0, 'the empty batch group is removed');
+
 -- ===== Atomic, limits (AC19) ======================================================================
 select tests.login(:'w1_founder'::uuid);
 select throws_ok($$select public.import_guests('[{"first_name":"Buona","group":"Gruppo fantasma"},{"first_name":""}]')$$, 'P0001', 'invalid_row', 'one invalid row refuses the whole import');
@@ -140,6 +177,7 @@ select throws_ok($$select public.import_guests('[{"first_name":"Ok","phone":"12"
 select throws_ok($$select public.import_guests('[{"first_name":"Ok","side":"C"}]')$$, 'P0001', 'invalid_row', 'a bad side is an invalid row');
 select throws_ok($$select public.import_guests('[{"first_name":"Ok","category":"senior"}]')$$, 'P0001', 'invalid_row', 'a bad category is an invalid row');
 select throws_ok(format($$select public.import_guests(%L::jsonb)$$, jsonb_build_array(jsonb_build_object('first_name', 'Ok', 'group', repeat('g', 81)))), 'P0001', 'invalid_row', 'a group name over 80 is an invalid row');
+select throws_ok(format($$select public.import_guests(%L::jsonb)$$, jsonb_build_array(jsonb_build_object('first_name', 'Ok', 'notes', repeat('n', 501)))), 'P0001', 'invalid_row', 'notes over 500 are an invalid row (the table CHECK through the RPC)');
 select throws_ok($$select public.import_guests('{"first_name":"Ok"}')$$, 'P0001', 'invalid_row', 'rows must be an array');
 select throws_ok($$select public.import_guests('["Ok"]')$$, 'P0001', 'invalid_row', 'every row must be an object');
 select throws_ok($$select public.import_guests(null)$$, 'P0001', 'invalid_row', 'null rows are refused');

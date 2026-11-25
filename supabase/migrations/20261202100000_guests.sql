@@ -308,8 +308,8 @@ begin
       returning id into v_id;
       v_ids := v_ids || v_id;
     end loop;
-  exception when check_violation or not_null_violation or invalid_text_representation
-    or string_data_right_truncation then
+  -- every row-level data or integrity failure becomes invalid_row (REV-55 of code-11)
+  exception when data_exception or integrity_constraint_violation then
     raise exception 'invalid_row' using errcode = 'P0001';
   end;
   return jsonb_build_object('group_id', v_group, 'guest_ids', to_jsonb(v_ids));
