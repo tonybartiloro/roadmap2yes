@@ -20,10 +20,13 @@ export interface PartnerNames {
 export const fullName = (g: Pick<Guest, "firstName" | "lastName">): string =>
   [g.firstName, g.lastName].filter(Boolean).join(" ");
 
+/** Alphabetical: last name, then first name (design 2.1). Used by the groups and the flat list. */
 export function compareNames(a: Pick<Guest, "firstName" | "lastName">, b: typeof a): number {
-  const left = normalizeText(`${a.lastName ?? ""} ${a.firstName}`);
-  const right = normalizeText(`${b.lastName ?? ""} ${b.firstName}`);
-  return left < right ? -1 : left > right ? 1 : 0;
+  // Last name, then first name, Italian collation (accents and case do not reorder).
+  const byLast = (a.lastName ?? "").localeCompare(b.lastName ?? "", "it", { sensitivity: "base" });
+  return byLast !== 0
+    ? byLast
+    : a.firstName.localeCompare(b.firstName, "it", { sensitivity: "base" });
 }
 
 export function sideText(side: GuestSide | null, partners: PartnerNames): string {

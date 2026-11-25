@@ -148,46 +148,6 @@ export function TableSheet({
             </SheetDescription>
           </SheetHeader>
 
-          <form noValidate onSubmit={submit} className="flex flex-col gap-4">
-            <Field label="Nome del tavolo" error={errors.name}>
-              {(control) => (
-                <Input
-                  {...control}
-                  value={name}
-                  maxLength={TABLE_NAME_MAX}
-                  required
-                  autoComplete="off"
-                  onChange={(event) => setName(event.target.value)}
-                />
-              )}
-            </Field>
-            <Field label="Capienza" error={errors.capacity} hint="Facoltativa: da 1 a 50 posti.">
-              {(control) => (
-                <Input
-                  {...control}
-                  type="text"
-                  inputMode="numeric"
-                  autoComplete="off"
-                  value={capacity}
-                  onChange={(event) => setCapacity(event.target.value)}
-                />
-              )}
-            </Field>
-            {formError ? (
-              <p role="alert" className="text-destructive text-base">
-                {formError}
-              </p>
-            ) : null}
-            <SheetFooter>
-              <Button type="submit" disabled={pending}>
-                {pending ? "Un attimo…" : table ? "Salva" : "Crea tavolo"}
-              </Button>
-              <Button type="button" variant="outline" disabled={pending} onClick={onClose}>
-                Annulla
-              </Button>
-            </SheetFooter>
-          </form>
-
           {table ? (
             <section aria-labelledby="table-members" className="flex flex-col gap-2">
               <h3 id="table-members" className="text-lg font-semibold">
@@ -236,6 +196,45 @@ export function TableSheet({
               </Button>
             </section>
           ) : null}
+          <form noValidate onSubmit={submit} className="flex flex-col gap-4">
+            <Field label="Nome del tavolo" error={errors.name}>
+              {(control) => (
+                <Input
+                  {...control}
+                  value={name}
+                  maxLength={TABLE_NAME_MAX}
+                  required
+                  autoComplete="off"
+                  onChange={(event) => setName(event.target.value)}
+                />
+              )}
+            </Field>
+            <Field label="Capienza" error={errors.capacity} hint="Facoltativa: da 1 a 50 posti.">
+              {(control) => (
+                <Input
+                  {...control}
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  value={capacity}
+                  onChange={(event) => setCapacity(event.target.value)}
+                />
+              )}
+            </Field>
+            {formError ? (
+              <p role="alert" className="text-destructive text-base">
+                {formError}
+              </p>
+            ) : null}
+            <SheetFooter>
+              <Button type="submit" disabled={pending}>
+                {pending ? "Un attimo…" : table ? "Salva" : "Crea tavolo"}
+              </Button>
+              <Button type="button" variant="outline" disabled={pending} onClick={onClose}>
+                Annulla
+              </Button>
+            </SheetFooter>
+          </form>
         </PanelContent>
       </Sheet>
       {table && adding ? (

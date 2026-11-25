@@ -86,7 +86,7 @@ export function TableAddPeople({
   async function seat(ids: readonly string[]) {
     if (ids.length === 0) {
       // Nobody to seat (all already at a table): say so and close, never a silent no-op.
-      toast("Nessuno da aggiungere: sono già tutti seduti.");
+      toast("Nessuno aggiunto: sono rimasti dove erano.");
       onDone();
       return;
     }

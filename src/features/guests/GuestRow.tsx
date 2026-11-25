@@ -38,19 +38,14 @@ export const GuestRow = memo(function GuestRow({
   const type = typeText(guest.category);
   const details = (
     <>
-      <span className="min-w-0 flex-1 break-words">{name}</span>{" "}
-      <span className="text-muted-foreground flex shrink-0 flex-col items-end text-sm">
-        <span>
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className="break-words">{name}</span>{" "}
+        <span className="text-muted-foreground text-sm break-words">
           {type ? null : <span className="sr-only">Adulto</span>}
-          {[type, groupLabel].filter(Boolean).join(" · ")}
-        </span>{" "}
-        <span>{sideText(guest.side, partners)}</span>
-        {tableLabel ? (
-          <>
-            {" "}
-            <span>{tableLabel}</span>
-          </>
-        ) : null}
+          {[type, groupLabel, sideText(guest.side, partners), tableLabel]
+            .filter(Boolean)
+            .join(" · ")}
+        </span>
         {extra}
       </span>
     </>

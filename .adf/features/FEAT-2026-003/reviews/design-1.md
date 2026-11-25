@@ -30,3 +30,10 @@ Scope reviewed: production build on port 3300 against the local Supabase stack, 
 ## Questions for the developer
 1. DES-03: implement columns and two-column preview from 768 px now, or keep the single column and update design.md?
 2. Is the toast overlapping the bottom nav accepted app-wide, or fixed in the shared `sonner.tsx` (DES-02)?
+
+## Risposte (developer B)
+- **DES-01**: fatto. La lista piatta (ricerca o filtri) è ordinata per cognome e poi nome con `localeCompare("it")` (stesso `compareNames` dei gruppi); test in `view.test.ts`.
+- **DES-04**: fatto. Nel foglio del tavolo vengono prima le persone sedute e i due pulsanti "Aggiungi", poi il modulo (in DOM, non solo a vista: l'ordine del focus segue). In creazione resta solo il modulo.
+- **DES-05**: fatto. "Lascia dove sono" senza nessuno da aggiungere mostra "Nessuno aggiunto: sono rimasti dove erano."; se qualcuno viene seduto il toast con il numero (e Annulla) c'era già. Test aggiornato.
+- **DES-06**: fatto. Chevron su "Altri dati" (come "Per lato"). Segnaposto della ricerca accorciato a "Cerca" (l'etichetta accessibile resta "Cerca per nome").
+- **DES-07**: in parte. Righe: tipo, gruppo, lato e tavolo ora stanno su una sola riga che va a capo sotto il nome (max 2 righe); la barra ha meno padding. Rifiutato il menu di overflow per "Assegna": cambierebbe nomi e ruoli dei pulsanti su cui poggiano gli e2e di QA e il flusso di Annulla; la barra resta fino a 2 righe di pulsanti, con il margine in fondo alla pagina già coperto (REV-24).

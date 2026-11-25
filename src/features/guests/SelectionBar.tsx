@@ -90,7 +90,7 @@ export function SelectionBar({
     <div
       role="region"
       aria-label="Azioni sulla selezione"
-      className="border-border bg-card fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-30 flex flex-col gap-2 border-t p-3 shadow-lg md:right-4 md:bottom-4 md:left-auto md:w-[28rem] md:rounded-lg md:border"
+      className="border-border bg-card fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-30 flex flex-col gap-1 border-t p-2 shadow-lg md:right-4 md:bottom-4 md:left-auto md:w-[28rem] md:rounded-lg md:border"
       data-testid="selection-bar"
     >
       <div className="flex flex-wrap items-center justify-between gap-2">

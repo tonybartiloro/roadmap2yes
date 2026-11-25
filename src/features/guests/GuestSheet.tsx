@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { toast } from "sonner";
-import { Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -378,6 +378,7 @@ export function GuestSheet({
                 aria-controls="guest-more"
                 onClick={() => setMoreOpen((current) => !current)}
               >
+                {moreOpen ? <ChevronDown aria-hidden /> : <ChevronRight aria-hidden />}
                 Altri dati
               </Button>
               <div id="guest-more" hidden={!moreOpen} className="flex flex-col gap-4 pt-2">

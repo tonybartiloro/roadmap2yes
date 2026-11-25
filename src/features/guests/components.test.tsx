@@ -147,7 +147,7 @@ describe("row accessible name (WCAG 2.5.3)", () => {
     });
     const row = screen.getByRole("button", { name: /^Luca Rossi/ });
     expect(row.hasAttribute("aria-label")).toBe(false);
-    expect(row.textContent).toBe("Luca Rossi Bambino Tony");
+    expect(row.textContent).toBe("Luca Rossi Bambino · Tony");
   });
 });
 
@@ -661,7 +661,7 @@ describe("tables (AC14-AC16)", () => {
       guests: [guest({ firstName: "Mario", tableId: "t1" }), guest({ firstName: "Luca" })],
       tables: [t],
     });
-    expect(screen.getByText("Tavolo Rossi")).toBeTruthy();
+    expect(screen.getByText(/Tavolo Rossi/)).toBeTruthy();
     await userEvent.click(screen.getByRole("button", { name: /Filtri/ }));
     await userEvent.selectOptions(screen.getByLabelText("Tavolo"), "none");
     expect(screen.getByTestId("guests-count").textContent).toBe("1 di 2 persone");
@@ -768,7 +768,7 @@ describe("tables (AC14-AC16)", () => {
       await openGroupSheet([guest({ groupId: "g1", tableId: "t2" })]);
       await userEvent.click(screen.getByRole("button", { name: "Lascia dove sono" }));
       await waitFor(() =>
-        expect(toast).toHaveBeenCalledWith("Nessuno da aggiungere: sono già tutti seduti."),
+        expect(toast).toHaveBeenCalledWith("Nessuno aggiunto: sono rimasti dove erano."),
       );
       expect(actions.bulkGuestsAction).not.toHaveBeenCalled();
       expect(screen.queryByRole("button", { name: "Aggiungi il gruppo" })).toBeNull();
@@ -858,7 +858,7 @@ describe("tables (AC14-AC16)", () => {
       tables: [tbl("t1", "Rossi", 8, deleted)],
     });
     // no live table: no table text on the rows, no filter
-    expect(screen.queryByText("Tavolo Rossi")).toBeNull();
+    expect(screen.queryByText(/Tavolo Rossi/)).toBeNull();
     await userEvent.click(screen.getByRole("button", { name: "Altro" }));
     await userEvent.click(screen.getByRole("button", { name: /Eliminati di recente/ }));
     expect(screen.getByText("2 persone, rientrano se lo ripristini")).toBeTruthy();

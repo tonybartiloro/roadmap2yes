@@ -48,6 +48,7 @@ import { useGuestActions } from "./use-guest-actions";
 import {
   buildSections,
   COLLAPSE_ABOVE,
+  compareNames,
   fullName,
   PAGE_SIZE,
   tableLabel,
@@ -123,6 +124,8 @@ export function GuestsScreen({
   const filtering = hasActiveFilters(effective);
   const total = useMemo(() => countGuests(live), [live]);
   const shownCounts = useMemo(() => countGuests(filtered), [filtered]);
+  // The flat list (search or filters) is alphabetical like the groups, not in query order (DES-01).
+  const flat = useMemo(() => filtered.toSorted(compareNames), [filtered]);
   const bySide = useMemo(() => countBySide(live), [live]);
   const sections = useMemo(
     () => buildSections(filtered, groups, !filtering),
@@ -332,7 +335,7 @@ export function GuestsScreen({
                   <Input
                     id="guest-search"
                     type="search"
-                    placeholder="Cerca per nome"
+                    placeholder="Cerca"
                     autoComplete="off"
                     value={filters.query}
                     onChange={(event) => setFilters({ ...filters, query: event.target.value })}
@@ -367,7 +370,7 @@ export function GuestsScreen({
                 />
               ) : filtering ? (
                 <FlatList
-                  guests={filtered}
+                  guests={flat}
                   groupNames={groupNames}
                   state={list}
                   partners={partners}
