@@ -19,7 +19,7 @@ In cima a ogni sezione c'è il link **Aiuto**: apre la pagina della Guida su que
 
 ## Cosa ancora non c'è
 
-Fornitori, RSVP e link personali per gli invitati, abiti, sito per gli invitati e area del giorno del matrimonio arrivano nelle prossime versioni. Tavoli, importazione e esportazione CSV degli invitati arrivano in una prossima versione. Non ci sono notifiche push, calendario esterno, modifica offline né più lingue.
+Fornitori, RSVP e link personali per gli invitati, la disposizione visiva della sala, abiti, sito per gli invitati e area del giorno del matrimonio arrivano nelle prossime versioni. Invitati ha già tavoli, importazione ed esportazione CSV. Non ci sono notifiche push, calendario esterno, modifica offline né più lingue.
 
 ## Come leggere le date
 

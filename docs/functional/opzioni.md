@@ -38,7 +38,7 @@ Gli interruttori per le email di promemoria e per il riepilogo del lunedì. Con 
 
 ## Esporta
 
-Scarica i tuoi dati in JSON e CSV. Vedi [Esportazione](esportazione.md).
+Scarica i tuoi dati: quattro file, JSON e CSV, tra cui **Invitati (CSV)** con tutti gli invitati vivi, anche se in Invitati hai dei filtri attivi. Vedi [Esportazione](esportazione.md).
 
 ## Info
 
