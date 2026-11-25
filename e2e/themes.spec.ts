@@ -102,7 +102,10 @@ test("12 themes x light/dark: the shared toast (title, action) passes axe contra
       await page.waitForLoadState("networkidle");
       // three stacked "Annulla" toasts (title + action button), the worst case for overlap
       for (let i = 0; i < 3; i += 1) {
-        await page.getByRole("checkbox", { name: /Segna come fatto/ }).first().click();
+        await page
+          .getByRole("checkbox", { name: /Segna come fatto/ })
+          .first()
+          .click();
         await expect(page.locator("li[data-sonner-toast]")).toHaveCount(i + 1);
       }
       await expect(page.locator("li[data-sonner-toast] button[data-action]").first()).toBeVisible();
@@ -138,8 +141,20 @@ test("12 themes x light/dark on /invitati: filter chips, selection, over-capacit
   const w = await seedWedding({ templateTasks: false, names: { a: "Tony", b: "Jessica" } });
   const group = await addGuestGroup(w, "Famiglia Esempio");
   const table = await addGuestTable(w, "Tavolo Uno", { capacity: 1 });
-  await addGuest(w, { firstName: "Anna", lastName: "Esempio", side: "A", groupId: group, tableId: table });
-  await addGuest(w, { firstName: "Bruno", lastName: "Esempio", side: "A", groupId: group, tableId: table });
+  await addGuest(w, {
+    firstName: "Anna",
+    lastName: "Esempio",
+    side: "A",
+    groupId: group,
+    tableId: table,
+  });
+  await addGuest(w, {
+    firstName: "Bruno",
+    lastName: "Esempio",
+    side: "A",
+    groupId: group,
+    tableId: table,
+  });
   await addGuest(w, { firstName: "Carla", lastName: "Prova", side: "B", category: "child" });
   await addGuest(w, { firstName: "Neo", lastName: "Prova", side: "both", category: "infant" });
   await loginAs(page, w.wedding.founder, uniqueIp());
@@ -149,8 +164,9 @@ test("12 themes x light/dark on /invitati: filter chips, selection, over-capacit
         () =>
           page.evaluate(
             () =>
-              document.getAnimations().filter((a) => a.effect?.getComputedTiming().iterations !== Infinity)
-                .length,
+              document
+                .getAnimations()
+                .filter((a) => a.effect?.getComputedTiming().iterations !== Infinity).length,
           ),
         { timeout: 10_000 },
       )
@@ -205,6 +221,54 @@ test("12 themes x light/dark on /invitati: filter chips, selection, over-capacit
       await expect(page.getByTestId("import-row-error").first()).toBeVisible();
       await check(`${at} / import preview`);
       await page.keyboard.press("Escape");
+    }
+  }
+  expect(failures, failures.join("\n\n")).toEqual([]);
+});
+
+test("12 themes x light/dark: a toast WITH a description is readable and clears the bottom bar (DES-02)", async ({
+  page,
+}) => {
+  const w = await seedWedding({ templateTasks: false });
+  await addGuest(w, { firstName: "Prova", lastName: "Esempio" }); // not empty: "Altro" menu path
+  await loginAs(page, w.wedding.founder, uniqueIp());
+  const failures: string[] = [];
+  for (const theme of THEMES) {
+    const saved = await serviceClient()
+      .from("weddings")
+      .update({ theme_id: theme })
+      .eq("id", w.weddingId);
+    expect(saved.error).toBeNull();
+    for (const scheme of ["light", "dark"] as const) {
+      await page.emulateMedia({ colorScheme: scheme });
+      await page.goto("/invitati");
+      await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
+      await page.waitForLoadState("networkidle");
+      // import one person: the sheet closes and the "Annulla importazione" toast has a description
+      await page.getByRole("button", { name: "Altro", exact: true }).click();
+      await page.getByRole("dialog").getByRole("button", { name: "Importa" }).click();
+      await page.getByLabel("Una persona per riga").fill("Nuovo Esempio");
+      await page.getByRole("button", { name: "Vedi l'anteprima" }).click();
+      await page.getByRole("button", { name: /^Importa 1 / }).click();
+      await expect(page.getByRole("dialog")).toHaveCount(0);
+      const toast = page.locator("li[data-sonner-toast]").first();
+      await expect(toast.locator("[data-description]")).toBeVisible();
+      await expect.poll(() => page.evaluate(() => document.getAnimations().length)).toBe(0);
+      const findings = await axeFindings(page, { include: "[data-sonner-toaster]" });
+      if (findings.length) {
+        failures.push(`${theme} / ${scheme}\n${describeFindings(findings)}`);
+      }
+      // under 768 px the toast sits above the bottom bar, not over it
+      const viewport = page.viewportSize();
+      if (viewport && viewport.width < 768) {
+        const toastBox = await toast.boundingBox();
+        const navBox = await page.getByRole("navigation", { name: "Principale" }).boundingBox();
+        if (!toastBox || !navBox || toastBox.y + toastBox.height > navBox.y) {
+          failures.push(`${theme} / ${scheme}: the toast covers the bottom bar`);
+        }
+      }
+      await toast.locator("button[data-action]").click();
+      await expect(page.locator("li[data-sonner-toast]")).toHaveCount(0);
     }
   }
   expect(failures, failures.join("\n\n")).toEqual([]);
