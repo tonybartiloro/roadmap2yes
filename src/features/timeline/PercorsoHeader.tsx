@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Popover } from "radix-ui";
-import { CircleHelp } from "lucide-react";
+import { Info } from "lucide-react";
 import { formatShortDate } from "@/components/format";
 import { HelpLink } from "@/components/HelpLink";
 import { ReferenceBadge } from "@/components/ReferenceBadge";
@@ -20,7 +20,7 @@ function ReferenceHelp({ nearest }: { nearest: boolean }) {
     <Popover.Root>
       <Popover.Trigger asChild>
         <Button type="button" variant="ghost" size="sm" data-testid="reference-help">
-          <CircleHelp aria-hidden />
+          <Info aria-hidden />
           Cos&apos;è?
         </Button>
       </Popover.Trigger>

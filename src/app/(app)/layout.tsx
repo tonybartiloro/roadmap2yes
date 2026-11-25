@@ -1,39 +1,22 @@
 import type { ReactNode } from "react";
 import { AppNav } from "@/components/AppNav";
 import { EmailStatusProvider } from "@/components/EmailOffBanner";
+import { shouldShowGuestsNav } from "@/components/guests-nav";
 import { readEmailConfig } from "@/lib/app-config";
 import { createClient } from "@/lib/supabase/server";
-import { LOOKUP_TIMEOUT_MS, withTimeout } from "@/themes/server";
-
-/**
- * Can the user read the guests? Only decides whether the nav item shows (the real check is RLS
- * and the page itself). `has_permission` on the user's wedding (RLS shows only that one).
- * Any failure or timeout resolves to `true`: an outage must not hide a section by mistake.
- */
-async function canReadGuests(): Promise<boolean> {
-  try {
-    const db = await createClient();
-    const { data: wedding, error } = await db.from("weddings").select("id").limit(1).maybeSingle();
-    if (error || !wedding) return true;
-    const { data, error: rpcError } = await db.rpc("has_permission", {
-      p_wedding_id: wedding.id,
-      p_area: "guests",
-      p_action: "read",
-    });
-    return rpcError ? true : data === true;
-  } catch {
-    return true;
-  }
-}
 
 /**
  * Shell of the signed-in area: skip link, navigation (bottom bar / rail) and the content column.
  * Access control is NOT here: the proxy guards and RLS own it. The "are emails on?" flag is
  * computed on the server at request time and handed to `EmailOffBanner` through a provider.
+ *
+ * "Invitati" in the bar depends on the `guests` read permission (`shouldShowGuestsNav`: both reads
+ * share one 1.5 s abort signal, fail-open). It runs on full loads and refreshes, not on client
+ * navigation (a shared layout stays mounted), so a permission change shows only after a reload.
  */
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const emailEnabled = readEmailConfig().enabled;
-  const showGuests = await withTimeout(canReadGuests(), LOOKUP_TIMEOUT_MS, true);
+  const showGuests = await shouldShowGuestsNav(await createClient());
   return (
     <EmailStatusProvider emailEnabled={emailEnabled}>
       <a

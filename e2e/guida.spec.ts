@@ -247,6 +247,31 @@ test.describe("reading at 320 px (AC2, AC6)", () => {
   });
 });
 
+test("'Aiuto' fits at 320 px: 44 px target, beside the title, no sideways scroll (DES-26)", async ({
+  page,
+}) => {
+  await enter(page);
+  await page.setViewportSize({ width: 320, height: 800 });
+  for (const route of ["/", "/percorso", "/scelte", "/budget", "/altro"]) {
+    await page.goto(route);
+    const help = page.getByRole("main").getByRole("link", { name: "Aiuto" });
+    await expect(help, route).toBeVisible();
+    const box = await help.boundingBox();
+    expect(box!.height, route).toBeGreaterThanOrEqual(44);
+    expect(box!.width, route).toBeGreaterThanOrEqual(44);
+    expect(box!.x + box!.width, route).toBeLessThanOrEqual(320);
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    );
+    expect(overflow, `${route}: sideways scroll`).toBeLessThanOrEqual(0);
+  }
+  // The Percorso "Cos'è?" popover is a different control with another icon.
+  await page.goto("/percorso");
+  await expect(page.getByTestId("percorso-header").getByRole("link", { name: "Aiuto" })).toHaveCount(
+    1,
+  );
+});
+
 test.describe("document title and structure (AC6)", () => {
   test("titles: index and pages", async ({ page }) => {
     await enter(page);

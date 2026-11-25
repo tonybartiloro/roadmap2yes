@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { CircleHelp } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 /**
  * Section route -> in-app guide page (the file name in `docs/functional`, without `.md`).
@@ -26,7 +27,10 @@ export function HelpLink({ route, className }: { route: HelpRoute; className?: s
   return (
     <Link
       href={`/guida/${HELP_PAGES[route]}`}
-      className={`text-primary focus-visible:ring-ring inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1 rounded-md px-2 text-base underline-offset-2 hover:underline focus-visible:ring-2 focus-visible:outline-none ${className ?? ""}`}
+      className={cn(
+        "text-primary focus-visible:ring-ring inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1 rounded-md px-2 text-base underline-offset-2 hover:underline focus-visible:ring-2 focus-visible:outline-none",
+        className,
+      )}
     >
       <CircleHelp aria-hidden className="size-5 shrink-0" />
       <span className="max-[359px]:sr-only">Aiuto</span>
