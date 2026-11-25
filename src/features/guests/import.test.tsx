@@ -269,6 +269,19 @@ describe("import (AC17-AC20)", () => {
         expect(mocks.importGuestsAction).toHaveBeenCalledTimes(1);
       },
     );
+
+    it("'Torna indietro' makes the preview usable again; every close still refreshes the list (REV-57)", async () => {
+      mocks.importGuestsAction.mockRejectedValueOnce(new Error("network"));
+      await toPreview();
+      await screen.findByRole("alert");
+      await userEvent.click(screen.getByRole("button", { name: "Torna indietro" }));
+      expect(screen.queryByRole("alert")).toBeNull();
+      await userEvent.click(screen.getByRole("button", { name: "Vedi l'anteprima" }));
+      expect(screen.getByRole("button", { name: "Importa 1 invitato" })).toBeTruthy();
+      expect(nav.refresh).not.toHaveBeenCalled();
+      await userEvent.keyboard("{Escape}");
+      await waitFor(() => expect(nav.refresh).toHaveBeenCalled());
+    });
   });
 
   it("Esc, like Fine, keeps the import and fires the Annulla importazione toast", async () => {

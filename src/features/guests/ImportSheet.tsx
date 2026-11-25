@@ -84,6 +84,12 @@ export function ImportSheet({
   const [done, setDone] = useState<Done | null>(null);
   const [formatOpen, setFormatOpen] = useState(false);
   const [unknownOutcome, setUnknownOutcome] = useState(false);
+  // Once the outcome was unknown, the list may have changed: every close refreshes it (REV-57).
+  const [maybeSaved, setMaybeSaved] = useState(false);
+  const close = () => {
+    onClose();
+    if (maybeSaved) onStale();
+  };
   const [doneShown, setDoneShown] = useState(PAGE_SIZE);
   const [fileNote, setFileNote] = useState("");
   const titleRef = useRef<HTMLHeadingElement>(null);
@@ -154,6 +160,7 @@ export function ImportSheet({
       // No response at all (network, timeout): the write may or may not have happened.
       setPending(false);
       setUnknownOutcome(true);
+      setMaybeSaved(true);
       return setError(OUTCOME_UNKNOWN);
     }
     setPending(false);
@@ -162,6 +169,7 @@ export function ImportSheet({
       // answer (unreachable) or with an unreadable one, we cannot say so.
       if (UNKNOWN_OUTCOME_CODES.has(result.code)) {
         setUnknownOutcome(true);
+        setMaybeSaved(true);
         return setError(OUTCOME_UNKNOWN);
       }
       return setError(`Non ho importato nulla. ${result.message}`);
@@ -214,7 +222,7 @@ export function ImportSheet({
       onOpenChange={(next) => {
         if (next || pending) return;
         if (step === "done") finishDone();
-        else onClose();
+        else close();
       }}
     >
       <PanelContent className="max-h-[92dvh] overflow-y-auto" aria-describedby="import-step">
@@ -326,7 +334,7 @@ export function ImportSheet({
               <Button type="button" disabled={text.trim() === ""} onClick={showPreview}>
                 Vedi l&apos;anteprima
               </Button>
-              <Button type="button" variant="outline" onClick={onClose}>
+              <Button type="button" variant="outline" onClick={close}>
                 Annulla
               </Button>
             </>
@@ -338,8 +346,7 @@ export function ImportSheet({
                 <Button
                   type="button"
                   onClick={() => {
-                    onClose();
-                    onStale();
+                    close();
                   }}
                 >
                   Chiudi e controlla l&apos;elenco
@@ -361,7 +368,11 @@ export function ImportSheet({
                 type="button"
                 variant="outline"
                 disabled={pending}
-                onClick={() => setStep("input")}
+                onClick={() => {
+                  setUnknownOutcome(false);
+                  setError(null);
+                  setStep("input");
+                }}
               >
                 Torna indietro
               </Button>
