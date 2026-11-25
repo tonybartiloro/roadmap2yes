@@ -137,6 +137,18 @@ describe("summary and empty state (AC1, AC8)", () => {
   });
 });
 
+describe("row accessible name (WCAG 2.5.3)", () => {
+  it("is the visible text in order (name, type, group, side), with no aria-label", () => {
+    renderScreen({
+      guests: [guest({ firstName: "Luca", category: "child", side: "A", groupId: "g1" })],
+      groups: [group("g1", "Famiglia Rossi")],
+    });
+    const row = screen.getByRole("button", { name: /^Luca Rossi/ });
+    expect(row.hasAttribute("aria-label")).toBe(false);
+    expect(row.textContent).toBe("Luca Rossi Bambino Tony");
+  });
+});
+
 describe("filters (AC9)", () => {
   it("shows '2 di 5 persone' with a chip, keeps the side numbers on the total, and clears", async () => {
     renderScreen({ guests: people() });

@@ -3,11 +3,11 @@
 import { memo } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { GuestView } from "./data";
-import { fullName, rowLabel, sideText, typeText, type PartnerNames } from "./view";
+import { fullName, sideText, typeText, type PartnerNames } from "./view";
 
 /**
- * One person. Normally a button that opens the edit sheet (name "Mario Rossi, adulto, Famiglia
- * Rossi"); in selection mode a checkbox row. Type, side and group are always text (never colour).
+ * One person. Normally a button that opens the edit sheet (no aria-label: its name is its visible
+ * text, so it always contains it, WCAG 2.5.3; adults get a screen-reader-only "Adulto"); in selection mode a checkbox row. Type, side and group are always text (never colour).
  * `extra` is the extension point for the table column (T9).
  */
 export const GuestRow = memo(function GuestRow({
@@ -35,9 +35,12 @@ export const GuestRow = memo(function GuestRow({
   const type = typeText(guest.category);
   const details = (
     <>
-      <span className="min-w-0 flex-1 break-words">{name}</span>
+      <span className="min-w-0 flex-1 break-words">{name}</span>{" "}
       <span className="text-muted-foreground flex shrink-0 flex-col items-end text-sm">
-        <span>{[type, groupLabel].filter(Boolean).join(" · ")}</span>
+        <span>
+          {type ? null : <span className="sr-only">Adulto</span>}
+          {[type, groupLabel].filter(Boolean).join(" · ")}
+        </span>{" "}
         <span>{sideText(guest.side, partners)}</span>
         {extra}
       </span>
@@ -60,7 +63,6 @@ export const GuestRow = memo(function GuestRow({
         <button
           type="button"
           onClick={() => onOpen(guest)}
-          aria-label={rowLabel(guest, groupLabel)}
           className={`${box} hover:bg-muted focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-none focus-visible:ring-inset`}
         >
           {details}
