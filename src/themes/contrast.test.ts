@@ -77,6 +77,20 @@ describe("theme contrast gate (generated themes.css, light and dark)", () => {
     }
   }
 
+  it("keeps checking the pairs the Guide renderer uses (links, prose, tables, code)", () => {
+    const checked = new Set(REQUIRED_PAIRS.map((pair) => `${pair.fg}/${pair.bg}`));
+    for (const pair of [
+      "primary/background", // links and ← Guida
+      "primary/muted",
+      "foreground/background", // prose
+      "foreground/muted", // table headers, code
+      "mutedForeground/background", // card descriptions, quotes
+      "mutedForeground/card",
+    ]) {
+      expect(checked.has(pair), pair).toBe(true);
+    }
+  });
+
   it("the catalogue and the generated css agree on primary and background", () => {
     for (const theme of THEMES) {
       expect(generated.get(`${theme.id}:light`)?.["primary"]).toBe(
