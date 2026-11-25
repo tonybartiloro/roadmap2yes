@@ -40,7 +40,12 @@ import {
   updateGroupAction,
   updateGuestAction,
 } from "@/features/guests/actions";
-import { guestInputSchema, schemas } from "@/features/guests/schemas";
+import {
+  guestInputSchema,
+  MAX_SELECTION,
+  schemas,
+  SELECTION_TOO_LARGE,
+} from "@/features/guests/schemas";
 
 const UUID = "00000000-0000-4000-8000-000000000000";
 const REFRESH = [["/invitati"], ["/altro/impostazioni"]];
@@ -129,7 +134,7 @@ describe("guests server actions", () => {
       await bulkGuestsAction({ ids: [UUID], op: "assign_group" }),
       await bulkGuestsAction({ ids: ["x"], op: "delete" }),
       await bulkGuestsAction({ ids: [UUID], op: "purge" }),
-      await bulkGuestsAction({ ids: Array.from({ length: 20_001 }, () => UUID), op: "delete" }),
+      await bulkGuestsAction({ ids: Array.from({ length: 5_001 }, () => UUID), op: "delete" }),
       await undoBulkAction({ previous: [{ id: UUID, op: "nuke" }] }),
       await undoBulkAction({ previous: "x" }),
     ];
@@ -203,6 +208,29 @@ describe("guests server actions", () => {
       schemas.createFamily.safeParse({ name: "F", side: "A", guests: [{ firstName: "A" }] })
         .success,
     ).toBe(true);
+  });
+
+  it("the selection bound is per action, safely under the 1 MB body, and has its own message (REV-18)", async () => {
+    const entry = { id: UUID, op: "delete", group_id: UUID, table_id: UUID, deleted: false };
+    const ids = (n: number) => Array.from({ length: n }, () => UUID);
+    expect(schemas.bulk.safeParse({ ids: ids(MAX_SELECTION), op: "delete" }).success).toBe(true);
+    expect(
+      schemas.undo.safeParse({ previous: Array.from({ length: MAX_SELECTION }, () => entry) })
+        .success,
+    ).toBe(true);
+    // the largest legitimate payloads stay well under the 1 MB Server Action limit
+    expect(
+      JSON.stringify({ previous: Array.from({ length: MAX_SELECTION }, () => entry) }).length,
+    ).toBeLessThan(900_000);
+    expect(JSON.stringify({ ids: ids(MAX_SELECTION), op: "delete" }).length).toBeLessThan(900_000);
+    for (const result of [
+      await bulkGuestsAction({ ids: ids(MAX_SELECTION + 1), op: "delete" }),
+      await undoBulkAction({ previous: Array.from({ length: MAX_SELECTION + 1 }, () => entry) }),
+    ]) {
+      expect(result).toEqual({ ok: false, code: "invalid", message: SELECTION_TOO_LARGE });
+      expect((result as { message: string }).message).not.toMatch(/Riprova/);
+    }
+    expect(state.revalidate).toEqual([]);
   });
 
   it("without a session nothing is written and nothing is revalidated", async () => {

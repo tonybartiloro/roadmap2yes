@@ -130,7 +130,7 @@ export async function bulkGuestsAction(
   input: unknown,
 ): Promise<ActionResult<{ previous: BulkPrevious[]; changed: number }>> {
   const parsed = schemas.bulk.safeParse(input);
-  if (!parsed.success) return invalid(BULK_ERROR);
+  if (!parsed.success) return invalid(invalidMessage(parsed.error, BULK_ERROR));
   const ctx = await session();
   if (!ctx) return expired;
   return refreshed(await data.bulkGuests(ctx.db, parsed.data));
@@ -138,7 +138,7 @@ export async function bulkGuestsAction(
 
 export async function undoBulkAction(input: unknown): Promise<ActionResult<{ restored: number }>> {
   const parsed = schemas.undo.safeParse(input);
-  if (!parsed.success) return invalid(BULK_ERROR);
+  if (!parsed.success) return invalid(invalidMessage(parsed.error, BULK_ERROR));
   const ctx = await session();
   if (!ctx) return expired;
   return refreshed(await data.undoBulk(ctx.db, parsed.data));

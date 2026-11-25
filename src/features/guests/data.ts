@@ -103,7 +103,7 @@ const MESSAGES: Readonly<Record<string, string>> = {
 };
 
 /** Codes after which the screen is stale and must reload. */
-export const STALE_CODES: ReadonlySet<string> = new Set(["not_found", "invalid_target"]);
+export const STALE_CODES: ReadonlySet<string> = new Set(["not_found", "invalid_target", "partial"]);
 
 const INVALID_SQLSTATES: ReadonlySet<string> = new Set(["23514", "22P02", "23502", "22001"]);
 
@@ -184,8 +184,14 @@ export async function loadGuests(db: Db): Promise<GuestsSnapshot> {
         db.from("guest_tables").select(TABLE_COLUMNS).order("id").range(from, to),
       ),
     ]);
+    // Pages are read at different instants: an insert or a hard delete between two pages can
+    // repeat a row. Keep the first of each id (a skipped row heals on the next refresh) (REV-19).
+    const unique = <T extends { id: string }>(rows: T[]): T[] => {
+      const seen = new Set<string>();
+      return rows.filter((row) => !seen.has(row.id) && !!seen.add(row.id));
+    };
     return {
-      guests: guests.map((g) => ({
+      guests: unique(guests).map((g) => ({
         id: g.id,
         firstName: g.first_name,
         lastName: g.last_name,
@@ -199,13 +205,13 @@ export async function loadGuests(db: Db): Promise<GuestsSnapshot> {
         deletedAt: g.deleted_at,
         version: g.version,
       })),
-      groups: groups.map((g) => ({
+      groups: unique(groups).map((g) => ({
         id: g.id,
         name: g.name,
         deletedAt: g.deleted_at,
         version: g.version,
       })),
-      tables: tables.map((t) => ({
+      tables: unique(tables).map((t) => ({
         id: t.id,
         name: t.name,
         capacity: t.capacity,
@@ -382,6 +388,11 @@ async function versioned<T extends VersionedTable>(
   try {
     const result = await versionedUpdate(db, table, id, version, patch);
     if (!result.conflict) return { ok: true, data: { version: result.row.version } };
+    // Zero rows but the row is visible and still at the expected version: not a conflict, the
+    // UPDATE was denied by RLS (REV-20).
+    if (result.current && result.current.version === version) {
+      return failure({ code: "42501" });
+    }
     return conflictResult(
       db,
       userId,
@@ -515,6 +526,17 @@ export interface EmptyCounts {
   tables: number;
 }
 
+/** "3 persone e 1 gruppo" for the sections already emptied; "" when nothing was removed. */
+function removedSummary(counts: EmptyCounts): string {
+  const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+  const parts = [
+    counts.guests > 0 ? plural(counts.guests, "persona", "persone") : "",
+    counts.groups > 0 ? plural(counts.groups, "gruppo", "gruppi") : "",
+    counts.tables > 0 ? plural(counts.tables, "tavolo", "tavoli") : "",
+  ].filter(Boolean);
+  return parts.length > 1 ? `${parts.slice(0, -1).join(", ")} e ${parts.at(-1)}` : (parts[0] ?? "");
+}
+
 /**
  * "Svuota" (AC11), per section or all of it: physical DELETE of every soft-deleted row. People
  * first, so a group's members that were deleted go with it; live members are freed by the FKs.
@@ -537,7 +559,18 @@ export async function emptyDeleted(
       .from(tableOf[section])
       .delete({ count: "exact" })
       .not("deleted_at", "is", null);
-    if (removed.error) return failure(removed.error);
+    if (removed.error) {
+      const failed = failure(removed.error);
+      const done = removedSummary(counts);
+      // Earlier sections stay deleted: say what is gone and what is left, and to reload.
+      return done && failed.ok === false
+        ? {
+            ok: false,
+            code: "partial",
+            message: `Ho eliminato per sempre ${done}, ma non sono riuscito a finire. Ricarica la pagina: quello che resta è ancora tra gli eliminati.`,
+          }
+        : failed;
+    }
     counts[section] = removed.count ?? 0;
   }
   return { ok: true, data: counts };
@@ -560,11 +593,27 @@ async function undoBatch(db: Db, previous: readonly BulkPrevious[]): Promise<Act
   return { ok: true, data: body.restored };
 }
 
+const PARTIAL_BULK: ActionResult<never> = {
+  ok: false,
+  code: "partial",
+  message: "Ne ho cambiati solo alcuni. Ricarica la pagina e controlla.",
+};
+const PARTIAL_UNDO: ActionResult<never> = {
+  ok: false,
+  code: "partial",
+  message: "Ne ho ripristinati solo alcuni. Ricarica la pagina e controlla.",
+};
+
 /**
  * `guests_bulk`: the ids travel in the request body, in batches of 1000 (the per-call cap is NOT a
  * cap on the selection: "Seleziona tutti i filtrati" may be 1200). `previous` is what the database
- * changed, concatenated and handed back UNCHANGED to `undoBulk`. If a later batch fails, the
- * earlier ones are rolled back with their own `previous`, so the action is all or nothing.
+ * changed, concatenated and handed back UNCHANGED to `undoBulk`.
+ *
+ * BEST EFFORT across batches (each RPC is its own transaction): if a later batch fails, the earlier
+ * ones are rolled back with their own `previous`. When that rollback fails or restores fewer rows
+ * (the usual cause of the first failure, a dropped connection, also breaks it; a concurrent edit
+ * of those rows is skipped), the result is `partial` with a message that tells the user to reload
+ * and check, never a plain "Riprova".
  */
 export async function bulkGuests(
   db: Db,
@@ -585,7 +634,10 @@ export async function bulkGuests(
       !Array.isArray(body.previous) ||
       typeof body.changed !== "number"
     ) {
-      if (previous.length > 0) await undo(db, previous);
+      if (previous.length > 0) {
+        const rolledBack = await undo(db, previous);
+        if (!rolledBack.ok || rolledBack.data < previous.length) return PARTIAL_BULK;
+      }
       return failure(result.error ?? null, BULK_ERROR);
     }
     previous.push(...(body.previous as BulkPrevious[]));
@@ -598,7 +650,7 @@ async function undo(db: Db, previous: readonly BulkPrevious[]): Promise<ActionRe
   let restored = 0;
   for (const batch of chunk([...previous], BULK_BATCH)) {
     const result = await undoBatch(db, batch);
-    if (!result.ok) return result;
+    if (!result.ok) return restored > 0 ? PARTIAL_UNDO : result;
     restored += result.data;
   }
   return { ok: true, data: restored };

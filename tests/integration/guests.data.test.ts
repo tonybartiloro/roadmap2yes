@@ -348,6 +348,183 @@ describe("guests data", () => {
     });
   });
 
+  describe("failures halfway (REV-17, REV-19, REV-20, Svuota)", () => {
+    type Hooks = {
+      rpc?: (fn: string, args: unknown) => Promise<unknown> | undefined;
+      from?: (table: string) => unknown;
+    };
+    const wrap = (real: Db, hooks: Hooks): Db =>
+      new Proxy(real, {
+        get(target, prop) {
+          if (prop === "rpc" && hooks.rpc) {
+            return (fn: string, args: unknown) =>
+              hooks.rpc!(fn, args) ?? target.rpc(fn as never, args as never);
+          }
+          if (prop === "from" && hooks.from) {
+            return (table: string) => hooks.from!(table) ?? target.from(table as never);
+          }
+          const value = Reflect.get(target, prop);
+          return typeof value === "function" ? value.bind(target) : value;
+        },
+      });
+    const boom = Promise.resolve({ data: null, error: { code: "XX000", message: "boom Mario" } });
+    let ids: string[];
+    const live = async () => {
+      const snapshot = await loadGuests(db());
+      return snapshot.guests.filter((g) => ids.includes(g.id) && g.deletedAt === null).length;
+    };
+
+    beforeAll(async () => {
+      const inserted = await serviceClient()
+        .from("guests")
+        .insert(
+          Array.from({ length: 1100 }, (_, i) => ({
+            wedding_id: wedding.weddingId,
+            first_name: `Meta${i}`,
+          })),
+        )
+        .select("id");
+      ids = inserted.data!.map((r) => r.id);
+    }, 60_000);
+
+    it("a later batch fails and the earlier one is rolled back: a plain failure", async () => {
+      let calls = 0;
+      const flaky = wrap(db(), {
+        rpc: (fn) => (fn === "guests_bulk" && ++calls === 2 ? boom : undefined),
+      });
+      const result = await bulkGuests(flaky, { ids, op: "delete" });
+      expect(result).toMatchObject({ ok: false, code: "unknown" });
+      expect(JSON.stringify(result)).not.toContain("Mario");
+      expect(await live()).toBe(1100); // the first batch was put back
+    });
+
+    it("the rollback fails too: `partial`, with a message to reload and check", async () => {
+      let calls = 0;
+      const broken = wrap(db(), {
+        rpc: (fn) =>
+          fn === "guests_bulk" && ++calls === 2
+            ? boom
+            : fn === "guests_bulk_undo"
+              ? boom
+              : undefined,
+      });
+      const result = await bulkGuests(broken, { ids, op: "delete" });
+      expect(result).toEqual({
+        ok: false,
+        code: "partial",
+        message: "Ne ho cambiati solo alcuni. Ricarica la pagina e controlla.",
+      });
+      expect(await live()).toBe(100); // the first 1000 stayed deleted
+      ok(await bulkGuests(db(), { ids, op: "restore" }));
+      expect(await live()).toBe(1100);
+    });
+
+    it("an undo that stops after the first batch is `partial` too", async () => {
+      const done = ok(await bulkGuests(db(), { ids, op: "delete" }));
+      let calls = 0;
+      const broken = wrap(db(), {
+        rpc: (fn) => (fn === "guests_bulk_undo" && ++calls === 2 ? boom : undefined),
+      });
+      expect(await undoBulk(broken, { previous: done.previous })).toMatchObject({
+        ok: false,
+        code: "partial",
+      });
+      expect(await live()).toBe(1000);
+      ok(await undoBulk(db(), { previous: done.previous })); // the user can replay it
+      expect(await live()).toBe(1100);
+    });
+
+    it("Svuota that stops partway says what was removed and what is left", async () => {
+      const guest = ok(await addGuest(db(), { guest: values({ firstName: "Da svuotare" }) }));
+      const group = ok(await addGroup(db(), { name: "Gruppo da svuotare" }));
+      ok(await removeEntity(db(), me(), { kind: "guest", id: guest.guestId, version: 1 }));
+      ok(await removeEntity(db(), me(), { kind: "group", id: group.groupId, version: 1 }));
+      const stopped = wrap(db(), {
+        from: (table) =>
+          table === "guest_groups"
+            ? {
+                delete: () => ({
+                  not: async () => ({ error: { code: "XX000", message: "boom" }, count: null }),
+                }),
+              }
+            : undefined,
+      });
+      const result = await emptyDeleted(stopped, { scope: "all" });
+      expect(result).toMatchObject({ ok: false, code: "partial" });
+      const message = (result as { message: string }).message;
+      expect(message).toMatch(/Ho eliminato per sempre \d+ person[ae]/);
+      expect(message).toMatch(/Ricarica la pagina/);
+      const snapshot = await loadGuests(db());
+      expect(snapshot.guests.some((g) => g.id === guest.guestId)).toBe(false);
+      expect(snapshot.groups.some((g) => g.id === group.groupId)).toBe(true); // still among the deleted
+      // the first section failing is a plain failure: nothing was removed
+      const first = wrap(db(), {
+        from: (table) =>
+          table === "guests"
+            ? {
+                delete: () => ({
+                  not: async () => ({ error: { code: "XX000", message: "boom" }, count: null }),
+                }),
+              }
+            : undefined,
+      });
+      expect(await emptyDeleted(first, { scope: "all" })).toMatchObject({
+        ok: false,
+        code: "unknown",
+      });
+    });
+
+    it("a write denied by RLS (zero rows, same version) is `forbidden`, not a conflict", async () => {
+      const guest = ok(await addGuest(db(), { guest: values({ firstName: "Negato" }) }));
+      const denied = wrap(db(), {
+        from: (table) =>
+          table === "guests"
+            ? {
+                update: () => ({
+                  eq: () => ({
+                    eq: () => ({
+                      select: () => ({ maybeSingle: async () => ({ data: null, error: null }) }),
+                    }),
+                  }),
+                }),
+                select: (...args: unknown[]) =>
+                  (db().from("guests").select as (...a: unknown[]) => unknown)(...args),
+              }
+            : undefined,
+      });
+      expect(
+        await updateGuest(denied, me(), { guestId: guest.guestId, version: 1, guest: values() }),
+      ).toMatchObject({ ok: false, code: "forbidden" });
+    });
+
+    it("a row repeated between two pages is listed once", async () => {
+      const row = {
+        id: "00000000-0000-4000-8000-0000000000aa",
+        first_name: "Doppio",
+        last_name: null,
+        category: "adult",
+        side: null,
+        phone: null,
+        email: null,
+        notes: null,
+        group_id: null,
+        table_id: null,
+        deleted_at: null,
+        version: 1,
+      };
+      const stub = {
+        from: (table: string) => ({
+          select: () => ({
+            order: () => ({
+              range: async () => ({ data: table === "guests" ? [row, row] : [], error: null }),
+            }),
+          }),
+        }),
+      } as unknown as Db;
+      expect((await loadGuests(stub)).guests).toHaveLength(1);
+    });
+  });
+
   describe("errors and a schema that is not there", () => {
     const missing = (code: string) =>
       ({

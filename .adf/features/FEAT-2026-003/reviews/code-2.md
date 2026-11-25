@@ -1,6 +1,6 @@
 # Code review 2 - FEAT-2026-003 / T1 (guests migration), commit 021a212
 
-Reviewer: adf:reviewer. Focus: security of the data layer. Round 1.
+Reviewer: adf:reviewer. Focus: security of the data layer. Round 1, closed in round 2 (see the end).
 
 **Verdict: changes requested** (0 blocking, 4 should, 2 nit). No exploitable hole found: the points below are
 hardening and one structural guard that the L security round should leave in place.
@@ -80,3 +80,9 @@ BR5 side as A/B/both/null (ok), BR8 partner-only area (ok), BR10 shape/pos store
 - **REV-8**: in T4: `mapDbError` legge solo SQLSTATE e codici esatti noti, mai `message`/`details`; test con spia su `console` (guests.actions). Residuo dei log di Postgres da annotare in ADR-0002 (coordinatore).
 - **REV-9**: fatto lato DB: `last_name` rifiuta '' e solo spazi (null = nessuno). Il dominio T2 tratta gia' vuoto come valido: lo schema Zod (T4) normalizza vuoto in null, quindi nessuna modifica a `validation.ts`.
 - **REV-10**: fatto. Le asserzioni "nessuna chiave/valore personale" sono ripetute a fine file, dopo undo, 1200 righe e famiglie (con controllo di non vacuita').
+
+## Round 2 (reviewer, commit 631e251; details in code-4.md)
+REV-5 CLOSED, REV-6 CLOSED, REV-7 CLOSED, REV-9 CLOSED, REV-10 CLOSED (all verified in the migration and pgTAP file).
+REV-8 CLOSED on the code side (mapper reads SQLSTATE and exact codes only; spy test in guests.actions); the ADR-0002
+note on Postgres DETAIL logs was not found in the diff: coordinator to confirm.
+**Verdict code-2: approved.**

@@ -19,8 +19,14 @@ const uuid = z.string().uuid();
 const version = z.number().int().min(1);
 const optionalText = z.string().nullable().optional();
 
-/** Cap on the ids of one action: ~39 bytes each, so 20000 stay under the 1 MB action body. */
-export const MAX_SELECTION = 20_000;
+/**
+ * Cap on the people of ONE action (a transport bound, NOT a cap on the guests of a wedding): the
+ * undo payload is the largest, ~140 bytes per entry, so 5000 entries (~0.7 MB) stay safely under
+ * the 1 MB Server Action body. `serverActions.bodySizeLimit` is not raised (it is global).
+ */
+export const MAX_SELECTION = 5_000;
+export const SELECTION_TOO_LARGE =
+  "Puoi selezionare al massimo 5.000 persone alla volta: dividi la selezione.";
 /** A family, not an import (the database says `too_many_rows` above 100). */
 export const MAX_FAMILY = 100;
 
@@ -119,12 +125,14 @@ export const schemas = {
   empty: z.object({ scope: z.enum(["guests", "groups", "tables", "all"]) }),
   bulk: z
     .object({
-      ids: z.array(uuid).min(1).max(MAX_SELECTION),
+      ids: z.array(uuid).min(1).max(MAX_SELECTION, SELECTION_TOO_LARGE),
       op: z.enum(["assign_group", "assign_table", "delete", "restore"]),
       target: uuid.nullable().optional(),
     })
     .refine((v) => (v.op !== "assign_group" && v.op !== "assign_table") || !!v.target, "target"),
-  undo: z.object({ previous: z.array(previousEntry).min(1).max(MAX_SELECTION) }),
+  undo: z.object({
+    previous: z.array(previousEntry).min(1).max(MAX_SELECTION, SELECTION_TOO_LARGE),
+  }),
 };
 
 /**
@@ -133,7 +141,9 @@ export const schemas = {
  */
 export function invalidMessage(error: z.ZodError, fallback: string): string {
   const custom = error.issues.find(
-    (issue) => issue.code === "custom" && issue.message !== "target",
+    (issue) =>
+      (issue.code === "custom" && issue.message !== "target") ||
+      issue.message === SELECTION_TOO_LARGE,
   );
   return custom ? custom.message : fallback;
 }
