@@ -18,3 +18,4 @@ Decisioni di architettura: [`docs/adr`](../adr/0001-stack-auth-ambienti.md).
 | Data | Feature | Modifica |
 |---|---|---|
 | 2026-11-24 | FEAT-2026-001 | Prima stesura (F4, T18) |
+| 2026-11-25 | FEAT-2026-002 | Guida d'uso in app: route, lettura e tracciamento, sicurezza, test dei documenti; "Altro" diventa "Opzioni" |

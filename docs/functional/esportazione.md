@@ -29,3 +29,4 @@ Su Safari il file si salva dal foglio di condivisione o dai download, come per o
 | Data | Feature | Modifica |
 |---|---|---|
 | 2026-11-24 | FEAT-2026-001 | Prima stesura (F4, T18) |
+| 2026-11-25 | FEAT-2026-002 | "Altro" diventa "Opzioni" |

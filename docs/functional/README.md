@@ -28,3 +28,4 @@ Convenzioni per chi scrive qui:
 | Data | Feature | Modifica |
 |---|---|---|
 | 2026-11-24 | FEAT-2026-001 | Prima stesura (F4, T18) |
+| 2026-11-25 | FEAT-2026-002 | Queste pagine sono la Guida nell'app; "Altro" diventa "Opzioni" (`altro.md` → `opzioni.md`); rimandi tecnici tolti; convenzioni per chi scrive |

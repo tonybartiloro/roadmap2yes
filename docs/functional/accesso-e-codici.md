@@ -74,3 +74,4 @@ Quando il link si apre, la pagina mostra solo il nome di chi vi invita. Se il li
 | Data | Feature | Modifica |
 |---|---|---|
 | 2026-11-24 | FEAT-2026-001 | Prima stesura con il modello email + codice d'accesso (F4, T18). Sostituisce la versione con link magico e codice a 6 cifre. |
+| 2026-11-25 | FEAT-2026-002 | "Altro" diventa "Opzioni" nei percorsi; rimando tecnico tolto dalla fine della pagina |

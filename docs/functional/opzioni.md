@@ -45,3 +45,4 @@ La versione dell'app e quando il servizio ha controllato l'ultima volta che tutt
 | Data | Feature | Modifica |
 |---|---|---|
 | 2026-11-24 | FEAT-2026-001 | Prima stesura (F4, T18) |
+| 2026-11-25 | FEAT-2026-002 | Nuovo nome della sezione (prima "Altro"), con icona a ingranaggio; file rinominato da `altro.md` |

@@ -29,3 +29,4 @@ Fornitori, invitati e RSVP, abiti, tavoli, sito per gli invitati e area del gior
 | Data | Feature | Modifica |
 |---|---|---|
 | 2026-11-24 | FEAT-2026-001 | Prima stesura (F4, T18) |
+| 2026-11-25 | FEAT-2026-002 | Aggiunta la voce Guida; "Altro" diventa "Opzioni" |
