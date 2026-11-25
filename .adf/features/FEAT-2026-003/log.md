@@ -31,3 +31,10 @@
 - Coordinator decisions: per-action bounds (bulk 5,000 selected, family 100, bulk RPC 1,000 per call with transparent batching), not a cap on guests (brief Decision 10 note); ADR-0002 notes the Postgres log residual (REV-8); remote PG 17.12 verified; extra files recorded in plan Change log; QA-1 accepted (family role redirected to /su-invito by the existing proxy).
 - QA: acceptance 13/13, nav 4/4, mobile 9/9 after QA-2 fix (axe name mismatch on guest rows), desktop 4 pass + 1 fixme (1200 guests in the full export, waits for T14). 500 guests ready in ~250 ms; search over 1200 in 9 ms. db:test 1228 green.
 - `adf verify` pass on 33939b637e7b. Not run yet: full e2e suite (end of S3, T17).
+- Developer: "Procedi" → S2.
+
+## F3 step S2 checkpoint — 2026-11-25
+- Done: T9 tables (8c90a12, b245703, a0d626d), T10 QA (0ce1731, a93c447, 42adaff); A exported `versioned`/`conflictResult` for reuse (REV-32); code-6 closed (2212ce7).
+- Reviews: code-7 (T9) REV-32..36 fixed; closure re-check in the final review round.
+- QA: tables mobile 6/6, S1 mobile 9/9, desktop 4 + 1 fixme (full export, T14). QA-3 (table sheet covered the Annulla toast at 360 px) fixed. QA-4 (toast contrast) was a false positive from the enter animation; developer C added a 12 themes × light/dark toast axe check in `e2e/themes.spec.ts` (841a683). 500 guests ready in ~470 ms with tables.
+- `adf verify` pass on f6d26ad5ea77.
