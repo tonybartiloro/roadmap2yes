@@ -221,6 +221,78 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"guest_groups": {
+                  Row: {
+                    "created_at": string,"created_by": string | null,"deleted_at": string | null,"deleted_by": string | null,"id": string,"import_batch_id": string | null,"name": string,"updated_at": string,"updated_by": string | null,"version": number,"wedding_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"created_by"?: string | null,"deleted_at"?: string | null,"deleted_by"?: string | null,"id"?: string,"import_batch_id"?: string | null,"name": string,"updated_at"?: string,"updated_by"?: string | null,"version"?: number,"wedding_id": string
+                  }
+                  Update: {
+                    "created_at"?: string,"created_by"?: string | null,"deleted_at"?: string | null,"deleted_by"?: string | null,"id"?: string,"import_batch_id"?: string | null,"name"?: string,"updated_at"?: string,"updated_by"?: string | null,"version"?: number,"wedding_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "guest_groups_wedding_id_fkey"
+      columns: ["wedding_id"]
+isOneToOne: false
+      referencedRelation: "weddings"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"guest_tables": {
+                  Row: {
+                    "capacity": number | null,"created_at": string,"created_by": string | null,"deleted_at": string | null,"deleted_by": string | null,"id": string,"name": string,"pos_x": number | null,"pos_y": number | null,"shape": string,"updated_at": string,"updated_by": string | null,"version": number,"wedding_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "capacity"?: number | null,"created_at"?: string,"created_by"?: string | null,"deleted_at"?: string | null,"deleted_by"?: string | null,"id"?: string,"name": string,"pos_x"?: number | null,"pos_y"?: number | null,"shape"?: string,"updated_at"?: string,"updated_by"?: string | null,"version"?: number,"wedding_id": string
+                  }
+                  Update: {
+                    "capacity"?: number | null,"created_at"?: string,"created_by"?: string | null,"deleted_at"?: string | null,"deleted_by"?: string | null,"id"?: string,"name"?: string,"pos_x"?: number | null,"pos_y"?: number | null,"shape"?: string,"updated_at"?: string,"updated_by"?: string | null,"version"?: number,"wedding_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "guest_tables_wedding_id_fkey"
+      columns: ["wedding_id"]
+isOneToOne: false
+      referencedRelation: "weddings"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"guests": {
+                  Row: {
+                    "category": string,"created_at": string,"created_by": string | null,"deleted_at": string | null,"deleted_by": string | null,"email": string | null,"first_name": string,"group_id": string | null,"id": string,"import_batch_id": string | null,"last_name": string | null,"notes": string | null,"phone": string | null,"side": string | null,"table_id": string | null,"updated_at": string,"updated_by": string | null,"version": number,"wedding_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "category"?: string,"created_at"?: string,"created_by"?: string | null,"deleted_at"?: string | null,"deleted_by"?: string | null,"email"?: string | null,"first_name": string,"group_id"?: string | null,"id"?: string,"import_batch_id"?: string | null,"last_name"?: string | null,"notes"?: string | null,"phone"?: string | null,"side"?: string | null,"table_id"?: string | null,"updated_at"?: string,"updated_by"?: string | null,"version"?: number,"wedding_id": string
+                  }
+                  Update: {
+                    "category"?: string,"created_at"?: string,"created_by"?: string | null,"deleted_at"?: string | null,"deleted_by"?: string | null,"email"?: string | null,"first_name"?: string,"group_id"?: string | null,"id"?: string,"import_batch_id"?: string | null,"last_name"?: string | null,"notes"?: string | null,"phone"?: string | null,"side"?: string | null,"table_id"?: string | null,"updated_at"?: string,"updated_by"?: string | null,"version"?: number,"wedding_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "guests_group_id_wedding_id_fkey"
+      columns: ["group_id","wedding_id"]
+isOneToOne: false
+      referencedRelation: "guest_groups"
+      referencedColumns: ["id","wedding_id"]
+    },{
+      foreignKeyName: "guests_table_id_wedding_id_fkey"
+      columns: ["table_id","wedding_id"]
+isOneToOne: false
+      referencedRelation: "guest_tables"
+      referencedColumns: ["id","wedding_id"]
+    },{
+      foreignKeyName: "guests_wedding_id_fkey"
+      columns: ["wedding_id"]
+isOneToOne: false
+      referencedRelation: "weddings"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"heartbeats": {
                   Row: {
                     "details": NonNullable<Json>,"id": number,"ran_at": string,"source": string
@@ -494,6 +566,9 @@ isOneToOne: false
 "complete_onboarding":
 { Args: { "p_scenarios"?: Json,"p_tasks"?: Json }; Returns: Json
                            },
+"create_guest_family":
+{ Args: { "p_name": string,"p_rows": Json,"p_side": string }; Returns: Json
+                           },
 "create_invitation":
 { Args: { "p_email": string,"p_invitee_user_id"?: string,"p_method": string,"p_token_hash"?: string }; Returns: Json
                            },
@@ -502,6 +577,12 @@ isOneToOne: false
                            },
 "dismiss_welcome":
 { Args: Record<PropertyKey, never>; Returns: Json
+                           },
+"guests_bulk":
+{ Args: { "p_ids": (string)[],"p_op": string,"p_target"?: string }; Returns: Json
+                           },
+"guests_bulk_undo":
+{ Args: { "p_previous": Json }; Returns: Json
                            },
 "has_permission":
 { Args: { "p_action": string,"p_area": string,"p_wedding_id": string }; Returns: boolean

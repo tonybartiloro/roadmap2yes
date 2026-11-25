@@ -24,8 +24,12 @@ export type TableSpec = {
   /** Columns a user may INSERT / UPDATE (exactly). */
   insert: readonly string[];
   update: readonly string[];
-  /** DELETE allowed for authenticated (own rows only). */
-  delete: boolean;
+  /**
+   * DELETE allowed for authenticated: `true` = own rows (option_reactions), `"soft_deleted"` = the
+   * wedding's rows, but ONLY the ones already soft-deleted (`deleted_at is not null`, with the
+   * `guests/delete` permission: ADR-0002); on a live row the DELETE removes nothing.
+   */
+  delete: boolean | "soft_deleted";
   /** Patch for a granted column, used to attack foreign rows (never applied to a row we own). */
   patch?: Record<string, unknown>;
 };
@@ -248,6 +252,55 @@ export const TABLES: Record<string, TableSpec> = {
     update: ["digest_enabled", "reminders_enabled"],
     patch: { digest_enabled: false },
   },
+  guest_groups: {
+    tenancy: "wedding",
+    key: "wedding_id",
+    select: true,
+    delete: "soft_deleted",
+    insert: ["name", "wedding_id"],
+    update: ["deleted_at", "name"],
+    patch: { name: "Hacked" },
+  },
+  guest_tables: {
+    tenancy: "wedding",
+    key: "wedding_id",
+    select: true,
+    delete: "soft_deleted",
+    insert: ["capacity", "name", "pos_x", "pos_y", "shape", "wedding_id"],
+    update: ["capacity", "deleted_at", "name", "pos_x", "pos_y", "shape"],
+    patch: { name: "Hacked" },
+  },
+  guests: {
+    tenancy: "wedding",
+    key: "wedding_id",
+    select: true,
+    delete: "soft_deleted",
+    insert: [
+      "category",
+      "email",
+      "first_name",
+      "group_id",
+      "last_name",
+      "notes",
+      "phone",
+      "side",
+      "table_id",
+      "wedding_id",
+    ],
+    update: [
+      "category",
+      "deleted_at",
+      "email",
+      "first_name",
+      "group_id",
+      "last_name",
+      "notes",
+      "phone",
+      "side",
+      "table_id",
+    ],
+    patch: { first_name: "Hacked" },
+  },
 };
 
 /**
@@ -278,6 +331,9 @@ export const FUNCTIONS: Record<string, "user" | "service"> = {
   last_heartbeat: "user",
   has_permission: "user",
   move_budget_items: "user",
+  create_guest_family: "user",
+  guests_bulk: "user",
+  guests_bulk_undo: "user",
   record_heartbeat: "service",
   login_gate: "service",
   login_record: "service",
