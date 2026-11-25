@@ -41,3 +41,7 @@ Open from other reviews: REV-47 (idempotent retry) needs the RPC to accept an op
 - New nit REV-58: the success toast still says "Annulla importazione rimuove le N persone importate" (`ImportSheet.tsx` `announce`), but undo now spares edited, seated or deleted people. Reword to "... le persone importate che non hai ancora modificato".
 - New nit REV-59: in `ImportSheet.tsx` "Torna indietro" now resets `unknownOutcome` (REV-57), so after a lost response the user can re-preview and press Importa again, and the preview's duplicate warnings use a guest list that is not refreshed yet. Call `onStale()` as soon as the outcome is unknown (the `guests` prop then updates and the repeat shows "c'è già ..."), or keep the retry blocked until the sheet is closed.
 - Verdict for T12: **approved**; REV-58 and REV-59 are optional nits.
+
+## Risposte
+- **REV-58**: fatto. La descrizione del toast ora dice "Annulla importazione rimuove le persone importate che non hai ancora modificato." (nessun altro testo afferma che tutte le N vengono rimosse); il toast del risultato mostra il numero reale ("Importazione annullata: N persone rimosse."). Test aggiornato.
+- **REV-59**: fatto. `onStale()` parte subito quando l'esito diventa ignoto (eccezione, `unreachable`, risposta illeggibile), così `guests` si aggiorna prima di una nuova anteprima dopo "Torna indietro" e i duplicati compaiono come avvisi. Test: ricarica già al primo errore (1 chiamata), poi alla chiusura (2).

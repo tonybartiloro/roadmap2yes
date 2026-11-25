@@ -143,7 +143,8 @@ export function ImportSheet({
 
   function announce(batchId: string, count: number) {
     toast(`${plural(count, "invitato importato", "invitati importati")}.`, {
-      description: `Annulla importazione rimuove le ${count} persone importate.`,
+      description:
+        "Annulla importazione rimuove le persone importate che non hai ancora modificato.",
       duration: UNDO_TOAST_MS,
       action: { label: "Annulla importazione", onClick: () => void undo(batchId) },
     });
@@ -161,6 +162,7 @@ export function ImportSheet({
       setPending(false);
       setUnknownOutcome(true);
       setMaybeSaved(true);
+      onStale(); // fresh list before any re-preview after "Torna indietro" (REV-59)
       return setError(OUTCOME_UNKNOWN);
     }
     setPending(false);
@@ -170,6 +172,7 @@ export function ImportSheet({
       if (UNKNOWN_OUTCOME_CODES.has(result.code)) {
         setUnknownOutcome(true);
         setMaybeSaved(true);
+        onStale(); // fresh list before any re-preview after "Torna indietro" (REV-59)
         return setError(OUTCOME_UNKNOWN);
       }
       return setError(`Non ho importato nulla. ${result.message}`);

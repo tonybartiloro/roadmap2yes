@@ -188,7 +188,9 @@ describe("import (AC17-AC20)", () => {
       { duration: number; description: string; action: { label: string; onClick: () => void } },
     ];
     expect(message).toBe("2 invitati importati.");
-    expect(options.description).toBe("Annulla importazione rimuove le 2 persone importate.");
+    expect(options.description).toBe(
+      "Annulla importazione rimuove le persone importate che non hai ancora modificato.",
+    );
     expect(options.duration).toBeGreaterThanOrEqual(8_000);
     expect(options.action.label).toBe("Annulla importazione");
     options.action.onClick();
@@ -274,13 +276,15 @@ describe("import (AC17-AC20)", () => {
       mocks.importGuestsAction.mockRejectedValueOnce(new Error("network"));
       await toPreview();
       await screen.findByRole("alert");
+      expect(nav.refresh).toHaveBeenCalledTimes(1); // REV-59: fresh list before any re-preview
       await userEvent.click(screen.getByRole("button", { name: "Torna indietro" }));
       expect(screen.queryByRole("alert")).toBeNull();
       await userEvent.click(screen.getByRole("button", { name: "Vedi l'anteprima" }));
       expect(screen.getByRole("button", { name: "Importa 1 invitato" })).toBeTruthy();
-      expect(nav.refresh).not.toHaveBeenCalled();
+      // the list was refreshed the moment the outcome became unknown (REV-59), and again on close
+      expect(nav.refresh).toHaveBeenCalledTimes(1);
       await userEvent.keyboard("{Escape}");
-      await waitFor(() => expect(nav.refresh).toHaveBeenCalled());
+      await waitFor(() => expect(nav.refresh).toHaveBeenCalledTimes(2));
     });
   });
 
