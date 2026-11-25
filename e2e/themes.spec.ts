@@ -72,6 +72,58 @@ test("12 themes x light/dark: axe finds no contrast or target-size problem", asy
   expect(failures, failures.join("\n\n")).toEqual([]);
 });
 
+test("12 themes x light/dark: the shared toast (title, action) passes axe contrast (QA-4)", async ({
+  page,
+}) => {
+  const w = await seedWedding();
+  for (const title of ["Compito uno", "Compito due", "Compito tre"]) {
+    await addTask(w, { title, due: romeDate(10) });
+  }
+  await loginAs(page, w.wedding.founder, uniqueIp());
+  const failures: string[] = [];
+  for (const theme of THEMES) {
+    const saved = await serviceClient()
+      .from("weddings")
+      .update({ theme_id: theme })
+      .eq("id", w.weddingId);
+    expect(saved.error).toBeNull();
+    for (const scheme of ["light", "dark"] as const) {
+      await page.emulateMedia({ colorScheme: scheme });
+      await page.goto("/percorso");
+      await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
+      await page.waitForLoadState("networkidle");
+      // three stacked "Annulla" toasts (title + action button), the worst case for overlap
+      for (let i = 0; i < 3; i += 1) {
+        await page.getByRole("checkbox", { name: /Segna come fatto/ }).first().click();
+        await expect(page.locator("li[data-sonner-toast]")).toHaveCount(i + 1);
+      }
+      await expect(page.locator("li[data-sonner-toast] button[data-action]").first()).toBeVisible();
+      // axe reads the LIVE colours: while sonner's enter/stack transitions run (opacity, 0.4 s)
+      // it sees a blended colour, which is not what a person sees. Wait for the final state.
+      await expect
+        .poll(() =>
+          page.evaluate(
+            () =>
+              document.querySelector("[data-sonner-toaster]")?.getAnimations({ subtree: true })
+                .length ?? 0,
+          ),
+        )
+        .toBe(0);
+      const findings = await axeFindings(page, { include: "[data-sonner-toaster]" });
+      if (findings.length) {
+        failures.push(`${theme} / ${scheme}\n${describeFindings(findings)}`);
+      }
+      // put the tasks back (Annulla on each), so the next round starts from the same state
+      for (let i = 0; i < 3; i += 1) {
+        await page.locator("li[data-sonner-toast] button[data-action]").first().click();
+      }
+      await expect(page.locator("li[data-sonner-toast]")).toHaveCount(0);
+      await page.waitForLoadState("networkidle");
+    }
+  }
+  expect(failures, failures.join("\n\n")).toEqual([]);
+});
+
 test("the dark mode really changes the page for every theme (not a no-op)", async ({ page }) => {
   const w = await seedWedding();
   await loginAs(page, w.wedding.founder, uniqueIp());
