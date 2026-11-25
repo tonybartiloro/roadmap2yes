@@ -3,8 +3,13 @@ import { getMilestone, type Rite } from "@/content/milestones";
 import { generateTasks } from "@/domain/timeline";
 import {
   addPartnerB,
+  createUser,
   createWedding,
+  serviceClient,
+  signInAs,
+  type TestClient,
   type TestPartnerB,
+  type TestUser,
   type TestWedding,
 } from "../../tests/support/supabase";
 
@@ -106,6 +111,135 @@ export async function addTask(
     if (done.error) throw new Error(`seed: task done: ${done.error.message}`);
   }
   return inserted.data.id;
+}
+
+export type SeededGuests = {
+  ids: string[];
+  /** counts of the rows THIS call inserted (the deterministic pattern below) */
+  total: number;
+  adults: number;
+  children: number;
+  infants: number;
+  /** the `first_name` of every inserted guest, in order */
+  firstNames: string[];
+};
+
+const GUEST_SIDES = ["A", "B", "both", null] as const;
+const GUEST_BATCH = 500;
+
+/**
+ * Guests of the wedding, inserted straight through the founder's JWT in batches of 500 (QA-9: never
+ * through the UI nor `import_guests`; an insert is not capped by `max_rows`). Names are invented and
+ * unique ("Prova<n> Esempio<n>", n = 1-based and continuing after the guests the wedding already
+ * has, so `seedGuests(w, 500)` then `seedGuests(w, 700)` gives 1200 distinct people). Pattern:
+ * every 10th is a child, every 25th an infant, the sides cycle A / B / both / not set. Fake data only
+ * (`@example.test`, phones `+39 000 000123`, not assignable numbers).
+ */
+export async function seedGuests(
+  w: SeededWedding,
+  count: number,
+  options: { groupId?: string } = {},
+): Promise<SeededGuests> {
+  const db = w.wedding.founderClient;
+  const existing = await db
+    .from("guests")
+    .select("id", { count: "exact", head: true })
+    .eq("wedding_id", w.weddingId);
+  if (existing.error) throw new Error(`seed: guests count: ${existing.error.message}`);
+  const first = (existing.count ?? 0) + 1;
+  const rows = Array.from({ length: count }, (_, i) => {
+    const n = first + i;
+    return {
+      wedding_id: w.weddingId,
+      first_name: `Prova${n}`,
+      last_name: `Esempio${n}`,
+      category: n % 25 === 0 ? "infant" : n % 10 === 0 ? "child" : "adult",
+      side: GUEST_SIDES[n % GUEST_SIDES.length] ?? null,
+      email: `prova${n}@example.test`,
+      phone: `+39 000 ${String(n).padStart(6, "0")}`,
+      group_id: options.groupId ?? null,
+    };
+  });
+  const ids: string[] = [];
+  for (let at = 0; at < rows.length; at += GUEST_BATCH) {
+    const inserted = await db
+      .from("guests")
+      .insert(rows.slice(at, at + GUEST_BATCH))
+      .select("id");
+    if (inserted.error) throw new Error(`seed: guests: ${inserted.error.message}`);
+    ids.push(...inserted.data.map((r) => r.id));
+  }
+  const of = (category: string) => rows.filter((r) => r.category === category).length;
+  return {
+    ids,
+    total: rows.length,
+    adults: of("adult"),
+    children: of("child"),
+    infants: of("infant"),
+    firstNames: rows.map((r) => r.first_name),
+  };
+}
+
+/** A guest group (family), inserted directly; returns its id. */
+export async function addGuestGroup(w: SeededWedding, name: string): Promise<string> {
+  const inserted = await w.wedding.founderClient
+    .from("guest_groups")
+    .insert({ wedding_id: w.weddingId, name })
+    .select("id")
+    .single();
+  if (inserted.error) throw new Error(`seed: guest group: ${inserted.error.message}`);
+  return inserted.data.id;
+}
+
+/** A guest with chosen fields (for named flows: duplicates, soft delete, search). Returns its id. */
+export async function addGuest(
+  w: SeededWedding,
+  guest: {
+    firstName: string;
+    lastName?: string;
+    category?: "adult" | "child" | "infant";
+    side?: "A" | "B" | "both" | null;
+    groupId?: string | null;
+    deleted?: boolean;
+  },
+): Promise<string> {
+  const inserted = await w.wedding.founderClient
+    .from("guests")
+    .insert({
+      wedding_id: w.weddingId,
+      first_name: guest.firstName,
+      last_name: guest.lastName ?? null,
+      category: guest.category ?? "adult",
+      side: guest.side ?? null,
+      group_id: guest.groupId ?? null,
+    })
+    .select("id")
+    .single();
+  if (inserted.error) throw new Error(`seed: guest: ${inserted.error.message}`);
+  if (guest.deleted) {
+    const gone = await w.wedding.founderClient
+      .from("guests")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("id", inserted.data.id);
+    if (gone.error) throw new Error(`seed: guest deleted: ${gone.error.message}`);
+  }
+  return inserted.data.id;
+}
+
+export type TestFamilyMember = { user: TestUser; client: TestClient };
+
+/**
+ * A `family` member of the wedding (a role with no `guests` permission): the same pattern as
+ * tests/acceptance/rls-api.test.ts. The membership is written with the secret key, as there is no
+ * invitation flow for this role yet. Log in with `loginAs(page, member.user, ip)`.
+ */
+export async function addFamilyMember(w: SeededWedding): Promise<TestFamilyMember> {
+  const user = await createUser();
+  const { error } = await serviceClient()
+    .from("memberships")
+    .insert({ wedding_id: w.weddingId, user_id: user.id, role: "family" });
+  if (error) throw new Error(`seed: family membership: ${error.message}`);
+  return { user, client: await signInAs(user) };
 }
 
 export async function seedWedding(
