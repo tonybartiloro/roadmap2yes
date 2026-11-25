@@ -109,7 +109,7 @@ I tavoli sono facoltativi. La scheda **Tavoli**, accanto a Persone, è sempre vi
    - **Torna indietro** conserva il testo.
 3. **Importa.** Il pulsante dice quante persone importi, per esempio **Importa 38 invitati**. Le righe con errore vengono saltate, e restano elencate con il motivo. Con **Copia le righe saltate** le copi, le correggi e le riprovi.
 
-Subito dopo compare il messaggio "38 invitati importati" con **Annulla importazione** per almeno 8 secondi. Annulla importazione rimuove le persone importate e i gruppi che l'importazione ha creato (un gruppo già esistente, o che qualcuno ha riempito nel frattempo, resta). Dopo quegli 8 secondi, per togliere le persone importate usa Elimina e poi Elimina definitivamente.
+Subito dopo compare il messaggio "38 invitati importati" con **Annulla importazione** per almeno 8 secondi. Annulla importazione rimuove le persone importate che non hai ancora modificato né messo a un tavolo, e i gruppi che l'importazione ha creato (un gruppo già esistente, o che qualcuno ha riempito nel frattempo, resta). Dopo quegli 8 secondi, per togliere le persone importate usa Elimina e poi Elimina definitivamente.
 
 **Attenzione al lato.** L'esportazione scrive il nome del partner nella colonna lato. Se cambi il nome di un partner dopo un'esportazione, le righe con il vecchio nome non si reimportano: correggi la colonna con il nuovo nome, con `A`, `B` o `entrambi`.
 
