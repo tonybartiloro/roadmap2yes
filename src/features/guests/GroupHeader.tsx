@@ -35,6 +35,7 @@ export function ActionMenu({
   className?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const menuId = useId();
   return (
     <>
       <Button
@@ -56,12 +57,13 @@ export function ActionMenu({
             <SheetDescription className="sr-only">Scegli un&apos;azione</SheetDescription>
           </SheetHeader>
           <div className="flex flex-col gap-2">
-            {actions.map((action) => (
+            {actions.map((action, index) => (
               <div key={action.label} className="flex flex-col gap-1">
                 <Button
                   type="button"
                   variant="outline"
                   disabled={action.disabled ?? false}
+                  {...(action.description ? { "aria-describedby": `${menuId}-${index}` } : {})}
                   className={`justify-start ${action.destructive ? "text-destructive" : ""}`}
                   onClick={() => {
                     setOpen(false);
@@ -72,7 +74,9 @@ export function ActionMenu({
                   {action.label}
                 </Button>
                 {action.description ? (
-                  <p className="text-muted-foreground px-1 text-sm">{action.description}</p>
+                  <p id={`${menuId}-${index}`} className="text-muted-foreground px-1 text-sm">
+                    {action.description}
+                  </p>
                 ) : null}
               </div>
             ))}

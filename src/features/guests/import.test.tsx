@@ -172,7 +172,7 @@ describe("import (AC17-AC20)", () => {
 
   it("imports the ready rows, closes, and offers 'Annulla importazione' for at least 8 s", async () => {
     mocks.importGuestsAction.mockResolvedValue(ok({ batchId: BATCH, guests: 2, groups: 1 }));
-    mocks.undoGuestImportAction.mockResolvedValue({ ok: true, data: undefined });
+    mocks.undoGuestImportAction.mockResolvedValue({ ok: true, data: { guests: 2, groups: 1 } });
     renderScreen();
     await openImport();
     await paste("Mario Rossi\nLuca Rossi");
@@ -222,6 +222,73 @@ describe("import (AC17-AC20)", () => {
     expect(last[1].action.label).toBe("Annulla importazione");
   });
 
+  describe("when the outcome is unknown (REV-47)", () => {
+    async function toPreview() {
+      renderScreen();
+      await openImport();
+      await paste("Mario Rossi");
+      await preview();
+      await userEvent.click(screen.getByRole("button", { name: "Importa 1 invitato" }));
+    }
+    const UNKNOWN =
+      "Non so se l'importazione è andata a buon fine. Controlla la lista prima di riprovare.";
+
+    it.each([
+      [
+        "no response at all",
+        () => mocks.importGuestsAction.mockRejectedValueOnce(new Error("network")),
+      ],
+      [
+        "the service is unreachable",
+        () =>
+          mocks.importGuestsAction.mockResolvedValueOnce({
+            ok: false,
+            code: "unreachable",
+            message: "x",
+          }),
+      ],
+      [
+        "an unreadable answer",
+        () =>
+          mocks.importGuestsAction.mockResolvedValueOnce({
+            ok: false,
+            code: "unknown_outcome",
+            message: "y",
+          }),
+      ],
+    ])(
+      "%s: does not claim nothing was imported and offers no blind retry",
+      async (_name, arrange) => {
+        arrange();
+        await toPreview();
+        expect((await screen.findByRole("alert")).textContent).toBe(UNKNOWN);
+        expect(screen.queryByRole("button", { name: "Riprova" })).toBeNull();
+        expect(screen.queryByRole("button", { name: /^Importa/ })).toBeNull();
+        await userEvent.click(screen.getByRole("button", { name: "Chiudi e controlla l'elenco" }));
+        expect(nav.refresh).toHaveBeenCalled();
+        expect(mocks.importGuestsAction).toHaveBeenCalledTimes(1);
+      },
+    );
+  });
+
+  it("Esc, like Fine, keeps the import and fires the Annulla importazione toast", async () => {
+    mocks.importGuestsAction.mockResolvedValue(ok({ batchId: BATCH, guests: 1, groups: 0 }));
+    renderScreen();
+    await openImport();
+    await paste("Mario Rossi\n;Bianchi;;");
+    await preview();
+    await userEvent.click(screen.getByRole("button", { name: "Importa 1 invitato" }));
+    await screen.findByTestId("import-done");
+    await userEvent.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByTestId("import-done")).toBeNull());
+    const last = vi.mocked(toast).mock.calls.at(-1) as unknown as [
+      string,
+      { action: { label: string } },
+    ];
+    expect(last[0]).toBe("1 invitato importato.");
+    expect(last[1].action.label).toBe("Annulla importazione");
+  });
+
   it("says 'Non ho importato nulla' with Riprova when saving fails, and keeps the preview", async () => {
     mocks.importGuestsAction.mockResolvedValueOnce({
       ok: false,
@@ -257,6 +324,7 @@ describe("import (AC17-AC20)", () => {
           .value,
       ).toBe("Niccolò;Rossi"),
     );
+    expect(screen.getByText("File letto: 1 riga.")).toBeTruthy();
   });
 
   it("refuses a file that is not text", async () => {
@@ -309,6 +377,7 @@ describe("Esporta CSV (AC21)", () => {
     expect(content).toContain("Mario;Rossi;adulto;Tony;Famiglia Rossi");
     expect(content).toContain("Luca;Rossi;bambino;entrambi");
     expect(content).not.toContain("Gone");
+    expect(toast).toHaveBeenCalledWith(`File salvato: ${name}`);
   });
 
   it("is off, with the reason, when there is nobody to export", () => {

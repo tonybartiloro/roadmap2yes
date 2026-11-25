@@ -14,6 +14,11 @@ function ordered(rows: readonly ImportRow[]): ImportRow[] {
   return rows.toSorted((a, b) => rank(a) - rank(b) || a.line - b.line);
 }
 
+/** What is shown of a row's source: a runaway row (an unclosed quote) can be megabytes. "Copia" keeps it whole. */
+export function clipSource(source: string, max = 200): string {
+  return source.length > max ? `${source.slice(0, max)}…` : source;
+}
+
 function Card({ row }: { row: ImportRow }) {
   const guest = row.guest;
   return (
@@ -29,7 +34,7 @@ function Card({ row }: { row: ImportRow }) {
               Riga {row.line}: {row.errors.join("; ")}
             </span>
           </p>
-          <p className="text-muted-foreground text-sm break-words">{row.source}</p>
+          <p className="text-muted-foreground text-sm break-words">{clipSource(row.source)}</p>
         </>
       ) : (
         <>

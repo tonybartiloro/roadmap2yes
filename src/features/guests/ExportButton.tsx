@@ -36,7 +36,9 @@ export function exportMenuAction(
     onSelect: () => {
       try {
         const csv = guestsToCsv(live, groups, names);
-        downloadText(guestsCsvFileName(todayInRome(now())), csv, "text/csv;charset=utf-8");
+        const name = guestsCsvFileName(todayInRome(now()));
+        downloadText(name, csv, "text/csv;charset=utf-8");
+        toast(`File salvato: ${name}`);
       } catch {
         toast.error("Non riesco a preparare il file. Riprova.");
       }

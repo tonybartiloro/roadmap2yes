@@ -30,3 +30,13 @@ Questions: none.
 ## Risposte (developer C)
 
 - **REV-45**: Corretto. `guestsCsvOf` (`src/domain/export/build.ts`) usa ora `displayName(..., "") || null`, come `partnerNames().real` di Invitati: con un partner senza nome ne' etichetta nel CSV va la lettera, mai "Partner A". Test di andata e ritorno in `export.test.ts` riscritto: l'import riceve i nomi calcolati con una regola scritta nel test (nome o etichetta, `null` se vuoto), indipendente da `guestsCsvOf`, e verifica che il file non contenga "Partner"; casi: un partner senza nome, nessun partner con nome (`{a:null,b:null}`), due partner omonimi. Con il vecchio codice i primi due falliscono.
+
+## Risposte
+- **REV-45**: fuori dai miei file (export completo, sviluppatore C): inoltrato dal coordinatore.
+- **REV-46**: fatto. Nel passo finale Esc, overlay e X passano da `finishDone` come "Fine": l'importazione resta e il toast "Annulla importazione" parte sempre. Test con Esc.
+- **REV-47**: parole al posto dell'RPC (decisione del coordinatore). Con risposta del database (importazione atomica) resta "Non ho importato nulla" + "Riprova". Senza risposta (eccezione o rete), `unreachable` o risposta illeggibile (`unknown_outcome`): "Non so se l'importazione è andata a buon fine. Controlla la lista prima di riprovare.", niente "Riprova" e un pulsante "Chiudi e controlla l'elenco" (chiude e ricarica). Un test per caso (tre) più quello del caso noto.
+- **REV-48**: fatto. L'origine della riga è tagliata a 200 caratteri nell'anteprima e nell'elenco finale ("Copia le righe saltate" la copia intera); l'elenco finale ha "Mostra altre".
+- **REV-49**: fatto. Sessione controllata per prima; riga con carattere NUL rifiutata come `invalid_row` (test).
+- **REV-50**: fatto. Toast "File salvato: {nome}" dopo l'esportazione; `aria-describedby` tra pulsante e descrizione nel menu.
+- **REV-51**: fatto. `role="status"` "File letto: N righe." dopo la scelta del file (test).
+- Riconciliazione RPC: tipi generati senza cast, `undo_guest_import` restituisce `{guests, groups}` (toast "Importazione annullata: N persone rimosse."; nessun testo dice che vanno in "Eliminati di recente"). Test dell'annullamento aggiornati.

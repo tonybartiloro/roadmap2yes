@@ -12,6 +12,7 @@ import {
 } from "@/domain/guests/csv-import";
 import { LIMITS, validateGuest } from "@/domain/guests/validation";
 import type { ActionResult } from "@/features/decisions/types";
+import type { Json } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
 import { mapDbError, type Db } from "./data";
 
@@ -26,10 +27,9 @@ import { mapDbError, type Db } from "./data";
 const SESSION_EXPIRED = "La sessione è scaduta. Entra di nuovo: non hai perso nulla.";
 const IMPORT_FAILED = "Non ho importato nulla. Riprova tra un attimo.";
 const INVALID_ROW = "Una riga non è valida: torna indietro e controlla l'anteprima.";
+const OUTCOME_UNKNOWN =
+  "Non so se l'importazione è andata a buon fine. Controlla la lista prima di riprovare.";
 const UNDO_FAILED = "Non sono riuscito ad annullare l'importazione. Ricarica la pagina.";
-
-/** Name of the RPC argument that carries the batch id (kept in one place until the types land). */
-const UNDO_ARG = "p_batch_id";
 
 const optionalText = z.string().nullable();
 
@@ -48,12 +48,10 @@ const importSchema = z.object({
   rows: z.array(rowSchema).min(1).max(MAX_IMPORT_ROWS, IMPORT_TOO_MANY_ROWS),
 });
 
+/** `groups` = the new groups the import created. */
 export type ImportResult = { batchId: string; guests: number; groups: number };
-
-type Rpc = (
-  fn: string,
-  args: Record<string, unknown>,
-) => Promise<{ data: unknown; error: { code?: string; message?: string } | null }>;
+/** What the undo removed, for good (not into "Eliminati di recente"). */
+export type UndoImportResult = { guests: number; groups: number };
 
 async function session(): Promise<{ db: Db } | null> {
   const db = (await createClient()) as unknown as Db;
@@ -73,6 +71,8 @@ function failure(error: { code?: string; message?: string } | null, fallback: st
 }
 
 export async function importGuestsAction(input: unknown): Promise<ActionResult<ImportResult>> {
+  const ctx = await session();
+  if (!ctx) return { ok: false, code: "session", message: SESSION_EXPIRED };
   const parsed = importSchema.safeParse(input);
   if (!parsed.success) {
     const tooMany = parsed.error.issues.some((i) => i.message === IMPORT_TOO_MANY_ROWS);
@@ -95,19 +95,16 @@ export async function importGuestsAction(input: unknown): Promise<ActionResult<I
       notes: row.notes,
     });
     const group = (row.group ?? "").trim();
-    if (Object.keys(errors).length > 0 || group.length > LIMITS.name) {
+    const hasNul = Object.values(row).some((v) => typeof v === "string" && v.includes("\u0000"));
+    if (hasNul || Object.keys(errors).length > 0 || group.length > LIMITS.name) {
       return { ok: false, code: "invalid_row", message: INVALID_ROW };
     }
   }
   if (payloadSize(rows) > MAX_IMPORT_BYTES) {
     return { ok: false, code: "payload_too_large", message: IMPORT_TOO_LARGE };
   }
-  const ctx = await session();
-  if (!ctx) return { ok: false, code: "session", message: SESSION_EXPIRED };
 
-  const result = await (ctx.db.rpc as unknown as Rpc).call(ctx.db, "import_guests", {
-    p_rows: rows,
-  });
+  const result = await ctx.db.rpc("import_guests", { p_rows: rows as unknown as Json });
   const body = result.data as { batch_id?: unknown; guests?: unknown; groups?: unknown } | null;
   if (
     result.error ||
@@ -116,6 +113,8 @@ export async function importGuestsAction(input: unknown): Promise<ActionResult<I
     typeof body.guests !== "number" ||
     typeof body.groups !== "number"
   ) {
+    // A database error means the transaction rolled back. No error but an unreadable answer: unknown.
+    if (!result.error) return { ok: false, code: "unknown_outcome", message: OUTCOME_UNKNOWN };
     return failure(result.error, IMPORT_FAILED);
   }
   revalidatePath("/invitati");
@@ -124,16 +123,19 @@ export async function importGuestsAction(input: unknown): Promise<ActionResult<I
 }
 
 /** "Annulla importazione" (AC20): removes what the batch created (people and the groups it made). */
-export async function undoGuestImportAction(input: unknown): Promise<ActionResult> {
+export async function undoGuestImportAction(
+  input: unknown,
+): Promise<ActionResult<UndoImportResult>> {
   const parsed = z.object({ batchId: z.string().uuid() }).safeParse(input);
   if (!parsed.success) return { ok: false, code: "invalid", message: UNDO_FAILED };
   const ctx = await session();
   if (!ctx) return { ok: false, code: "session", message: SESSION_EXPIRED };
-  const result = await (ctx.db.rpc as unknown as Rpc).call(ctx.db, "undo_guest_import", {
-    [UNDO_ARG]: parsed.data.batchId,
-  });
-  if (result.error) return failure(result.error, UNDO_FAILED);
+  const result = await ctx.db.rpc("undo_guest_import", { p_batch_id: parsed.data.batchId });
+  const body = result.data as { guests?: unknown; groups?: unknown } | null;
+  if (result.error || !body || typeof body.guests !== "number" || typeof body.groups !== "number") {
+    return failure(result.error, UNDO_FAILED);
+  }
   revalidatePath("/invitati");
   revalidatePath("/altro/impostazioni");
-  return { ok: true, data: undefined };
+  return { ok: true, data: { guests: body.guests, groups: body.groups } };
 }

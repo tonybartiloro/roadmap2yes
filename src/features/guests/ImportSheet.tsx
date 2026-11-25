@@ -28,7 +28,9 @@ import { UNDO_TOAST_MS } from "@/features/timeline/copy";
 import { PanelContent } from "@/features/timeline/PanelContent";
 import type { GroupView, GuestView } from "./data";
 import { importGuestsAction, undoGuestImportAction } from "./import-actions";
-import { ImportPreview } from "./ImportPreview";
+import { clipSource, ImportPreview } from "./ImportPreview";
+import { ShowMore } from "./ShowMore";
+import { PAGE_SIZE } from "./view";
 
 /** A file bigger than this is refused before it is read (even 500 maximal rows are ~1.7 MB). */
 const MAX_FILE_BYTES = 4_000_000;
@@ -45,6 +47,11 @@ const STEP_TITLES: Record<Step, string> = {
   preview: "Controlla l'anteprima",
   done: "Importazione finita",
 };
+const OUTCOME_UNKNOWN =
+  "Non so se l'importazione è andata a buon fine. Controlla la lista prima di riprovare.";
+/** Codes of a failure whose outcome we cannot vouch for: no answer, or an unreadable one. */
+const UNKNOWN_OUTCOME_CODES: ReadonlySet<string> = new Set(["unreachable", "unknown_outcome"]);
+
 const STEP_NUMBER: Record<Step, number> = { input: 1, preview: 2, done: 3 };
 
 /**
@@ -76,6 +83,9 @@ export function ImportSheet({
   const [pending, setPending] = useState(false);
   const [done, setDone] = useState<Done | null>(null);
   const [formatOpen, setFormatOpen] = useState(false);
+  const [unknownOutcome, setUnknownOutcome] = useState(false);
+  const [doneShown, setDoneShown] = useState(PAGE_SIZE);
+  const [fileNote, setFileNote] = useState("");
   const titleRef = useRef<HTMLHeadingElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -91,6 +101,8 @@ export function ImportSheet({
       const decoded = decodeCsvBytes(new Uint8Array(await file.arrayBuffer()));
       if (!decoded) return setError(IMPORT_UNREADABLE);
       setText(decoded.text);
+      const lines = decoded.text.split(/\r\n|\r|\n/).filter((line) => line.trim() !== "").length;
+      setFileNote(`File letto: ${plural(lines, "riga", "righe")}.`);
     } catch {
       setError(IMPORT_UNREADABLE);
     }
@@ -107,11 +119,20 @@ export function ImportSheet({
 
   async function undo(batchId: string) {
     const result = await undoGuestImportAction({ batchId });
-    if (result.ok) toast("Importazione annullata.");
-    else {
+    if (result.ok) {
+      toast(
+        `Importazione annullata: ${plural(result.data.guests, "persona rimossa", "persone rimosse")}.`,
+      );
+    } else {
       toast.error(result.message);
       onStale();
     }
+  }
+
+  /** Closing the result step, by any way (Fine, Esc, overlay, X), keeps the import and says how to undo. */
+  function finishDone() {
+    onClose();
+    if (done) announce(done.batchId, done.guests);
   }
 
   function announce(batchId: string, count: number) {
@@ -126,9 +147,25 @@ export function ImportSheet({
     if (!preview) return;
     setError(null);
     setPending(true);
-    const result = await importGuestsAction({ rows: toImportPayload(preview) });
+    let result: Awaited<ReturnType<typeof importGuestsAction>>;
+    try {
+      result = await importGuestsAction({ rows: toImportPayload(preview) });
+    } catch {
+      // No response at all (network, timeout): the write may or may not have happened.
+      setPending(false);
+      setUnknownOutcome(true);
+      return setError(OUTCOME_UNKNOWN);
+    }
     setPending(false);
-    if (!result.ok) return setError(`Non ho importato nulla. ${result.message}`);
+    if (!result.ok) {
+      // A database answer means the transaction was rolled back: nothing was imported. Without an
+      // answer (unreachable) or with an unreadable one, we cannot say so.
+      if (UNKNOWN_OUTCOME_CODES.has(result.code)) {
+        setUnknownOutcome(true);
+        return setError(OUTCOME_UNKNOWN);
+      }
+      return setError(`Non ho importato nulla. ${result.message}`);
+    }
     const skipped = preview.rows.filter((row) => row.status === "error");
     if (skipped.length === 0) {
       onClose();
@@ -172,7 +209,14 @@ export function ImportSheet({
   }
 
   return (
-    <Sheet open onOpenChange={(next) => (next || pending ? undefined : onClose())}>
+    <Sheet
+      open
+      onOpenChange={(next) => {
+        if (next || pending) return;
+        if (step === "done") finishDone();
+        else onClose();
+      }}
+    >
       <PanelContent className="max-h-[92dvh] overflow-y-auto" aria-describedby="import-step">
         <SheetHeader>
           <SheetTitle ref={titleRef} tabIndex={-1}>
@@ -243,19 +287,31 @@ export function ImportSheet({
               {plural(done.skipped.length, "riga saltata", "righe saltate")}.
             </p>
             <ul className="flex flex-col gap-2">
-              {done.skipped.map((row) => (
+              {done.skipped.slice(0, doneShown).map((row) => (
                 <li key={row.line} className="border-border rounded-lg border p-3">
                   <p className="text-base font-semibold">
                     Riga {row.line}: {row.errors.join("; ")}
                   </p>
-                  <p className="text-muted-foreground text-sm break-words">{row.source}</p>
+                  <p className="text-muted-foreground text-sm break-words">
+                    {clipSource(row.source)}
+                  </p>
                 </li>
               ))}
             </ul>
+            <ShowMore
+              remaining={done.skipped.length - doneShown}
+              onClick={() => setDoneShown((n) => n + PAGE_SIZE)}
+            />
             <Button type="button" variant="outline" onClick={() => void copySkipped()}>
               Copia le righe saltate
             </Button>
           </div>
+        ) : null}
+
+        {fileNote && step === "input" ? (
+          <p role="status" className="text-muted-foreground text-sm">
+            {fileNote}
+          </p>
         ) : null}
 
         {error ? (
@@ -277,17 +333,30 @@ export function ImportSheet({
           ) : null}
           {step === "preview" && preview ? (
             <>
-              <Button
-                type="button"
-                disabled={pending || preview.ready === 0}
-                onClick={() => void runImport()}
-              >
-                {pending
-                  ? "Un attimo…"
-                  : error
-                    ? "Riprova"
-                    : `Importa ${plural(preview.ready, "invitato", "invitati")}`}
-              </Button>
+              {unknownOutcome ? (
+                // No blind retry: the first attempt may have been saved.
+                <Button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onStale();
+                  }}
+                >
+                  Chiudi e controlla l&apos;elenco
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  disabled={pending || preview.ready === 0}
+                  onClick={() => void runImport()}
+                >
+                  {pending
+                    ? "Un attimo…"
+                    : error
+                      ? "Riprova"
+                      : `Importa ${plural(preview.ready, "invitato", "invitati")}`}
+                </Button>
+              )}
               <Button
                 type="button"
                 variant="outline"
@@ -320,13 +389,7 @@ export function ImportSheet({
               >
                 Annulla importazione
               </Button>
-              <Button
-                type="button"
-                onClick={() => {
-                  onClose();
-                  announce(done.batchId, done.guests);
-                }}
-              >
+              <Button type="button" onClick={finishDone}>
                 Fine
               </Button>
             </>

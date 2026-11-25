@@ -150,6 +150,24 @@ describe("importGuestsAction", () => {
     expect(leaks(denied)).toEqual([]);
   });
 
+  it("refuses a NUL character in any field, and answers an unreadable success as an unknown outcome", async () => {
+    expect(await importGuestsAction({ rows: [row({ notes: "ab\u0000cd" })] })).toMatchObject({
+      ok: false,
+      code: "invalid_row",
+    });
+    expect(state.rpc).not.toHaveBeenCalled();
+    state.rpc.mockResolvedValueOnce({ data: "garbage", error: null });
+    const unknown = await importGuestsAction({ rows: [row()] });
+    expect(unknown).toMatchObject({ ok: false, code: "unknown_outcome" });
+    expect(unknown).toMatchObject({ message: expect.stringContaining("Controlla la lista") });
+    // a database ERROR is a rolled-back transaction: a known failure, not an unknown outcome
+    state.rpc.mockResolvedValueOnce({ data: null, error: { code: "XX000", message: "x" } });
+    expect(await importGuestsAction({ rows: [row()] })).toMatchObject({
+      ok: false,
+      code: "unknown",
+    });
+  });
+
   it("asks to sign in again without a session", async () => {
     state.claims = null;
     expect(await importGuestsAction({ rows: [row()] })).toMatchObject({
@@ -164,8 +182,11 @@ describe("undoGuestImportAction", () => {
   const batchId = "00000000-0000-4000-8000-0000000000aa";
 
   it("removes the batch through the RPC and refreshes", async () => {
-    state.rpc.mockResolvedValue({ data: null, error: null });
-    expect(await undoGuestImportAction({ batchId })).toEqual({ ok: true, data: undefined });
+    state.rpc.mockResolvedValue({ data: { guests: 3, groups: 1 }, error: null });
+    expect(await undoGuestImportAction({ batchId })).toEqual({
+      ok: true,
+      data: { guests: 3, groups: 1 },
+    });
     expect(state.rpc).toHaveBeenCalledWith("undo_guest_import", { p_batch_id: batchId });
     expect(state.revalidated).toEqual(["/invitati", "/altro/impostazioni"]);
   });
