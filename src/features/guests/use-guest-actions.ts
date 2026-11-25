@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { plural } from "@/components/format";
 import type { ActionFailure } from "@/features/decisions/types";
 import { UNDO_TOAST_MS } from "@/features/timeline/copy";
 import {
@@ -89,7 +90,10 @@ export function useGuestActions() {
     const { previous, changed } = result.data;
     undoToast(message(changed), async () => {
       const back = await undoBulkAction({ previous });
-      if (back.ok) toast(`Annullato: ${back.data.restored} ripristinati.`);
+      if (back.ok)
+        toast(
+          `Annullato: ${plural(back.data.restored, "persona ripristinata", "persone ripristinate")}.`,
+        );
       else fail(back);
     });
     return true;

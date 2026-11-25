@@ -58,8 +58,8 @@ function Rows({
             groupLabel={groupNames?.get(guest.id) ?? null}
             selecting={handlers.selecting}
             selected={handlers.selected.has(guest.id)}
-            onSelect={(next) => handlers.onSelect(guest.id, next)}
-            onOpen={() => handlers.onOpen(guest)}
+            onSelect={handlers.onSelect}
+            onOpen={handlers.onOpen}
           />
         ))}
       </ul>

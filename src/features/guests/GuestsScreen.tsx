@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useDeferredValue, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CheckSquare, History, Plus, UserPlus, UsersRound } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
@@ -30,14 +30,9 @@ import { RenameGroupSheet } from "./RenameGroupSheet";
 import { SelectionBar } from "./SelectionBar";
 import { Summary } from "./Summary";
 import { useGuestActions } from "./use-guest-actions";
-import {
-  buildSections,
-  COLLAPSE_ABOVE,
-  fullName,
-  liveGroupId,
-  PAGE_SIZE,
-  type PartnerNames,
-} from "./view";
+import { buildSections, COLLAPSE_ABOVE, fullName, PAGE_SIZE, type PartnerNames } from "./view";
+
+const MENU_ID = "guests-menu";
 
 type Sheet_ =
   | { kind: "guest"; guest: GuestView | null; groupId: string | null }
@@ -76,11 +71,14 @@ export function GuestsScreen({
 
   const { guests, groups, tables } = snapshot;
   const live = useMemo(() => guests.filter((g) => !g.deletedAt), [guests]);
+  // The box stays responsive while the (large) list catches up; the count is announced once.
+  const deferredQuery = useDeferredValue(filters.query);
+  const effective = useMemo(() => ({ ...filters, query: deferredQuery }), [filters, deferredQuery]);
   const filtered = useMemo(
-    () => filterGuests(live, filters, { groups, tables }),
-    [live, filters, groups, tables],
+    () => filterGuests(live, effective, { groups, tables }),
+    [live, effective, groups, tables],
   );
-  const filtering = hasActiveFilters(filters);
+  const filtering = hasActiveFilters(effective);
   const total = useMemo(() => countGuests(live), [live]);
   const shownCounts = useMemo(() => countGuests(filtered), [filtered]);
   const bySide = useMemo(() => countBySide(live), [live]);
@@ -89,10 +87,10 @@ export function GuestsScreen({
     [filtered, groups, filtering],
   );
   const groupNames = useMemo(() => {
+    const liveGroups = new Map(groups.filter((g) => !g.deletedAt).map((g) => [g.id, g.name]));
     const names = new Map<string, string>();
     for (const g of filtered) {
-      const id = liveGroupId(g, groups);
-      const name = id ? groups.find((x) => x.id === id)?.name : undefined;
+      const name = g.groupId ? liveGroups.get(g.groupId) : undefined;
       if (name) names.set(g.id, name);
     }
     return names;
@@ -104,10 +102,25 @@ export function GuestsScreen({
   const liveIds = useMemo(() => new Set(live.map((g) => g.id)), [live]);
   const selectedIds = [...selected].filter((id) => liveIds.has(id));
 
+  // A selection never outlives its filter: "Elimina" must only act on people that are in view.
   function setFilters(next: GuestFilters) {
     setFiltersState(next);
     setList((current) => ({ ...current, shown: {} }));
+    setSelected((current) => (current.size === 0 ? current : new Set()));
   }
+
+  const onSelect = useCallback((id: string, on: boolean) => {
+    setSelected((current) => {
+      const next = new Set(current);
+      if (on) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }, []);
+  const onOpen = useCallback(
+    (guest: GuestView) => setSheet({ kind: "guest", guest, groupId: null }),
+    [],
+  );
 
   async function run<T>(work: () => Promise<T>): Promise<T> {
     setBusy(true);
@@ -121,14 +134,8 @@ export function GuestsScreen({
   const handlers: ListHandlers = {
     selecting,
     selected,
-    onSelect: (id, on) =>
-      setSelected((current) => {
-        const next = new Set(current);
-        if (on) next.add(id);
-        else next.delete(id);
-        return next;
-      }),
-    onOpen: (guest) => setSheet({ kind: "guest", guest, groupId: null }),
+    onSelect,
+    onOpen,
     onShowMore: (key) =>
       setList((c) => ({
         ...c,
@@ -158,6 +165,8 @@ export function GuestsScreen({
   const stopSelecting = () => {
     setSelecting(false);
     setSelected(new Set());
+    // The bar (and its focus) disappears: send the focus to the menu that started the selection.
+    queueMicrotask(() => document.getElementById(MENU_ID)?.focus());
   };
 
   const menu: MenuAction[] = [
@@ -180,7 +189,11 @@ export function GuestsScreen({
   const stale = () => router.refresh();
 
   return (
-    <div className="flex flex-col gap-4" data-testid="guests-screen">
+    // Room under the list for the fixed FAB, or for the (up to three rows tall) selection bar.
+    <div
+      className={`flex flex-col gap-4 ${selecting ? "pb-44" : "pb-12"}`}
+      data-testid="guests-screen"
+    >
       <div className="flex items-center justify-between gap-2">
         <h1 className="text-2xl leading-8 font-semibold">Invitati</h1>
         <HelpLink route="/invitati" />
@@ -227,7 +240,7 @@ export function GuestsScreen({
               partners={partners}
               matchCount={filtered.length}
             />
-            <ActionMenu title="Altro" triggerLabel="Altro" actions={menu} />
+            <ActionMenu id={MENU_ID} title="Altro" triggerLabel="Altro" actions={menu} />
           </div>
           <FilterChips
             filters={filters}
@@ -275,6 +288,7 @@ export function GuestsScreen({
         <SelectionBar
           selectedCount={selectedIds.length}
           filteredCount={filtered.length}
+          filtering={filtering}
           groups={groups}
           busy={busy}
           onSelectAll={() => setSelected(new Set(filtered.map((g) => g.id)))}

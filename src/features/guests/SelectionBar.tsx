@@ -29,6 +29,7 @@ import {
 export function SelectionBar({
   selectedCount,
   filteredCount,
+  filtering = false,
   groups,
   busy,
   onSelectAll,
@@ -40,6 +41,8 @@ export function SelectionBar({
 }: {
   selectedCount: number;
   filteredCount: number;
+  /** Filters or search active: the button says "filtrati", otherwise just "tutti". */
+  filtering?: boolean;
   groups: readonly GroupView[];
   busy: boolean;
   onSelectAll: () => void;
@@ -66,6 +69,8 @@ export function SelectionBar({
     const resolved = await resolveGroup(choice);
     if (!resolved.ok || !resolved.groupId)
       return setFailure(resolved.ok ? "Scegli un gruppo." : resolved.message);
+    // A group created just now stays chosen: a retry must not create a second one with that name.
+    if (choice.kind === "new") setChoice({ kind: "existing", id: resolved.groupId });
     if (await onAssignGroup(resolved.groupId)) {
       setAssigning(false);
       setChoice(NO_GROUP);
@@ -84,7 +89,9 @@ export function SelectionBar({
           {selectedCount} {selectedCount === 1 ? "selezionato" : "selezionati"}
         </p>
         <Button type="button" variant="ghost" onClick={allSelected ? onClear : onSelectAll}>
-          {allSelected ? "Deseleziona tutti" : `Seleziona tutti i ${filteredCount} filtrati`}
+          {allSelected
+            ? "Deseleziona tutti"
+            : `Seleziona tutti i ${filteredCount}${filtering ? " filtrati" : ""}`}
         </Button>
       </div>
       {tooMany ? (

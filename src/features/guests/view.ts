@@ -86,10 +86,13 @@ export function buildSections(
   groups: readonly GroupView[],
   keepEmpty: boolean,
 ): Section[] {
+  const liveIds = new Set(groups.filter((g) => !g.deletedAt).map((g) => g.id));
   const members = new Map<string | null, GuestView[]>();
   for (const guest of guests) {
-    const key = liveGroupId(guest, groups);
-    members.set(key, [...(members.get(key) ?? []), guest]);
+    const key = guest.groupId && liveIds.has(guest.groupId) ? guest.groupId : null;
+    const bucket = members.get(key);
+    if (bucket) bucket.push(guest);
+    else members.set(key, [guest]);
   }
   const sections: Section[] = groups
     .filter((g) => !g.deletedAt)

@@ -1,6 +1,7 @@
 "use client";
 
 import { Input } from "@/components/ui/input";
+import { LIMITS } from "@/domain/guests";
 import { Field, NativeSelect } from "@/features/decisions/form-bits";
 import { addGroupAction } from "./actions";
 import type { GroupView } from "./data";
@@ -72,7 +73,7 @@ export function GroupPicker({
             <Input
               {...control}
               value={value.name}
-              maxLength={80}
+              maxLength={LIMITS.name}
               placeholder="Famiglia Rossi"
               onChange={(event) => onChange({ kind: "new", name: event.target.value })}
             />

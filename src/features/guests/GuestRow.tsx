@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { GuestView } from "./data";
 import { fullName, rowLabel, sideText, typeText, type PartnerNames } from "./view";
@@ -9,7 +10,7 @@ import { fullName, rowLabel, sideText, typeText, type PartnerNames } from "./vie
  * Rossi"); in selection mode a checkbox row. Type, side and group are always text (never colour).
  * `extra` is the extension point for the table column (T9).
  */
-export function GuestRow({
+export const GuestRow = memo(function GuestRow({
   guest,
   partners,
   groupLabel,
@@ -25,8 +26,9 @@ export function GuestRow({
   groupLabel: string | null;
   selecting: boolean;
   selected: boolean;
-  onSelect: (selected: boolean) => void;
-  onOpen: () => void;
+  /** Stable callbacks (the row binds its own id) so a memoised row skips needless renders. */
+  onSelect: (id: string, selected: boolean) => void;
+  onOpen: (guest: GuestView) => void;
   extra?: React.ReactNode;
 }) {
   const name = fullName(guest);
@@ -49,7 +51,7 @@ export function GuestRow({
         <label className={`${box} cursor-pointer`}>
           <Checkbox
             checked={selected}
-            onCheckedChange={(next) => onSelect(next === true)}
+            onCheckedChange={(next) => onSelect(guest.id, next === true)}
             aria-label={`Seleziona ${name}`}
           />
           {details}
@@ -57,7 +59,7 @@ export function GuestRow({
       ) : (
         <button
           type="button"
-          onClick={onOpen}
+          onClick={() => onOpen(guest)}
           aria-label={rowLabel(guest, groupLabel)}
           className={`${box} hover:bg-muted focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-none focus-visible:ring-inset`}
         >
@@ -66,4 +68,4 @@ export function GuestRow({
       )}
     </li>
   );
-}
+});

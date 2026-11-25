@@ -4,6 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { LIMITS } from "@/domain/guests";
 import {
   Sheet,
   SheetDescription,
@@ -84,7 +85,7 @@ export function RenameGroupSheet({
                 <Input
                   {...control}
                   value={name}
-                  maxLength={80}
+                  maxLength={LIMITS.name}
                   required
                   onChange={(event) => setName(event.target.value)}
                 />

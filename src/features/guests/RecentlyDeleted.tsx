@@ -62,6 +62,13 @@ interface Item {
   note: string | null;
 }
 
+interface SectionDef {
+  scope: Exclude<EmptyScope, "all">;
+  title: string;
+  items: Item[];
+  after: string;
+}
+
 const NO_RETURN = "Non si può annullare.";
 
 /**
@@ -95,12 +102,7 @@ export function RecentlyDeleted({
   const members = (field: "groupId" | "tableId", id: string) =>
     live.filter((g) => g[field] === id).length;
 
-  const sections: {
-    scope: Exclude<EmptyScope, "all">;
-    title: string;
-    items: Item[];
-    after: string;
-  }[] = [
+  const all: SectionDef[] = [
     {
       scope: "guests",
       title: "Persone",
@@ -155,7 +157,9 @@ export function RecentlyDeleted({
           };
         }),
     },
-  ].filter((section) => section.items.length > 0) as never;
+  ];
+  // Empty sections are hidden. The lists are not paged: "Svuota" is the way out of a long one.
+  const sections = all.filter((section) => section.items.length > 0);
 
   const total = sections.reduce((sum, s) => sum + s.items.length, 0);
   const noun = (scope: string, n: number) =>
@@ -165,7 +169,7 @@ export function RecentlyDeleted({
         ? plural(n, "gruppo", "gruppi")
         : plural(n, "tavolo", "tavoli");
 
-  function askPurge(section: (typeof sections)[number], item: Item) {
+  function askPurge(section: SectionDef, item: Item) {
     setConfirm({
       title: `Elimini definitivamente «${item.name}»?`,
       description: `${NO_RETURN} ${section.after}`,

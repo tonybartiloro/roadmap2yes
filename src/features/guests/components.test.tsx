@@ -327,7 +327,7 @@ describe("multiple selection (AC7)", () => {
     renderScreen({ guests: [...all, guest({ deletedAt: "2026-11-01T10:00:00Z" })] });
     await startSelecting();
     expect(screen.getByRole("button", { name: "Elimina" }).hasAttribute("disabled")).toBe(true);
-    await userEvent.click(screen.getByRole("button", { name: "Seleziona tutti i 5 filtrati" }));
+    await userEvent.click(screen.getByRole("button", { name: "Seleziona tutti i 5" }));
     expect(screen.getByText("5 selezionati")).toBeTruthy();
     await userEvent.click(screen.getByRole("button", { name: "Elimina" }));
 
@@ -375,10 +375,87 @@ describe("multiple selection (AC7)", () => {
     });
     renderScreen({ guests: [guest(), guest()] });
     await startSelecting();
-    await userEvent.click(screen.getByRole("button", { name: "Seleziona tutti i 2 filtrati" }));
+    await userEvent.click(screen.getByRole("button", { name: "Seleziona tutti i 2" }));
     await userEvent.click(screen.getByRole("button", { name: "Elimina" }));
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Ne ho cambiati solo alcuni."));
     expect(nav.refresh).toHaveBeenCalled();
+  });
+
+  it("shows the message of a denied bulk action and does not reload", async () => {
+    actions.bulkGuestsAction.mockResolvedValue({
+      ok: false,
+      code: "forbidden",
+      message: "Non hai il permesso di farlo.",
+    });
+    renderScreen({ guests: [guest(), guest()] });
+    await startSelecting();
+    await userEvent.click(screen.getByRole("button", { name: "Seleziona tutti i 2" }));
+    await userEvent.click(screen.getByRole("button", { name: "Elimina" }));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Non hai il permesso di farlo."));
+    expect(nav.refresh).not.toHaveBeenCalled();
+  });
+
+  it("drops the selection when the filters change, so Elimina only acts on what is in view", async () => {
+    renderScreen({
+      guests: [
+        guest({ firstName: "Mario" }),
+        guest({ firstName: "Luca" }),
+        guest({ firstName: "Sara" }),
+      ],
+    });
+    await startSelecting();
+    await userEvent.click(screen.getByRole("button", { name: "Seleziona tutti i 3" }));
+    expect(screen.getByText("3 selezionati")).toBeTruthy();
+    await userEvent.type(screen.getByRole("searchbox"), "Mario");
+    await waitFor(() => expect(screen.getByText("0 selezionati")).toBeTruthy());
+    expect(screen.getByRole("button", { name: "Elimina" }).hasAttribute("disabled")).toBe(true);
+    expect(screen.getByRole("button", { name: "Seleziona tutti i 1 filtrati" })).toBeTruthy();
+  });
+
+  it("assigns the selected people to a group from the bar, with Annulla", async () => {
+    actions.bulkGuestsAction.mockResolvedValue(ok({ previous: [], changed: 2 }));
+    const guests = [guest(), guest()];
+    renderScreen({ guests, groups: [group("g1", "Famiglia Rossi")] });
+    await startSelecting();
+    await userEvent.click(screen.getByRole("button", { name: "Seleziona tutti i 2" }));
+    await userEvent.click(screen.getByRole("button", { name: "Assegna a gruppo" }));
+    await userEvent.selectOptions(screen.getByLabelText("Gruppo"), "g1");
+    await userEvent.click(screen.getByRole("button", { name: "Assegna" }));
+    await waitFor(() =>
+      expect(actions.bulkGuestsAction).toHaveBeenCalledWith({
+        ids: guests.map((g) => g.id),
+        op: "assign_group",
+        target: "g1",
+      }),
+    );
+  });
+
+  it("does not create a second group when 'Assegna' is retried after a failure", async () => {
+    actions.addGroupAction.mockResolvedValue(ok({ groupId: "g-new" }));
+    actions.bulkGuestsAction
+      .mockResolvedValueOnce({
+        ok: false,
+        code: "unknown",
+        message: "Non sono riuscito a cambiarli tutti. Riprova.",
+      })
+      .mockResolvedValueOnce(ok({ previous: [], changed: 1 }));
+    renderScreen({ guests: [guest()] });
+    await startSelecting();
+    await userEvent.click(screen.getByRole("button", { name: "Seleziona tutti i 1" }));
+    await userEvent.click(screen.getByRole("button", { name: "Assegna a gruppo" }));
+    await userEvent.selectOptions(screen.getByLabelText("Gruppo"), "Nuovo gruppo…");
+    await userEvent.type(
+      screen.getByRole("textbox", { name: "Nome del nuovo gruppo" }),
+      "Famiglia Verdi",
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Assegna" }));
+    await waitFor(() => expect(actions.bulkGuestsAction).toHaveBeenCalledTimes(1));
+    await userEvent.click(screen.getByRole("button", { name: "Assegna" }));
+    await waitFor(() => expect(actions.bulkGuestsAction).toHaveBeenCalledTimes(2));
+    expect(actions.addGroupAction).toHaveBeenCalledTimes(1);
+    expect(actions.bulkGuestsAction).toHaveBeenLastCalledWith(
+      expect.objectContaining({ op: "assign_group", target: "g-new" }),
+    );
   });
 });
 

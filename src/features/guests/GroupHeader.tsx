@@ -22,7 +22,9 @@ export function ActionMenu({
   triggerLabel,
   actions,
   className,
+  id,
 }: {
+  id?: string;
   title: string;
   triggerLabel: string;
   actions: readonly MenuAction[];
@@ -35,6 +37,7 @@ export function ActionMenu({
         type="button"
         variant="outline"
         size="icon"
+        {...(id ? { id } : {})}
         aria-label={triggerLabel}
         aria-haspopup="dialog"
         onClick={() => setOpen(true)}
