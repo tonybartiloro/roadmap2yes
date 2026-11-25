@@ -40,3 +40,11 @@ Questions: none.
 - **REV-50**: fatto. Toast "File salvato: {nome}" dopo l'esportazione; `aria-describedby` tra pulsante e descrizione nel menu.
 - **REV-51**: fatto. `role="status"` "File letto: N righe." dopo la scelta del file (test).
 - Riconciliazione RPC: tipi generati senza cast, `undo_guest_import` restituisce `{guests, groups}` (toast "Importazione annullata: N persone rimosse."; nessun testo dice che vanno in "Eliminati di recente"). Test dell'annullamento aggiornati.
+
+## Closure (reviewer; 332068c, 434f86f)
+- REV-45 CLOSED: `build.ts` `guestsCsvOf` uses `displayName(..., "") || null`, the same rule as `partnerNames().real`; the round-trip test now computes the import names independently and checks no "Partner" in the file.
+- REV-46 CLOSED: `finishDone` serves Fine, Esc, overlay and X in the done step (`onOpenChange`, step === "done").
+- REV-47 CLOSED on the wording basis. The split is right: a thrown call or `unreachable`/`unknown_outcome` (no error but an unreadable body, `import-actions.ts`) gives "Non so se ... Controlla la lista prima di riprovare", no retry, "Chiudi e controlla l'elenco" closes and refreshes; a database error keeps "Non ho importato nulla" because the RPC is one transaction. Nit REV-57 (open, optional): `unknownOutcome` is never reset, so after "Torna indietro" the preview has no Importa button (safe, but a dead end) and closing with Esc/X skips `onStale`, leaving the list stale; call `onStale()` on every close once `unknownOutcome` is set.
+- REV-48 CLOSED (`clipSource` 200 chars in preview and result, copy keeps the whole text, result list paged). REV-49 CLOSED (session first, NUL rejected as `invalid_row`). REV-50 CLOSED (toast with the file name, `aria-describedby` through `useId`). REV-51 CLOSED (`role="status"` "File letto: N righe").
+- RPC reconciliation checked: typed `ctx.db.rpc("import_guests", { p_rows })` and `("undo_guest_import", { p_batch_id })` match the generated types; the undo reads `{guests, groups}` and the toast reports the real count, with no "Eliminati di recente" text.
+- `import.test.tsx`, `import-actions.test.ts`, `export.test.ts`: 42/42 pass. Verdict for T13: **approved** (REV-57 nit open).
