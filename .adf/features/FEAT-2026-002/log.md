@@ -100,3 +100,7 @@ QA:
 ## F4 — 2026-11-25
 - Sviluppatore: "Sì, con la nota" → nota `E2E_PORT=3300` aggiunta ai Gotchas di `.adf/project.md`.
 - Documentazione (e92033f): docs tecniche (architettura, sicurezza, sviluppo-locale-e-test, ambienti-e-rilascio, README), README radice, righe "Storico" nelle pagine funzionali toccate. REV-8 e REV-9 chiusi. Test dei docs 72/72.
+
+## F5 — 2026-11-25
+- PR #4 aperta. Prima CI rossa su due punti: `guida.nav.spec` ("Percorso" 54,0 > 53,3 px nel tema "essenziale" a 320 px sui font Linux) → 0d8e932 `tracking-tight` sotto `md`; `export.data.test` con date fisse (passava solo il 24/11) → 859fdf5 date calcolate dal giorno reale. Il push di 0d8e932, bloccato dai permessi del sottoagente, l'ha fatto il coordinatore (coperto dal Gate B). CI sul commit 0d8e932 verde.
+- T11 anteprima (lo sviluppatore è entrato da sé su Vercel e nell'app): indice con 12 schede in ordine README e "Opzioni"; `/guida/temi-e-aspetto` con un H1, una tabella, nessuno "Storico" né "docs/technical", nessuno scorrimento orizzontale, menu a 6 voci con "Guida" attiva; `/guida/budget` 200 con H1, senza errori (file presenti su Vercel); `/guida/xyz` → "Pagina non trovata". Richiesta senza cookie → redirect (Vercel Protection davanti all'app: il redirect dell'app resta coperto dagli e2e).

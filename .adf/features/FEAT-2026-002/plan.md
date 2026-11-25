@@ -118,5 +118,11 @@ Unit a fine step; e2e mirati, poi suite completa una volta. Niente matrice brows
 | Date | Change | Why | Approved by |
 |---|---|---|---|
 | 2026-11-25 | Round 1 F2 (vedi log) | DES-14…19, PO-1…4, QA-1…9 | — |
+| 2026-11-25 | F3: `GuideShell` in `src/app/(app)/guida/layout.tsx` per il focus sull'H1 (DES-20, REV-11); H1 sulla pagina non trovata (DES-21); `turbopackIgnore` in `source.ts` | Controllo visivo e revisione | Coordinatore (nel perimetro approvato) |
+| 2026-11-25 | F5: `tracking-tight` sulle etichette della barra sotto `md` (0,7 px di sforamento di "Percorso" a 320 px sui font della CI); test `export.data` reso indipendente dalla data | CI della PR #4 | Coordinatore (correzioni CI coperte dal Gate B) |
 
 ## Outcome
+- **Cosa:** voce "Guida" (6ª del menu) con indice, pagine da `docs/functional`, 404; sezione "Altro" rinominata "Opzioni" (URL `/altro` invariato); docs funzionali ripulite dai rimandi tecnici. PR https://github.com/tonybartiloro/roadmap2yes/pull/4.
+- **Verifiche:** `adf verify` pass sul commit finale; CI verde (checks, db, e2e-mobile, secrets); anteprima Vercel controllata il 2026-11-25 (T11).
+- **Deviazioni:** focus gestito da un layout della Guida invece che dal solo componente; spaziatura delle lettere ridotta sulla barra mobile.
+- **Lavori successivi:** test del Percorso instabile sotto carico (`percorso.spec:334`); commenti "Altro >" nel codice; spostare `/altro` a un URL nuovo con redirect, se mai servirà.
