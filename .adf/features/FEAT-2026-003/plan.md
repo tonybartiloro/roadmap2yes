@@ -250,7 +250,7 @@ Lo stato "schema non migrato" si prova con test dei componenti e d'integrazione,
   - `20261202100000_guests.sql`, poi `20261202200000_guests_import.sql`, applicate da `migrate.yml` al merge;
   - sono additive e il codice precedente le ignora;
   - per 1-2 minuti il codice nuovo può girare sullo schema vecchio (vedi Risks).
-- **Staging**: dipende da D-A.
+- **Staging**: nessuna prova in preview (D-A = c). Gate C sul risultato locale (verify + run QA finale), poi merge e controlli post-deploy in produzione.
 - **Feature flag**: nessuno.
 - **Rollback**:
   - Instant Rollback di Vercel: torna la barra con Guida e le tabelle restano inutilizzate;
@@ -274,7 +274,7 @@ Lo stato "schema non migrato" si prova con test dei componenti e d'integrazione,
 | P5 | `/guida` attiva Opzioni nella barra; `/invitati` senza permesso mostra il pannello in pagina | architect | 2026-11-25 |
 | P6 | Azioni di massa e loro Annulla via `guests_bulk`/`guests_bulk_undo` (`SECURITY INVOKER`, valori precedenti restituiti dal DB) | architect | 2026-11-25 |
 | P7 | Icone: Invitati `UsersRound`, Profili `UserCog` | architect | 2026-11-25 |
-| D-A | Come provare la preview prima del Gate C. **(a) consigliata**: lo sviluppatore applica le migrazioni allo staging da locale (`supabase link` allo staging + `db push`, solo dati finti). (b) Avvio di `migrate.yml` per lo staging anche dal branch: va cambiata la regola di branch dell'environment, meno sicuro. (c) Gate C solo in locale e verifica in produzione dopo il merge | sviluppatore | da decidere |
+| D-A | Come provare la preview prima del Gate C. **(a) consigliata**: lo sviluppatore applica le migrazioni allo staging da locale (`supabase link` allo staging + `db push`, solo dati finti). (b) Avvio di `migrate.yml` per lo staging anche dal branch: va cambiata la regola di branch dell'environment, meno sicuro. (c) Gate C solo in locale e verifica in produzione dopo il merge. **Scelta: (c)** — "vai direttamente in produzione, siamo ancora in sviluppo" | sviluppatore | 2026-11-25 |
 
 ## Change log
 | Date | Change | Why | Approved by |

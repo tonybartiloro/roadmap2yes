@@ -19,3 +19,8 @@
 - Developer answers: nav B ("Invitati" in the bar, Guida moved into Opzioni plus a help link; reverses the FEAT-2026-002 choice by the developer's decision); no auto-expiry of deleted guests; import skips bad rows; computed guest band; categories adult/child/infant (infant counted, no table seat); +1 as a normal guest; over-capacity allowed with warning; no budget link; Percorso links only; **no cap on guests** (paged reads, no silent truncation).
 - Scope change: developer asked for a visual, rearrangeable room of tables. Agreed as new roadmap item **R-06 "Sala: disposizione visuale dei tavoli"** (M, depends on R-03), roadmap re-approved 2026-11-25. R-03 stores table shape and position (BR10) so R-06 needs no destructive migration.
 - Final brief: 23 AC, steps 1 (AC1-13, AC23), 2 tables (AC14-16), 3 import/export (AC17-22). Gate A recorded via roadmap R-03.
+
+## F2 plan — 2026-11-25
+- Architect plan: 17 tasks in 3 steps, 2 additive migrations, 5 RPCs, no new dependency; ADR-0002 "Dati personali degli invitati" drafted.
+- Challenge: QA-1..11 (blocking QA-1 bulk undo, QA-2 TS oracle unowned), DES-17..26, PO-1..7. Architect accepted all but DES-22 (not-migrated state tested below e2e) and changed QA-7 (900 KB import guard instead of raising the global body limit).
+- Gate B approved 2026-11-25 by the developer ("Vai direttamente in produzione che tanto siamo ancora in sviluppo e non facciamo danni"): plan, ADR-0002, new `delete` permission action, routine git work. D-A = (c): no preview test on staging; Gate C on the local result before the merge, then production checks.
