@@ -21,7 +21,6 @@ import {
   addGuest,
   addGuestGroup,
   addGuestTable,
-  seatGuests,
   seedWedding,
   type SeededWedding,
 } from "./support/seed";
