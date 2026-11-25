@@ -84,7 +84,7 @@ Accettate: ARC-1 (AC13, NFR), ARC-2 (AC11, BR7), ARC-3 (AC6, BR9), ARC-5 (AC21),
 | 7 | Tavoli pieni e sala | Capienza superabile con avviso scritto (AC16). La sala visuale è la nuova voce R-06; qui il tavolo ha forma e posizione nel modello dati, non usate dalla UI (BR10). | 2026-11-25 |
 | 8 | Budget | Nessun legame per ora. | 2026-11-25 |
 | 9 | Percorso | Milestone e compito sugli invitati con link a Invitati, senza completamento automatico. | 2026-11-25 |
-| 10 | Limite invitati | Nessun tetto; nessun troncamento silenzioso (AC12, NFR). | 2026-11-25 |
+| 10 | Limite invitati | Nessun tetto; nessun troncamento silenzioso (AC12, NFR). Limiti tecnici per singola azione, non per matrimonio (F3, coordinatore): un'azione di massa lavora al massimo 5.000 persone selezionate (oltre, messaggio dedicato); una "Nuova famiglia" al massimo 100 persone. | 2026-11-25 |
 
 ## Open questions
 Nessuna.
