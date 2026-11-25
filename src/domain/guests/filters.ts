@@ -41,11 +41,11 @@ export const hasActiveFilters = (f: GuestFilters): boolean =>
   activeFilterCount(f) > 0 || normalizeText(f.query) !== "";
 
 /** Live guests matching all filters together. A deleted group/table counts as "none". */
-export function filterGuests(
-  guests: readonly Guest[],
+export function filterGuests<G extends Guest>(
+  guests: readonly G[],
   filters: GuestFilters,
   { groups, tables }: Context,
-): Guest[] {
+): G[] {
   const liveGroups = liveIds(groups);
   const liveTables = liveIds(tables);
   return guests.filter((g) => {

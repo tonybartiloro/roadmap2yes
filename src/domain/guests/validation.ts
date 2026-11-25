@@ -16,7 +16,8 @@ export type GuestInput = {
   notes?: string | null;
 };
 
-export type GuestField = "firstName" | "lastName" | "category" | "side" | "phone" | "email" | "notes";
+export type GuestField =
+  "firstName" | "lastName" | "category" | "side" | "phone" | "email" | "notes";
 export type GuestErrors = Partial<Record<GuestField, string>>;
 
 const trimmed = (v: string | null | undefined) => (v ?? "").trim();

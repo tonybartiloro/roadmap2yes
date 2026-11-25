@@ -77,8 +77,20 @@ describe("filters", () => {
   const groups = [group("rossi"), group("gone", "2026-01-01")];
   const tables = [table("t1"), table("t2", "2026-01-01")];
   const ctx = { groups, tables };
-  const a = guest({ firstName: "Niccolò", lastName: "Bianchi", side: "A", groupId: "rossi", tableId: "t1" });
-  const b = guest({ firstName: "Anna", category: "child", side: "B", groupId: "gone", tableId: "t2" });
+  const a = guest({
+    firstName: "Niccolò",
+    lastName: "Bianchi",
+    side: "A",
+    groupId: "rossi",
+    tableId: "t1",
+  });
+  const b = guest({
+    firstName: "Anna",
+    category: "child",
+    side: "B",
+    groupId: "gone",
+    tableId: "t2",
+  });
   const c = guest({ firstName: "Zoe", category: "infant" });
   const dead = guest({ firstName: "Niccolò", deletedAt: "2026-01-01" });
   const all = [a, b, c, dead];
