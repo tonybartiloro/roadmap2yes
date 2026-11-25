@@ -9,12 +9,13 @@
 -- family (member of W1 with role `family`, which has NO rows in private.role_permissions).
 begin;
 \set su 'reset role; do $x$ begin perform set_config(''request.jwt.claims'','''',true); perform set_config(''request.jwt.claim.sub'','''',true); end $x$;'
-select plan(313);  -- generated per table: adding a table to the oracle changes this number (and must)
+select plan(359);  -- generated per table: adding a table to the oracle changes this number (and must)
 
 -- Oracle (see qa_catalog_matrix.test.sql for the full grant matrix).
 create temp table qx_t (
   name text primary key, keycol text not null, anycol text not null, sel boolean not null,
-  upd_col text, del boolean not null default false, ins_sql text, parent text
+  upd_col text, del boolean not null default false, ins_sql text, parent text,
+  del_soft boolean not null default false  -- hard DELETE only on soft-deleted rows (guests, ADR-0002)
 );
 insert into qx_t (name, keycol, anycol, sel, upd_col, del, ins_sql, parent) values
   ('weddings', 'id', 'id', true, 'comune', false, null, null),
@@ -48,6 +49,13 @@ insert into qx_t (name, keycol, anycol, sel, upd_col, del, ins_sql, parent) valu
     $q$insert into public.payments (wedding_id, item_id, amount_cents) values (%1$L, %2$L, 1)$q$, 'item'),
   ('notification_preferences', 'wedding_id', 'wedding_id', true, 'digest_enabled', false,
     $q$insert into public.notification_preferences (user_id, wedding_id) values (auth.uid(), %1$L) on conflict do nothing$q$, null);
+insert into qx_t (name, keycol, anycol, sel, upd_col, del, ins_sql, parent, del_soft) values
+  ('guest_groups', 'wedding_id', 'wedding_id', true, 'name', true,
+    $q$insert into public.guest_groups (wedding_id, name) values (%1$L, 'Extra')$q$, null, true),
+  ('guest_tables', 'wedding_id', 'wedding_id', true, 'name', true,
+    $q$insert into public.guest_tables (wedding_id, name) values (%1$L, 'Extra')$q$, null, true),
+  ('guests', 'wedding_id', 'wedding_id', true, 'first_name', true,
+    $q$insert into public.guests (wedding_id, first_name, group_id) values (%1$L, 'Extra', %2$L)$q$, 'group', true);
 -- column "upd_col" is a granted column; the update below assigns it to itself.
 create temp table qx_ids (wedding uuid, kind text, id uuid);
 grant select on qx_t, qx_ids to public;
@@ -99,6 +107,10 @@ begin
     select id, p_wedding, p_founder, 'prefer' from public.decision_options where wedding_id = p_wedding and title = 'Villa Esempio';
   insert into public.notification_preferences (user_id, wedding_id) values (p_founder, p_wedding);
   insert into public.task_suggestion_dismissals (wedding_id, template_key, kind) values (p_wedding, 'scegli-catering', 'add');
+  insert into public.guest_groups (wedding_id, name) values (p_wedding, 'Famiglia Prova');
+  insert into public.guest_tables (wedding_id, name) values (p_wedding, 'Tavolo 1');
+  insert into public.guests (wedding_id, first_name, group_id)
+    select p_wedding, 'Mario', id from public.guest_groups where wedding_id = p_wedding;
   insert into public.notification_log (wedding_id, user_id, kind, batch_key, status, sent_at, claimed_at)
     values (p_wedding, p_founder, 'reminder', 'qx-' || p_wedding, 'sent', now(), now());
   insert into qx_ids
@@ -107,6 +119,7 @@ begin
     union all select p_wedding, 'option_loc', id from public.decision_options where wedding_id = p_wedding and title = 'Villa Esempio'
     union all select p_wedding, 'category', id from public.budget_categories where wedding_id = p_wedding
     union all select p_wedding, 'item', id from public.budget_items where wedding_id = p_wedding
+    union all select p_wedding, 'group', id from public.guest_groups where wedding_id = p_wedding
     union all select p_wedding, 'task', id from public.tasks where wedding_id = p_wedding limit 100;
 end;
 $$;
@@ -180,11 +193,19 @@ select format($$select throws_ok(%L, '42501', null, %L)$$,
 from qx_t t where not t.del order by t.name \gexec
 select is(tests.qx_rows(format('delete from public.option_reactions where wedding_id = %L', :'w1_wedding')),
   0, 'outsider deletes 0 reactions of another wedding');
+-- soft-delete tables (guests): the outsider's DELETE removes nothing
+select format($$select is(tests.qx_rows(%L), 0, %L)$$,
+  format('delete from public.%I where %I = %L', t.name, t.keycol, :'w1_wedding'), 'outsider deletes 0 rows of ' || t.name || ' of W1')
+from qx_t t where t.del_soft order by t.name \gexec
 :su
 select tests.login(:'w1_founder'::uuid);
 select format($$select throws_ok(%L, '42501', null, %L)$$,
   format('delete from public.%I where %I = %L', t.name, t.keycol, :'w1_wedding'), 'own wedding: no hard DELETE on ' || t.name)
 from qx_t t where not t.del order by t.name \gexec
+-- own wedding, LIVE rows: the policy lets nothing through (hard DELETE only after a soft delete)
+select format($$select is(tests.qx_rows(%L), 0, %L)$$,
+  format('delete from public.%I where %I = %L', t.name, t.keycol, :'w1_wedding'), 'own wedding: DELETE of live rows of ' || t.name || ' removes nothing')
+from qx_t t where t.del_soft order by t.name \gexec
 :su
 
 -- ===== E. Cross-wedding INSERT. ================================================================
