@@ -51,9 +51,14 @@ const securityHeaders = [
   { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains" },
 ];
 
+// The Guide reads docs/functional at request time; nothing imports those files, so tracing must
+// be told to ship them with the serverless functions of both routes (index and catch-all).
+const guideDocs = ["./docs/functional/**/*.md"];
+
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  outputFileTracingIncludes: { "/guida": guideDocs, "/guida/*": guideDocs },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

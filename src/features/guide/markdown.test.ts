@@ -65,7 +65,7 @@ describe("resolveGuideHref", () => {
     expect(resolveGuideHref(href, slugs)).toEqual({ kind: "internal", href: expected });
   });
 
-  it.each(["https://example.com/x", "http://example.com", "mailto:a@b.it"])(
+  it.each(["https://example.com/x", "http://example.com", "mailto:a@example.test"])(
     "%s is external",
     (href) => {
       expect(resolveGuideHref(href, slugs)).toEqual({ kind: "external", href });
