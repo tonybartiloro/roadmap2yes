@@ -132,7 +132,7 @@ describe("Esportazione (T15) on the local stack", () => {
     expect(input.dateScenarios[0]?.locationOptionId).toBe(locationOptionId);
   });
 
-  it("builds the three files with the date in the name and the linked location", async () => {
+  it("builds the four files with the date in the name and the linked location", async () => {
     const result = await prepareExport(wedding.founderClient, NOW);
     if (!result.ok) throw new Error(result.message);
     const { bundle } = result;
@@ -140,6 +140,7 @@ describe("Esportazione (T15) on the local stack", () => {
       json: "roadmap2yes-2026-11-24.json",
       tasksCsv: "roadmap2yes-compiti-2026-11-24.csv",
       budgetCsv: "roadmap2yes-budget-2026-11-24.csv",
+      guestsCsv: "roadmap2yes-invitati-2026-11-24.csv",
     });
     const doc = JSON.parse(bundle.json) as {
       schemaVersion: number;
@@ -218,5 +219,108 @@ describe("Esportazione (T15) on the local stack", () => {
     const tomorrow = addDays(todayInRome(new Date()), 1);
     const last = await loadLastExport(partnerB.client, partnerB.user.id, tomorrow);
     expect(last.label).toBe("ultimo export: 1 giorno fa");
+  });
+});
+
+/**
+ * T14 (FEAT-2026-003, AC12, AC21, AC22): guests, groups and tables in the full export. Own wedding,
+ * so the counts above are not touched. Every name here is invented.
+ */
+describe("Esportazione degli invitati (T14) on the local stack", () => {
+  const COUNT = 1200; // over the API's 1000-row cap: nothing may be cut
+  let w: TestWedding;
+  let strangers: TestWedding;
+
+  beforeAll(async () => {
+    w = await createWedding();
+    strangers = await createWedding("sposa");
+    const db = w.founderClient;
+    const rows = Array.from({ length: COUNT }, (_, i) => ({
+      wedding_id: w.weddingId,
+      first_name: `Prova${i + 1}`,
+      last_name: `Esempio${i + 1}`,
+      category: "adult",
+      phone: `+39 000 ${String(i + 1).padStart(6, "0")}`,
+    }));
+    for (let at = 0; at < rows.length; at += 500) {
+      const inserted = await db.from("guests").insert(rows.slice(at, at + 500));
+      if (inserted.error) throw new Error(`guests: ${inserted.error.message}`);
+    }
+    // a soft-deleted guest, group and table, and one live of each
+    const groups = await db.from("guest_groups").insert([
+      { wedding_id: w.weddingId, name: "Gruppo vivo" },
+      { wedding_id: w.weddingId, name: "Gruppo eliminato" },
+    ]);
+    if (groups.error) throw new Error(`groups: ${groups.error.message}`);
+    const tables = await db.from("guest_tables").insert([
+      { wedding_id: w.weddingId, name: "Tavolo vivo", capacity: 8 },
+      { wedding_id: w.weddingId, name: "Tavolo eliminato" },
+    ]);
+    if (tables.error) throw new Error(`tables: ${tables.error.message}`);
+    const person = await db
+      .from("guests")
+      .insert({ wedding_id: w.weddingId, first_name: "Eliminato", last_name: "Finto" });
+    if (person.error) throw new Error(`deleted guest: ${person.error.message}`);
+    // The soft delete is not a column the user inserts: set it with the service client (a test setup).
+    const when = { deleted_at: NOW.toISOString() };
+    const admin = serviceClient();
+    const marked = await Promise.all([
+      admin
+        .from("guest_groups")
+        .update(when)
+        .eq("wedding_id", w.weddingId)
+        .eq("name", "Gruppo eliminato"),
+      admin
+        .from("guest_tables")
+        .update(when)
+        .eq("wedding_id", w.weddingId)
+        .eq("name", "Tavolo eliminato"),
+      admin.from("guests").update(when).eq("wedding_id", w.weddingId).eq("first_name", "Eliminato"),
+    ]);
+    for (const result of marked)
+      if (result.error) throw new Error(`soft delete: ${result.error.message}`);
+    await strangers.founderClient
+      .from("guests")
+      .insert({ wedding_id: strangers.weddingId, first_name: "Altrui", last_name: "Estraneo" });
+  });
+
+  it("reads all 1200 live guests plus the deleted one, with no duplicates", async () => {
+    const input = await gatherExportInput(w.founderClient);
+    expect(input.guests).toHaveLength(COUNT + 1);
+    expect(new Set(input.guests.map((g) => g.id)).size).toBe(COUNT + 1);
+    expect(input.guests.filter((g) => g.deleted)).toHaveLength(1);
+    expect(input.guestGroups.map((g) => [g.name, g.deleted]).sort()).toEqual([
+      ["Gruppo eliminato", true],
+      ["Gruppo vivo", false],
+    ]);
+    expect(input.guestTables.map((t) => [t.name, t.deleted]).sort()).toEqual([
+      ["Tavolo eliminato", true],
+      ["Tavolo vivo", false],
+    ]);
+  });
+
+  it("the JSON marks the deleted ones and the CSV has the 1200 live guests only", async () => {
+    const result = await prepareExport(w.founderClient, NOW);
+    if (!result.ok) throw new Error(result.message);
+    const doc = JSON.parse(result.bundle.json) as {
+      guests: { firstName: string; deleted: boolean }[];
+      guestGroups: unknown[];
+      guestTables: unknown[];
+    };
+    expect(doc.guests).toHaveLength(COUNT + 1);
+    expect(doc.guests.find((g) => g.firstName === "Eliminato")?.deleted).toBe(true);
+    expect(doc.guestGroups).toHaveLength(2);
+    expect(doc.guestTables).toHaveLength(2);
+    const lines = result.bundle.guestsCsv.split("\r\n");
+    expect(lines).toHaveLength(COUNT + 2); // header + 1200 + trailing newline
+    expect(result.bundle.guestsCsv).not.toContain("Eliminato");
+    expect(result.bundle.fileNames.guestsCsv).toBe("roadmap2yes-invitati-2026-11-24.csv");
+  });
+
+  it("never carries another wedding's guests", async () => {
+    const result = await prepareExport(w.founderClient, NOW);
+    if (!result.ok) throw new Error(result.message);
+    expect(result.bundle.json).not.toContain("Estraneo");
+    expect(result.bundle.guestsCsv).not.toContain("Estraneo");
   });
 });

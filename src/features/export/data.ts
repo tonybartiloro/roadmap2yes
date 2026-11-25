@@ -17,6 +17,7 @@ import type {
   Payment,
   PaymentKind,
 } from "@/domain/budget";
+import { GuestsLoadError, loadGuests } from "@/features/guests/data";
 import { isPlainDate, type PlainDate } from "@/lib/dates/plain-date";
 import { displayName } from "@/lib/display-name";
 import type { Database } from "@/lib/supabase/database.types";
@@ -37,10 +38,10 @@ export type Db = SupabaseClient<Database>;
 /** A failed read of the export. `infra` is set for a paused/unreachable service. */
 export class ExportLoadError extends Error {
   readonly infra: "paused" | "unreachable" | null;
-  constructor(what: string, cause: unknown) {
+  constructor(what: string, cause: unknown, infra?: "paused" | "unreachable" | null) {
     super(`Esportazione: ${what}`, { cause });
     this.name = "ExportLoadError";
-    this.infra = classifyDbError(cause);
+    this.infra = infra === undefined ? classifyDbError(cause) : infra;
   }
 }
 
@@ -68,6 +69,57 @@ const PAYMENT_KINDS: readonly string[] = ["deposit", "balance", "other"];
 
 const WEDDING_COLUMNS =
   "id, rite, guest_band, style_label, style_note, region, comune, theme_id, onboarding_answers, onboarding_unknown, onboarding_completed_at, manual_reference_option_id, applied_reference_date, created_at, updated_at";
+
+/**
+ * Guests, groups and tables, deleted ones included and marked (AC22), through the paged and
+ * de-duplicated read of the guests module (no truncation at 1200+ people, AC12). A missing
+ * table (code deployed before the migration) is an empty list, not an error. Any other failure
+ * is an `ExportLoadError` with NO cause attached: the cause of a guests read could carry a
+ * database message, and personal values must not reach logs or results (ADR-0002).
+ */
+export async function gatherGuests(
+  db: Db,
+): Promise<Pick<ExportInput, "guests" | "guestGroups" | "guestTables">> {
+  let snapshot;
+  try {
+    snapshot = await loadGuests(db);
+  } catch (error) {
+    if (error instanceof GuestsLoadError) {
+      if (error.code === "not_migrated") return { guests: [], guestGroups: [], guestTables: [] };
+      throw new ExportLoadError("invitati", undefined, error.infra);
+    }
+    throw new ExportLoadError("invitati", undefined, null);
+  }
+  return {
+    guests: snapshot.guests.map((g) => ({
+      id: g.id,
+      firstName: g.firstName,
+      lastName: g.lastName,
+      category: g.category,
+      side: g.side,
+      phone: g.phone,
+      email: g.email,
+      notes: g.notes,
+      groupId: g.groupId,
+      tableId: g.tableId,
+      deleted: g.deletedAt !== null,
+      deletedAt: g.deletedAt,
+    })),
+    guestGroups: snapshot.groups.map((g) => ({
+      id: g.id,
+      name: g.name,
+      deleted: g.deletedAt !== null,
+      deletedAt: g.deletedAt,
+    })),
+    guestTables: snapshot.tables.map((t) => ({
+      id: t.id,
+      name: t.name,
+      capacity: t.capacity,
+      deleted: t.deletedAt !== null,
+      deletedAt: t.deletedAt,
+    })),
+  };
+}
 
 /** Everything of the wedding, mapped to the plain shapes of `domain/export`. */
 export async function gatherExportInput(db: Db): Promise<ExportInput> {
@@ -289,7 +341,10 @@ export async function gatherExportInput(db: Db): Promise<ExportInput> {
     deleted: p.deleted_at !== null,
   }));
 
+  const guestData = await gatherGuests(db);
+
   return {
+    ...guestData,
     wedding,
     partners: exportPartners,
     decisions,
@@ -349,7 +404,7 @@ export async function prepareExport(db: Db, now: Date): Promise<PrepareExportRes
 }
 
 function failure(error: unknown): PrepareExportResult {
-  const infra = classifyDbError(error instanceof ExportLoadError ? error.cause : error);
+  const infra = error instanceof ExportLoadError ? error.infra : classifyDbError(error);
   if (infra === "paused") return { ok: false, code: "unreachable", message: PAUSED };
   if (infra === "unreachable") return { ok: false, code: "unreachable", message: UNREACHABLE };
   return { ok: false, code: "unknown", message: GENERIC };
