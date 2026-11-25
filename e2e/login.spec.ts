@@ -34,6 +34,9 @@ const PRIVATE_ROUTES = [
   "/altro/account",
   "/altro/profili",
   "/altro/esporta",
+  "/guida",
+  "/guida/budget",
+  "/guida/xyz",
   "/onboarding",
 ];
 
@@ -45,6 +48,20 @@ test.describe("private pages without a session (AC1)", () => {
       expect(new URL(response.headers()["location"] ?? "", "http://x").pathname).toBe("/accesso");
       expect(await response.text()).not.toMatch(/Percorso|Budget|Scelte|@example\.test/);
       expect(response.headers()["cache-control"]).toMatch(/no-store/);
+    });
+  }
+
+  for (const route of ["/guida", "/guida/budget", "/guida/xyz"]) {
+    test(`${route} shows nothing of the Guida without a session (FEAT-2026-002 AC5)`, async ({
+      request,
+    }) => {
+      // no assertion on the status line of the missing page: only the redirect and the empty body matter
+      const response = await request.get(route, { maxRedirects: 0 });
+      expect([302, 303, 307, 308]).toContain(response.status());
+      expect(new URL(response.headers()["location"] ?? "", "http://x").pathname).toBe("/accesso");
+      expect(await response.text()).not.toMatch(
+        /Come si usa roadmap2yes|Pagina non trovata|Torna alla Guida|Panoramica|Totale/,
+      );
     });
   }
 

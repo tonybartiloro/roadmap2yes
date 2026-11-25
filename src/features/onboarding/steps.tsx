@@ -293,7 +293,7 @@ function PartnerForm({
     {
       value: "later",
       label: "Più tardi",
-      hint: "Salviamo i dati; l'invito lo fai da Altro > Invito al partner.",
+      hint: "Salviamo i dati; l'invito lo fai da Opzioni > Invito al partner.",
     },
   ];
 
@@ -381,7 +381,7 @@ function PartnerForm({
             <p className="text-muted-foreground" data-testid="partner-code-ready">
               <strong>Accesso creato.</strong> Per cambiare il codice o l&apos;invito usa{" "}
               <Link href="/altro/invito" className="text-primary underline underline-offset-4">
-                Altro &gt; Invito
+                Opzioni &gt; Invito
               </Link>{" "}
               (da lì puoi impostare un codice temporaneo). Qui puoi continuare.
             </p>

@@ -27,6 +27,18 @@ Una PR passa la CI solo se tutte le suite sono verdi. Il controllo di `database.
 
 Le suite di date girano anche con `TZ=UTC` e `TZ=America/Los_Angeles`, con gli stessi vettori usati da pgTAP (`tests/fixtures/date-offset-vectors.json`).
 
+## Documenti della Guida
+
+I test unitari leggono i file veri di `docs/functional` (non copie). Se una regola non è rispettata, `npm test` fallisce e la CI si ferma:
+
+- `source.test.ts`: ogni `*.md` della cartella è nella tabella di `README.md`, ogni riga cita un file esistente, e nome e descrizione non sono vuoti (`checkIndex`).
+- `guide-docs.test.tsx`: ogni pagina, senza "Storico delle modifiche", viene resa e non deve contenere link fuori dalla cartella (diventano testo semplice), il testo "docs/technical", né più di un H1 o salti di livello.
+- `markdown.test.ts`: le regole dei link (`resolveGuideHref`, `parseIndexTable`, `stripChangelog`) con i casi limite.
+
+Per aggiungere una pagina: create il file in `docs/functional`, aggiungete la sua riga alla tabella di `README.md`, e linkate solo altre pagine della cartella. Il titolo e la descrizione della riga diventano la scheda dell'indice.
+
+Il comando mirato è `npm run test -- src/features/guide`.
+
 ## Integration e acceptance
 
 `npm run test:integration` esegue i file in `tests/integration/**` e `tests/acceptance/**`. Richiedono lo stack locale avviato e le variabili esportate da `npm run -s db:env`.
@@ -80,6 +92,14 @@ npx playwright test --project=time
 E2E_PORT=3100 npx playwright test --project=mobile
 ```
 
+Sulla macchina di sviluppo del progetto la porta 3000 è occupata da un'altra app Docker, e Playwright riusa il server che la occupa (test falliti in massa). Per gli e2e locali usate:
+
+```
+E2E_PORT=3300 npm run e2e
+```
+
+con `npm run db:start` attivo. `webkit-smoke` richiede `npm run e2e:install`; senza, resta alla CI.
+
 I server `degraded` ed `email-off` si avviano solo quando il loro progetto è selezionato, oppure con `E2E_ALL_SERVERS=1`.
 
 ### Matrice dei temi (axe)
@@ -120,3 +140,4 @@ Riferimento dal log della feature, non un contratto: unit circa 850, integration
 | Data | Feature | Modifica |
 |---|---|---|
 | 2026-11-24 | FEAT-2026-001 | Prima stesura: suite, progetti e2e, matrice dei temi, limiti noti (F4, T18) |
+| 2026-11-25 | FEAT-2026-002 | Test dei documenti della Guida; porta e2e locale (`E2E_PORT=3300`) |

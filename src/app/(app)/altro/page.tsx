@@ -12,9 +12,10 @@ import {
   Users,
   type LucideIcon,
 } from "lucide-react";
+import { OPTIONS_SECTION_LABEL } from "@/components/section-label";
 import { SignOutButton } from "@/features/auth/SignOutButton";
 
-export const metadata: Metadata = { title: "Altro" };
+export const metadata: Metadata = { title: OPTIONS_SECTION_LABEL };
 
 const LINKS: ReadonlyArray<{
   href: string;
@@ -72,11 +73,11 @@ const LINKS: ReadonlyArray<{
   },
 ];
 
-/** Altro: the index of the secondary areas, plus "Esci" (AC62). */
+/** Opzioni (route `/altro`): the index of the secondary areas, plus "Esci" (AC62). */
 export default function AltroPage() {
   return (
     <div className="flex max-w-xl flex-col gap-6">
-      <h1 className="font-heading text-[28px] leading-9">Altro</h1>
+      <h1 className="font-heading text-[28px] leading-9">{OPTIONS_SECTION_LABEL}</h1>
       <ul className="border-border bg-card divide-border divide-y rounded-lg border">
         {LINKS.map(({ href, label, description, icon: Icon }) => (
           <li key={href}>

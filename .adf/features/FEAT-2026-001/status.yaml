@@ -3,18 +3,18 @@ id: FEAT-2026-001
 title: "Fondamenta, onboarding guidato, timeline e budget"
 type: feature
 size: L
-phase: F5
+phase: done
 branch: feature/FEAT-2026-001-fondamenta-onboarding-budget
 ticket: ""
 created: 2026-11-23
-updated: 2026-11-24
+updated: 2026-11-25
 gates:
   a_requirements: "approved 2026-11-23 by tonybartiloro"
   b_plan: "approved 2026-11-24 by tonybartiloro"
   c_production: "approved 2026-11-24 by tonybartiloro"
 environments:
   staging: "deployed 2026-11-24 (Vercel preview + Supabase roadmap2yes-stage)"
-  production: pending
+  production: "deployed 2026-11-24 (https://roadmap2yes-tony-bartiloro.vercel.app, migrations applied via migrate.yml after fixes #2 and #3)"
 links:
   pr: "https://github.com/tonybartiloro/roadmap2yes/pull/1"
   brief: ""

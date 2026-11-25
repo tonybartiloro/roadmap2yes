@@ -4,7 +4,7 @@ Potete scaricare una copia dei vostri dati in qualunque momento: è l'unico modo
 
 ## Cosa scaricate
 
-In **Altro > Esporta** trovate tre pulsanti. Ognuno scarica un file separato, con la data di oggi nel nome.
+In **Opzioni > Esporta** trovate tre pulsanti. Ognuno scarica un file separato, con la data di oggi nel nome.
 
 | File | Contenuto |
 |---|---|
@@ -29,3 +29,4 @@ Su Safari il file si salva dal foglio di condivisione o dai download, come per o
 | Data | Feature | Modifica |
 |---|---|---|
 | 2026-11-24 | FEAT-2026-001 | Prima stesura (F4, T18) |
+| 2026-11-25 | FEAT-2026-002 | "Altro" diventa "Opzioni" |

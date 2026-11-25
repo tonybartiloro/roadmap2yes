@@ -2,8 +2,17 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarCheck, Home, Menu, Scale, Wallet, type LucideIcon } from "lucide-react";
+import {
+  BookOpen,
+  CalendarCheck,
+  Home,
+  Scale,
+  Settings,
+  Wallet,
+  type LucideIcon,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
+import { OPTIONS_SECTION_LABEL } from "./section-label";
 
 export interface NavItem {
   href: string;
@@ -11,13 +20,14 @@ export interface NavItem {
   icon: LucideIcon;
 }
 
-/** The five sections (design §2). Future areas (R2-R6) grow under "Altro" and "Scelte". */
+/** The six sections (design §2 + the in-app guide). Future areas (R2-R6) grow under "Opzioni" and "Scelte". */
 export const NAV_ITEMS: readonly NavItem[] = [
   { href: "/", label: "Home", icon: Home },
   { href: "/percorso", label: "Percorso", icon: CalendarCheck },
   { href: "/scelte", label: "Scelte", icon: Scale },
   { href: "/budget", label: "Budget", icon: Wallet },
-  { href: "/altro", label: "Altro", icon: Menu },
+  { href: "/altro", label: OPTIONS_SECTION_LABEL, icon: Settings },
+  { href: "/guida", label: "Guida", icon: BookOpen },
 ];
 
 export function isActivePath(pathname: string, href: string): boolean {
@@ -45,7 +55,7 @@ export function AppNav({ items = NAV_ITEMS }: { items?: readonly NavItem[] }) {
                 href={href}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "text-muted-foreground relative flex min-h-14 flex-col items-center justify-center gap-0.5 px-1 text-xs md:min-h-14 md:rounded-md lg:flex-row lg:justify-start lg:gap-3 lg:px-3 lg:text-base",
+                  "text-muted-foreground relative flex min-h-14 flex-col items-center justify-center gap-0.5 px-0.5 text-xs tracking-tight md:min-h-14 md:tracking-normal md:px-1 md:rounded-md lg:flex-row lg:justify-start lg:gap-3 lg:px-3 lg:text-base",
                   active && "text-primary font-semibold",
                   !active && "hover:text-foreground",
                 )}

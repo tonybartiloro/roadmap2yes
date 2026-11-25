@@ -21,7 +21,7 @@ Nessuno storage di file: R1 non carica file. Lo storage, quando servirà (R6), s
 | Cartella | Contenuto |
 |---|---|
 | `src/app` | Route: pagine pubbliche `(public)`, onboarding, area `(app)`, route API del cron |
-| `src/features` | Logica per funzione: `auth`, `accounts`, `invitations`, `onboarding`, `timeline`, `decisions`, `budget`, `home`, `notifications`, `export`, `jobs` |
+| `src/features` | Logica per funzione: `auth`, `accounts`, `invitations`, `onboarding`, `timeline`, `decisions`, `budget`, `home`, `notifications`, `export`, `jobs`, `guide` |
 | `src/domain` | Funzioni pure del dominio (Percorso, budget, promemoria, esportazione), con `today` e `now` come parametri |
 | `src/lib` | Infrastruttura: client Supabase (`lib/supabase`), email (`lib/email`), configurazione (`app-config.ts`), orologio (`clock.ts`) |
 | `src/content` | Contenuti: catalogo delle tappe, categorie di budget, frasi di stile, codici deboli |
@@ -74,8 +74,23 @@ Tutto passa da `EmailSender`. `emailEnabled()` è l'unico interruttore: è vero 
 
 Se Supabase è in pausa o non risponde, il proxy e il layout riscrivono su `/servizio`, una pagina che non legge il database. `global-error.tsx` è autosufficiente e non importa dati.
 
+## Guida d'uso (`/guida`)
+
+La voce **Guida** del menu mostra le pagine di `docs/functional`. Il contenuto arriva dagli stessi file Markdown, senza copie nel codice: un file modificato appare alla build successiva.
+
+- **Route**: `src/app/(app)/guida/`. `page.tsx` è l'indice (la tabella di `docs/functional/README.md`, nel suo ordine); `[...pagina]/page.tsx` è una pagina. Stessa area autenticata delle altre pagine, senza guard nuovi.
+- **Lettura**: `src/features/guide/source.ts` (`server-only`) legge la cartella da `process.cwd()`. In produzione il risultato è tenuto in memoria per istanza; in sviluppo si rilegge a ogni richiesta. Una cartella mancante è un errore visibile, mai una Guida vuota.
+- **Tracciamento per Vercel**: nessun import porta i file nella funzione. `outputFileTracingIncludes` in `next.config.ts` include `./docs/functional/**/*.md` per `/guida` e `/guida/*`.
+- **Pagine ammesse**: solo i nomi reali dei file (`^[a-z0-9-]+\.md$`, `README.md` escluso). Il segmento dell'URL non costruisce mai un percorso; un nome fuori elenco o più segmenti è `notFound()`.
+- **Renderer**: `GuideMarkdown.tsx`, Server Component con `react-markdown@10.1.0` e `remark-gfm@4.0.1`, `skipHtml`, senza `rehype-raw`. Nel browser non arriva JavaScript del Markdown.
+- **Link**: una sola regola, `resolveGuideHref` in `markdown.ts`. Un `.md` noto diventa un link interno; `README.md` va all'indice; `http(s)` e `mailto` aprono una nuova scheda; ancore, percorsi fuori dalla cartella e `.md` sconosciuti sono testo semplice.
+- **Focus**: il layout della Guida (`src/app/(app)/guida/layout.tsx`) con `FocusHeading.tsx` (client) porta il focus sull'H1 solo dopo una navigazione interna, non al primo caricamento.
+- **Sezione nascosta**: "Storico delle modifiche" non viene mostrato (`stripChangelog`).
+- **Test che bloccano la CI**: vedi [Sviluppo locale e test](sviluppo-locale-e-test.md#documenti-della-guida).
+
 ## Storico delle modifiche
 
 | Data | Feature | Modifica |
 |---|---|---|
 | 2026-11-24 | FEAT-2026-001 | Prima stesura (F4, T18) |
+| 2026-11-25 | FEAT-2026-002 | Guida d'uso in app: route, lettura dei file, tracciamento Vercel, renderer e regole dei link |

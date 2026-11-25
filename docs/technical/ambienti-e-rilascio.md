@@ -87,7 +87,7 @@ Il bootstrap è **create-only**: se l'utente esiste già, non cambia nulla. Un c
 
 ### Dopo il primo accesso
 
-1. Cambiate il codice subito, in **Altro > Account**. Il codice iniziale è solo un punto di partenza.
+1. Cambiate il codice subito, in **Opzioni > Account**. Il codice iniziale è solo un punto di partenza.
 2. Togliete `R2Y_BOOTSTRAP_ACCESS_CODE` da Vercel: non serve più, perché il bootstrap è create-only. Dopo la modifica serve un nuovo deploy.
 3. Se cambiate `R2Y_BOOTSTRAP_EMAIL`, il bootstrap crea un **nuovo** fondatore. È voluto, ma è raro: non cambiatela per caso.
 
@@ -198,7 +198,7 @@ Il progetto Supabase gratuito va in pausa dopo circa 7 giorni senza attività ne
   - in **staging** scrive e rilegge un heartbeat;
   - in **produzione** controlla che gli heartbeat del job giornaliero degli ultimi 8 giorni siano recenti (non più vecchi di 36 ore) e che nessun run abbia fallito o superato la quota.
   Se il controllo fallisce, il run diventa rosso e GitHub avvisa il proprietario del repository.
-- **Controllo dall'app**: in **Altro > Info** c'è l'ultimo controllo del servizio.
+- **Controllo dall'app**: in **Opzioni > Info** c'è l'ultimo controllo del servizio.
 
 Se il controllo settimanale è rosso:
 
@@ -250,7 +250,7 @@ Le email di staging restano spente finché non c'è una decisione esplicita di a
 Il percorso è:
 
 1. Pull request: la CI deve essere verde (lint, typecheck, unit, build, pgTAP, integration, e2e mobile, gitleaks).
-2. Vercel crea la **preview**, collegata al progetto Supabase di staging, con le email spente. Il preview è protetto da Deployment Protection.
+2. Vercel crea la **preview**, collegata al progetto Supabase di staging, con le email spente. Il preview è protetto da Deployment Protection. Prima del merge si controlla anche la Guida: `/guida` e `/guida/budget` (vedi punto 12 dei controlli post-deploy).
 3. **Gate C**: approvazione del proprietario, dopo aver provato la preview.
 4. **Merge su `main`**: parte il deploy di produzione di Vercel e, in parallelo, `migrate.yml` in produzione (con approvazione del reviewer, se ci sono migrazioni).
 5. Controlli post-deploy (sotto).
@@ -263,11 +263,12 @@ Il percorso è:
 4. Creazione dell'account del partner e suo primo accesso.
 5. Un codice di 9 caratteri viene rifiutato dal server Auth.
 6. Intestazioni e `robots` corretti (noindex su tutto).
-7. Cron lanciato a mano: heartbeat in **Altro > Info**, nessuna email.
+7. Cron lanciato a mano: heartbeat in **Opzioni > Info**, nessuna email.
 8. `keepalive.yml` verde.
 9. Preview collegata allo staging.
 10. `/servizio` raggiungibile.
 11. Avviso "email spente" visibile.
+12. Guida: `/guida` mostra l'indice e `/guida/budget` mostra la pagina con la tabella, senza pagina d'errore. Se compare la pagina d'errore, controllate che `docs/functional` sia incluso nella build: il tracciamento è in `next.config.ts` (`outputFileTracingIncludes`).
 
 ## Rollback
 
@@ -281,7 +282,7 @@ Il percorso è:
 | Segreto | Cosa succede | Dove aggiornare |
 |---|---|---|
 | `SUPABASE_SECRET_KEY` | Si azzerano i contatori del limitatore di login | Vercel, GitHub (environment), `.env.local` locale |
-| `EMAIL_LINK_SECRET` | Non valgono più i link di disattivazione già inviati. Gli utenti possono disattivare da Altro > Promemoria | Vercel |
+| `EMAIL_LINK_SECRET` | Non valgono più i link di disattivazione già inviati. Gli utenti possono disattivare da Opzioni > Promemoria | Vercel |
 | `CRON_SECRET` | Vercel Cron usa il nuovo valore dal run successivo | Vercel |
 | `R2Y_BOOTSTRAP_ACCESS_CODE` | Nessun effetto sugli account esistenti (il bootstrap è create-only) | Togliere da Vercel dopo il primo accesso |
 | `RESEND_API_KEY` | Le email smettono di partire fino all'aggiornamento | Resend, Vercel Production |
@@ -300,3 +301,4 @@ Il percorso è:
 | Data | Feature | Modifica |
 |---|---|---|
 | 2026-11-24 | FEAT-2026-001 | Prima stesura del runbook: setup locale, primo utente, variabili, segreti GitHub con regola dei branch, checklist Auth, migrazioni, keep-alive, pausa, reset dal pannello, Resend, rilascio, rollback (F4, T18) |
+| 2026-11-25 | FEAT-2026-002 | "Altro" diventa "Opzioni" nei percorsi del runbook; controllo della Guida in Preview e post-deploy |

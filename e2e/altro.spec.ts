@@ -11,6 +11,7 @@
  *  - AC44  Info shows the app version and the heartbeat of the daily job
  *  - AC62  "Esci" is in the index
  */
+import { OPTIONS_SECTION_LABEL } from "@/components/section-label";
 import { loginAs } from "./support/auth";
 import { expect, newSession, serviceClient, test, uniqueIp } from "./support/fixtures";
 import { seedWedding } from "./support/seed";
@@ -34,6 +35,28 @@ test("the index lists every area and 'Esci'", async ({ page }) => {
     await expect(page.getByRole("link", { name: new RegExp(name) })).toBeVisible();
   }
   await expect(page.getByTestId("sign-out")).toBeVisible();
+});
+
+test("the section is named by the constant: H1, nav item, aria-current, no 'Altro' item (AC7)", async ({
+  page,
+}) => {
+  const w = await seedWedding();
+  await loginAs(page, w.wedding.founder, uniqueIp());
+  for (const route of ["/altro", "/altro/aspetto"]) {
+    await page.goto(route);
+    const nav = page.getByRole("navigation", { name: "Principale" });
+    const item = nav.getByRole("link", { name: OPTIONS_SECTION_LABEL, exact: true });
+    await expect(item, route).toHaveAttribute("href", "/altro");
+    await expect(item, route).toHaveAttribute("aria-current", "page");
+    await expect(nav.getByRole("link", { name: "Altro", exact: true }), route).toHaveCount(0);
+  }
+  await page.goto("/altro");
+  await expect(page.locator("h1")).toHaveText(OPTIONS_SECTION_LABEL);
+  await expect(page).toHaveTitle(new RegExp(`^${OPTIONS_SECTION_LABEL}`));
+  // the back link of a sub-page and the old name
+  await page.goto("/altro/profili");
+  await expect(page.getByRole("link", { name: `Torna a ${OPTIONS_SECTION_LABEL}` })).toBeVisible();
+  await expect(page.getByText(/Torna ad Altro|Altro >/)).toHaveCount(0);
 });
 
 test("Aspetto: 12 themes, chosen for the couple, seen by the partner (AC49)", async ({

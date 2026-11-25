@@ -23,7 +23,7 @@ Comandi principali: `npm run lint`, `npm run typecheck`, `npm test`, `npm run te
 
 ## Documentazione
 
-- **Uso dell'app**: [`docs/functional`](docs/functional/README.md). Accesso e codici, onboarding, Percorso, Scelte, Budget, Home, Altro, promemoria email, esportazione.
+- **Uso dell'app**: [`docs/functional`](docs/functional/README.md). Accesso e codici, onboarding, Percorso, Scelte, Budget, Home, Opzioni, promemoria email, esportazione. Le stesse pagine si leggono dentro l'app, nella voce **Guida**.
 - **Tecnica**: [`docs/technical`](docs/technical/README.md). [Architettura](docs/technical/architettura.md), [modello dati](docs/technical/modello-dati.md), [sicurezza](docs/technical/sicurezza.md), [email e job](docs/technical/email-e-job.md), [ambienti e rilascio (runbook)](docs/technical/ambienti-e-rilascio.md), [sviluppo locale e test](docs/technical/sviluppo-locale-e-test.md).
 - **Decisioni**: [`docs/adr`](docs/adr/0001-stack-auth-ambienti.md). Stack, accesso con codice e ambienti.
 
@@ -36,3 +36,4 @@ Next.js 16 (App Router) con React 19 e TypeScript su Vercel; Supabase per Postgr
 | Data | Feature | Modifica |
 |---|---|---|
 | 2026-11-24 | FEAT-2026-001 | Setup essenziale che rimanda alla documentazione (F4, T18) |
+| 2026-11-25 | FEAT-2026-002 | Voce Guida nell'app; "Altro" diventa "Opzioni" |

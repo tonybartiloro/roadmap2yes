@@ -204,7 +204,19 @@ La pagina `/invito/[token]` mostra solo il nome di chi invita e un'email mascher
 I link di disattivazione sono firmati con HMAC-SHA256 usando `EMAIL_LINK_SECRET` (almeno 32 caratteri). La firma copre un contesto fisso, il tipo (`reminders` o `digest`) e l'id dell'utente. Non c'è email né nome nell'URL.
 
 - Il GET non cambia nulla; la conferma è un POST.
-- Ruotare `EMAIL_LINK_SECRET` rende non validi tutti i link già inviati. Gli utenti possono comunque disattivare le email da Altro > Promemoria.
+- Ruotare `EMAIL_LINK_SECRET` rende non validi tutti i link già inviati. Gli utenti possono comunque disattivare le email da Opzioni > Promemoria.
+
+## Guida: lettura dei file e Markdown
+
+La Guida legge i file di `docs/functional` e li mostra nell'app. Le regole di sicurezza:
+
+- **Nessun percorso dall'input.** Lo slug nell'URL è accettato solo se coincide con un nome reale della cartella. `/guida/../x`, `..%2F…`, più segmenti o nomi fuori elenco rispondono "Pagina non trovata" (vedi [Architettura](architettura.md#guida-duso-guida)).
+- **Nessun HTML grezzo.** Il renderer usa `skipHtml` e non include `rehype-raw`: un tag nel Markdown non diventa mai markup.
+- **Link esterni** `http(s)` e `mailto`: nuova scheda con `rel="noopener noreferrer"`. Link `javascript:`, ancore e percorsi fuori cartella sono testo semplice.
+- **Contenuto pubblico.** I file sono nel repository pubblico: devono contenere solo testi funzionali, senza dati reali, segreti o indirizzi veri (regola già valida per tutto il repository).
+- **Accesso.** La Guida sta nell'area autenticata, con la stessa regola di default-deny delle altre pagine. Un utente anonimo viene portato all'accesso (e2e in `login.spec.ts`).
+
+## Storico delle modifiche
 
 ## Intestazioni
 
@@ -230,3 +242,4 @@ Il file `.env.example` contiene solo valori finti. Le chiavi locali le genera `n
 | Data | Feature | Modifica |
 |---|---|---|
 | 2026-11-24 | FEAT-2026-001 | Prima stesura con ordine DB-prima, codici, limitatore, R26 e R27, cookie, token di invito (F4, T18) |
+| 2026-11-25 | FEAT-2026-002 | Guida: slug solo da elenco reale, nessun HTML grezzo, regole dei link esterni; "Altro" diventa "Opzioni" |

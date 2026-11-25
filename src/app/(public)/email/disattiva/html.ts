@@ -65,7 +65,7 @@ export function confirmationPage(kind: UnsubscribableKind, actionUrl: string): s
     copy.question,
     `<h1>${escapeHtml(copy.question)}</h1>
 <p>${escapeHtml(copy.effect)}</p>
-<p class="muted">Puoi riattivarli quando vuoi da Altro &gt; Promemoria.</p>
+<p class="muted">Puoi riattivarli quando vuoi da Opzioni &gt; Promemoria.</p>
 <form method="post" action="${escapeHtml(actionUrl)}"><button type="submit">Sì, disattiva</button></form>`,
   );
 }
@@ -77,7 +77,7 @@ export function donePage(kind: UnsubscribableKind): string {
     "Fatto",
     `<h1>Fatto</h1>
 <p>${escapeHtml(copy.done)}</p>
-<p class="muted">Puoi riattivare le email quando vuoi da Altro &gt; Promemoria, dentro l'app.</p>
+<p class="muted">Puoi riattivare le email quando vuoi da Opzioni &gt; Promemoria, dentro l'app.</p>
 <p><a class="button" href="/">Apri ${escapeHtml(APP_NAME)}</a></p>`,
   );
 }
@@ -87,7 +87,7 @@ export function invalidPage(): string {
   return page(
     "Link non valido",
     `<h1>Questo link non funziona</h1>
-<p>Il link per disattivare le email non è valido. Puoi gestire i promemoria dall'app, in Altro &gt; Promemoria.</p>
+<p>Il link per disattivare le email non è valido. Puoi gestire i promemoria dall'app, in Opzioni &gt; Promemoria.</p>
 <p><a class="button" href="/">Apri ${escapeHtml(APP_NAME)}</a></p>`,
   );
 }
@@ -96,7 +96,7 @@ export function errorPage(): string {
   return page(
     "Qualcosa non ha funzionato",
     `<h1>Qualcosa non ha funzionato</h1>
-<p>Non siamo riusciti a salvare la modifica. Riprova tra poco, oppure gestisci i promemoria dall'app, in Altro &gt; Promemoria.</p>
+<p>Non siamo riusciti a salvare la modifica. Riprova tra poco, oppure gestisci i promemoria dall'app, in Opzioni &gt; Promemoria.</p>
 <p><a class="button" href="/">Apri ${escapeHtml(APP_NAME)}</a></p>`,
   );
 }

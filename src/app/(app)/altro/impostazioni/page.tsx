@@ -7,7 +7,7 @@ import { SettingsForm } from "@/features/settings/SettingsForm";
 export const metadata: Metadata = { title: "Impostazioni nozze" };
 
 /**
- * Altro > Impostazioni nozze (AC16, AC48): the answers of the onboarding, editable by either partner.
+ * Opzioni > Impostazioni nozze (AC16, AC48): the answers of the onboarding, editable by either partner.
  * A changed rite shows up as "Suggerimenti da rivedere" in Percorso; nothing is added or deleted.
  */
 export default async function SettingsPage() {
@@ -23,7 +23,7 @@ export default async function SettingsPage() {
       <SettingsForm view={view} scope={`${userId}:${view.weddingId}`} />
       <p>
         <Link href="/altro" className="text-primary underline underline-offset-4">
-          Torna ad Altro
+          Torna a Opzioni
         </Link>
       </p>
     </div>

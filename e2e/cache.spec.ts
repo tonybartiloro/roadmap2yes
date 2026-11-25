@@ -24,6 +24,8 @@ const PRIVATE_PAGES = [
   "/altro/profili",
   "/altro/esporta",
   "/altro/info",
+  "/guida",
+  "/guida/budget",
 ];
 
 test("private pages are no-store and noindex", async ({ page }) => {

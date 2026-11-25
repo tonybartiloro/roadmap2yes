@@ -12,8 +12,10 @@ import { MoneyInput } from "./MoneyInput";
 import { MonthYearField } from "./MonthYearField";
 import { OfflineBanner } from "./OfflineBanner";
 import { ServiceDownPage } from "./ServiceDownPage";
+import { OPTIONS_SECTION_LABEL } from "./section-label";
 
-vi.mock("next/navigation", () => ({ usePathname: () => "/percorso/oggi" }));
+let mockPathname = "/percorso/oggi";
+vi.mock("next/navigation", () => ({ usePathname: () => mockPathname }));
 vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
 
 afterEach(() => cleanup());
@@ -271,7 +273,7 @@ describe("ServiceDownPage", () => {
 });
 
 describe("AppNav", () => {
-  it("lists the five sections and marks the current one", () => {
+  it("lists the six sections and marks the current one", () => {
     render(<AppNav />);
     const links = screen.getAllByRole("link");
     expect(links.map((link) => link.textContent)).toEqual([
@@ -279,13 +281,29 @@ describe("AppNav", () => {
       "Percorso",
       "Scelte",
       "Budget",
-      "Altro",
+      OPTIONS_SECTION_LABEL,
+      "Guida",
     ]);
     expect(screen.getByRole("navigation", { name: "Principale" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "Percorso" }).getAttribute("aria-current")).toBe(
       "page",
     );
     expect(screen.getByRole("link", { name: "Home" }).getAttribute("aria-current")).toBeNull();
+  });
+
+  it("marks Guida, the last item, active on a guide page", () => {
+    mockPathname = "/guida/budget";
+    try {
+      render(<AppNav />);
+      const links = screen.getAllByRole("link");
+      expect(links).toHaveLength(6);
+      const last = links[5]!;
+      expect(last.textContent).toBe("Guida");
+      expect(last.getAttribute("aria-current")).toBe("page");
+      expect(screen.getByRole("link", { name: "Percorso" }).getAttribute("aria-current")).toBeNull();
+    } finally {
+      mockPathname = "/percorso/oggi";
+    }
   });
 
   it("matches paths by section", () => {

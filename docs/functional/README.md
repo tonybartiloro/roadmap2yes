@@ -1,6 +1,12 @@
 # Documentazione funzionale
 
-Come si usa roadmap2yes, pagina per pagina. Per il funzionamento interno vedi [`docs/technical`](../technical/README.md).
+Come si usa roadmap2yes, pagina per pagina. Queste pagine sono anche la **Guida** dentro l'app.
+
+Convenzioni per chi scrive qui:
+
+- ogni pagina della cartella deve comparire nella tabella qui sotto: l'indice della Guida è costruito da quella tabella;
+- i link vanno solo verso altre pagine di questa cartella;
+- la sezione "Storico delle modifiche" in fondo a ogni pagina non è mostrata nell'app.
 
 | Pagina | Di cosa parla |
 |---|---|
@@ -11,7 +17,7 @@ Come si usa roadmap2yes, pagina per pagina. Per il funzionamento interno vedi [`
 | [Scelte](scelte.md) | Decisioni, date, location, confronto e riaperture |
 | [Budget](budget.md) | Totale, categorie, voci e pagamenti |
 | [Home e Novità](home-e-novita.md) | Cosa fare adesso e cosa è cambiato |
-| [Altro](altro.md) | Profili, impostazioni, aspetto, promemoria, esportazione, Esci |
+| [Opzioni](opzioni.md) | Profili, impostazioni, aspetto, promemoria, esportazione, Esci |
 | [Promemoria email](promemoria-email.md) | Email accese e spente |
 | [Temi e aspetto](temi-e-aspetto.md) | I 12 temi e il chiaro/scuro |
 | [Esportazione](esportazione.md) | Scaricare i propri dati |
@@ -22,3 +28,4 @@ Come si usa roadmap2yes, pagina per pagina. Per il funzionamento interno vedi [`
 | Data | Feature | Modifica |
 |---|---|---|
 | 2026-11-24 | FEAT-2026-001 | Prima stesura (F4, T18) |
+| 2026-11-25 | FEAT-2026-002 | Queste pagine sono la Guida nell'app; "Altro" diventa "Opzioni" (`altro.md` → `opzioni.md`); rimandi tecnici tolti; convenzioni per chi scrive |

@@ -1,0 +1,24 @@
+# p49 ADF feature status — updated through the ADF CLI (adf feature set / adf gate).
+id: FEAT-2026-002
+title: "Guida d'uso nell'app"
+type: feature
+size: S
+phase: F5
+branch: feature/FEAT-2026-002-guida-in-app
+ticket: ""
+roadmap: R-02
+created: 2026-11-25
+updated: 2026-11-25
+gates:
+  a_requirements: "approved 2026-11-25 via roadmap R-02"
+  b_plan: "approved 2026-11-25 by tonybartiloro"
+  c_production: pending      # pending | approved <date> by <name> | not-needed
+environments:
+  staging: pending           # pending | deployed <date> | not-applicable
+  production: pending
+links:
+  pr: "https://github.com/tonybartiloro/roadmap2yes/pull/4"
+  brief: ""
+  plan: ""
+  docs_functional: docs/functional
+  docs_technical: docs/technical/architettura.md

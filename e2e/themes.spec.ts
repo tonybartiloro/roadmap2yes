@@ -16,7 +16,7 @@ import { axeFindings, describeFindings } from "./support/axe";
 import { expect, serviceClient, test, uniqueIp } from "./support/fixtures";
 import { addLocation, addTask, romeDate, seedWedding } from "./support/seed";
 
-test.describe.configure({ timeout: 180_000 });
+test.describe.configure({ timeout: 360_000 });
 
 const THEMES = [
   "giardino",
@@ -33,7 +33,9 @@ const THEMES = [
   "amalfi",
 ];
 const MATRIX = process.env["E2E_AXE_MATRIX"] === "1";
-const SCREENS = MATRIX ? ["/", "/percorso", "/budget"] : ["/"];
+// Guida pages (FEAT-2026-002 AC2): text and headings, links in the primary colour, a table
+const GUIDE_SCREENS = ["/guida/budget", "/guida/home-e-novita", "/guida/temi-e-aspetto"];
+const SCREENS = MATRIX ? ["/", "/percorso", "/budget", ...GUIDE_SCREENS] : ["/", ...GUIDE_SCREENS];
 
 test("12 themes x light/dark: axe finds no contrast or target-size problem", async ({ page }) => {
   const w = await seedWedding({

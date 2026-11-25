@@ -58,7 +58,7 @@ export function LoginForm({ emailEnabled }: { emailEnabled: boolean }) {
             <RecoveryRequest />
           ) : (
             <p className="text-muted-foreground" data-testid="forgot-code-no-email">
-              Chiedi al tuo partner di impostarti un codice temporaneo: lo fa da Altro, nella
+              Chiedi al tuo partner di impostarti un codice temporaneo: lo fa da Opzioni, nella
               sezione del tuo accesso. Con quello entri e scegli subito il tuo. Se nessuno dei due
               ricorda il codice, serve un reset da parte di chi gestisce l&apos;app.
             </p>

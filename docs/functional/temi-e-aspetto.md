@@ -2,7 +2,7 @@
 
 ## I 12 temi
 
-Potete scegliere uno dei 12 temi visivi. Il predefinito è **Giardino**. Lo scegliete all'ultimo passo dell'onboarding, con un'anteprima dal vivo, e lo cambiate quando volete in **Altro > Aspetto**.
+Potete scegliere uno dei 12 temi visivi. Il predefinito è **Giardino**. Lo scegliete all'ultimo passo dell'onboarding, con un'anteprima dal vivo, e lo cambiate quando volete in **Opzioni > Aspetto**.
 
 | Tema | Atmosfera |
 |---|---|
@@ -35,3 +35,4 @@ Accanto al tema scegliete se usare il chiaro, lo scuro, o quello del vostro disp
 | Data | Feature | Modifica |
 |---|---|---|
 | 2026-11-24 | FEAT-2026-001 | Prima stesura (F4, T18) |
+| 2026-11-25 | FEAT-2026-002 | "Altro" diventa "Opzioni" |
