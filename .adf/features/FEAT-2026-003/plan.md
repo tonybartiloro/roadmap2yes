@@ -280,5 +280,6 @@ Lo stato "schema non migrato" si prova con test dei componenti e d'integrazione,
 | Date | Change | Why | Approved by |
 |---|---|---|---|
 | 2026-11-25 | F2 round 1: RPC di massa con Annulla (QA-1, DES-20); oracolo TS e `DELETE` solo su eliminati (QA-2); proprietà di test e file riallineate (QA-3/4/8, DES-17/18/21); "Mostra altre 100" (DES-19); errori senza valori (QA-5); casi pgTAP e parser (QA-6/7); e2e snelli (QA-9/10/11); scheda Tavoli sempre visibile (PO-2); dettagli export (PO-3); `sort_order` tolto (PO-6); icone (DES-23) | Obiezioni F2 di QA, designer e PO | — |
+| 2026-11-25 | F3 S1: `supabase/tests/qa_cross_wedding.test.sql` passa a T1 (e poi a T12), il suo oracolo copre ogni tabella di `public`; `src/domain/guests/normalize.ts` aggiunto a T2; PG remoto verificato 17.12 (prod e stage) | Proprietà dei file mancanti nel piano | coordinatore (nessun cambio di soluzione) |
 
 ## Outcome
