@@ -43,12 +43,18 @@ const tabs = {
   tables: (page: Page) => page.getByRole("tab", { name: "Tavoli" }),
 };
 const db = () => serviceClient();
-/** After seating, the add sheet closes itself and the TABLE sheet stays open: close that one too. */
-async function closeTable(page: Page) {
-  // the add sheet is gone when the table sheet (hidden from the tree while the other is open) is back
-  await expect(sheet(page).getByRole("button", { name: "Elimina il tavolo" })).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(sheet(page)).toHaveCount(0);
+/** axe waits for the toast enter animation (it is mid-fade for 0.4 s): same approach as themes.spec. */
+async function axeAfterAnimations(page: Page) {
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          document.querySelector("[data-sonner-toaster]")?.getAnimations({ subtree: true }).length ??
+          0,
+      ),
+    )
+    .toBe(0);
+  return axeFindings(page);
 }
 const guestRows = async (w: SeededWedding) =>
   (await db().from("guests").select("*").eq("wedding_id", w.weddingId)).data ?? [];
@@ -128,8 +134,8 @@ test("capacity: over it is allowed and written in text and in the summary; infan
   await expect(page.getByText("2 persone al tavolo «Rosa».")).toBeVisible();
   await expect.poll(() => tableOf(w, "Anna")).toBe(table);
 
-  // The table sheet stays open behind and covers the toast (QA-3): close it, then Annulla at once
-  await closeTable(page);
+  // no sheet is left open: Annulla at once is reachable
+  await expect(sheet(page)).toHaveCount(0);
   await undo(page).last().click();
   await expect.poll(() => tableOf(w, "Anna")).toBeNull();
   await expect(card(page, "Rosa")).toContainText("0 / 2 posti");
@@ -141,7 +147,7 @@ test("capacity: over it is allowed and written in text and in the summary; infan
     await sheet(page).last().getByRole("checkbox", { name: `Aggiungi ${first} Prova` }).check();
   }
   await sheet(page).last().getByRole("button", { name: "Aggiungi 3 persone" }).click();
-  await closeTable(page);
+  await expect(sheet(page)).toHaveCount(0); // nothing stays open behind the toast
   await expect(card(page, "Rosa")).toContainText("3 / 2 posti");
   await expect(card(page, "Rosa")).toContainText("Oltre la capienza di 2");
   await tabs.people(page).click();
@@ -153,20 +159,18 @@ test("capacity: over it is allowed and written in text and in the summary; infan
   await sheet(page).getByRole("button", { name: "Aggiungi persone" }).click();
   await sheet(page).last().getByRole("checkbox", { name: "Aggiungi Neo Prova" }).check();
   await sheet(page).last().getByRole("button", { name: "Aggiungi 1 persona" }).click();
-  await closeTable(page);
+  await expect(sheet(page)).toHaveCount(0); // nothing stays open behind the toast
   await expect.poll(() => tableOf(w, "Neo")).toBe(table);
   await expect(card(page, "Rosa")).toContainText("3 / 2 posti");
   await expect(card(page, "Rosa")).toContainText("Neonati: 1 (non occupano posto)");
 
   // axe on the cards, then on the open sheet
-  // the toasts are left out: their action button fails color-contrast (shared component, QA-4)
-  const toasts = { exclude: ["[data-sonner-toaster]"] };
-  const cards = await axeFindings(page, toasts);
+  const cards = await axeAfterAnimations(page);
   expect(cards, describeFindings(cards)).toEqual([]);
   await card(page, "Rosa").click();
   await expect(sheet(page).getByRole("heading", { name: "Al tavolo (4)" })).toBeVisible();
   await expect(sheet(page).getByText("Oltre la capienza di 2").first()).toBeVisible();
-  const open_ = await axeFindings(page, toasts);
+  const open_ = await axeAfterAnimations(page);
   expect(open_, describeFindings(open_)).toEqual([]);
 
   // remove one: the table goes back within its capacity
@@ -203,7 +207,7 @@ test("a whole group at a table: those seated elsewhere are asked about; 'Lascia 
   const ask = page.getByRole("alertdialog");
   await expect(ask).toContainText("1 di loro sono già al tavolo Uno: li sposto qui?");
   await ask.getByRole("button", { name: "Lascia dove sono" }).click();
-  await closeTable(page);
+  await expect(sheet(page)).toHaveCount(0); // nothing stays open behind the toast
   await expect.poll(() => tableOf(w, "Luisa")).toBe(t2);
   expect(await tableOf(w, "Luca")).toBe(t2);
   expect(await tableOf(w, "Mario")).toBe(t1);
@@ -213,7 +217,7 @@ test("a whole group at a table: those seated elsewhere are asked about; 'Lascia 
   await addGroup("Tre");
   await expect(ask).toContainText("3 di loro sono già ai tavoli");
   await ask.getByRole("button", { name: "Sposta" }).click();
-  await closeTable(page);
+  await expect(sheet(page)).toHaveCount(0); // nothing stays open behind the toast
   await expect.poll(() => tableOf(w, "Mario")).toBe(t3);
   expect(await tableOf(w, "Luisa")).toBe(t3);
   expect(await tableOf(w, "Luca")).toBe(t3);
@@ -316,4 +320,35 @@ test("conflict on a table: the second save names the partner; 'Salva comunque' r
   await dialog.getByRole("button", { name: "Salva comunque" }).click();
   await expect.poll(read).toMatchObject({ name: "Verde mare" });
   await b.context.close();
+});
+
+test("whole group: everybody already at this table, and a group with no people, are said in words and write nothing (AC15)", async ({
+  page,
+}) => {
+  const w = await start();
+  const uno = await addGuestTable(w, "Uno", { capacity: 10 });
+  const rossi = await addGuestGroup(w, "Famiglia Rossi");
+  await addGuestGroup(w, "Gruppo vuoto");
+  for (const first of ["Mario", "Luisa"]) {
+    await addGuest(w, { firstName: first, lastName: "Rossi", groupId: rossi, tableId: uno });
+  }
+  await open(page, w);
+  await tabs.tables(page).click();
+  const openGroupSheet = async () => {
+    await card(page, "Uno").click();
+    await sheet(page).getByRole("button", { name: "Aggiungi un gruppo intero" }).click();
+  };
+
+  await openGroupSheet();
+  await sheet(page).last().getByLabel("Gruppo").selectOption({ label: "Gruppo vuoto" });
+  await sheet(page).last().getByRole("button", { name: "Aggiungi il gruppo" }).click();
+  await expect(
+    sheet(page).last().getByText("Questo gruppo non ha ancora persone: aggiungine prima dal gruppo."),
+  ).toBeVisible();
+  await sheet(page).last().getByLabel("Gruppo").selectOption({ label: "Famiglia Rossi" });
+  await sheet(page).last().getByRole("button", { name: "Aggiungi il gruppo" }).click();
+  await expect(page.getByText("Nessuno da aggiungere: sono già tutti seduti.")).toBeVisible();
+  await expect(sheet(page)).toHaveCount(0);
+  expect(await tableOf(w, "Mario")).toBe(uno);
+  await expect(card(page, "Uno")).toContainText("2 / 10 posti");
 });
