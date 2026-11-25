@@ -82,3 +82,10 @@ QA:
 ## Gate A (roadmap) e Gate B — 2026-11-25
 - Gate A registrato tramite roadmap R-02; Gate B approvato dallo sviluppatore ("Approvo tutto"), copre anche commit, push del branch e PR (repo pubblico). Merge = produzione → Gate C.
 - F3 avviata: S1 con developer A (T1–T5) e developer B (T6) in parallelo.
+
+## Checkpoint S1 — 2026-11-25
+- Commit: 7b2e364 (T1), 1c67bf2 (T2, finito per errore nel commit del log del coordinatore: nessuna riscrittura della storia), 2f80f1e (T3), 982a97d (T4), 91abfea (T5), 54fe384 + 78b9af4 (T6), 2126a2e (T9 e2e).
+- Revisioni: `code-1` (T6) e `code-2` (T1–T5) approvate al primo giro, 0 blocking / 0 should, 7 note. REV-4 (focus all'H1 entrando nella Guida da un'altra sezione solo dopo la prima visita) → da verificare nel controllo visivo del designer. REV-5 → verificato: le tracce di build includono `docs/functional` per `/guida` e `/guida/[...pagina]`.
+- Test: unit 1124/1124; e2e (5 spec, mobile+desktop) 115 passed, 1 skip preesistente; `adf verify` pass.
+- Aperto: scorrimento orizzontale delle tabelle non provato con contenuto reale (nessuna tabella dei docs supera 320 px).
+- Prossimo: S2 (T7 rinomina "Altro" → "Opzioni" in UI/email; T8 docs `altro.md` → `opzioni.md`), poi T10 e2e menu.
