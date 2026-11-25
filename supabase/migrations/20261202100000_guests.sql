@@ -11,6 +11,9 @@
 --   * DELETE (hard) is granted but the policy only lets it through on rows that are ALREADY soft
 --     deleted and only with `guests/delete`. The FKs of the members are nulled (PG >= 15 syntax).
 --   * No anon grant, no anon policy, ever (R-04 will use SECURITY DEFINER RPCs with the secret key).
+--   * NEW COLUMN = CLASSIFY IT: the audit exclusion is a deny-list, so a personal column added later
+--     must be added to the audit_row arguments below. guests_model.test.sql fails (allowlist of the
+--     structural columns) until the author decides.
 --   * Conventions of core.sql: business errors P0001 with a stable code, denials 42501.
 
 -- ---------------------------------------------------------------------------------------------
@@ -32,7 +35,7 @@ from (values ('read'), ('write'), ('delete')) as x (action);
 create table public.guest_groups (
   id uuid primary key default gen_random_uuid(),
   wedding_id uuid not null references public.weddings (id),
-  name text not null check (char_length(btrim(name)) between 1 and 80),
+  name text not null check (char_length(btrim(name)) between 1 and 80 and char_length(name) <= 80),
   -- Set by the import RPC (T12); lets "Annulla importazione" find the batch. Immutable.
   import_batch_id uuid,
   deleted_at timestamptz,
@@ -51,7 +54,7 @@ create index guest_groups_wedding_idx on public.guest_groups (wedding_id) where 
 create table public.guest_tables (
   id uuid primary key default gen_random_uuid(),
   wedding_id uuid not null references public.weddings (id),
-  name text not null check (char_length(btrim(name)) between 1 and 60),
+  name text not null check (char_length(btrim(name)) between 1 and 60 and char_length(name) <= 60),
   capacity integer check (capacity between 1 and 50),
   shape text not null default 'round' check (shape in ('round', 'rect')),
   pos_x numeric,
@@ -70,8 +73,10 @@ create index guest_tables_wedding_idx on public.guest_tables (wedding_id) where 
 create table public.guests (
   id uuid primary key default gen_random_uuid(),
   wedding_id uuid not null references public.weddings (id),
-  first_name text not null check (char_length(btrim(first_name)) between 1 and 80),
-  last_name text check (char_length(last_name) <= 80),
+  first_name text not null
+    check (char_length(btrim(first_name)) between 1 and 80 and char_length(first_name) <= 80),
+  -- null = none: '' and blank are refused (the app stores null), like phone and side
+  last_name text check (last_name is null or (char_length(btrim(last_name)) >= 1 and char_length(last_name) <= 80)),
   -- extendable by widening the check (DES-16)
   category text not null default 'adult' check (category in ('adult', 'child', 'infant')),
   -- A / B = partner slot, never the partner's name (BR5); null = "Non indicato"
@@ -278,6 +283,10 @@ begin
   if p_rows is null or jsonb_typeof(p_rows) <> 'array' then
     raise exception 'invalid_row' using errcode = 'P0001';
   end if;
+  -- A family, not an import: a per-call bound (REV-7). NOT a limit on the total number of guests.
+  if jsonb_array_length(p_rows) > 100 then
+    raise exception 'too_many_rows' using errcode = 'P0001';
+  end if;
   begin
     insert into public.guest_groups (wedding_id, name) values (v_wedding, p_name) returning id into v_group;
     for v_row in select e from jsonb_array_elements(p_rows) e loop
@@ -312,7 +321,7 @@ $$;
 -- SECURITY INVOKER: RLS and column grants apply, so someone without `guests/write` (or ids of another
 -- wedding) changes nothing and gets `changed: 0`. `previous` lists ONLY the rows this call changed,
 -- with the values they had BEFORE (read under row lock), and is what guests_bulk_undo takes back.
--- Deleted guests are skipped by the assign ops. The ids travel in the body (may exceed 1000).
+-- Deleted guests are skipped by the assign ops. The ids travel in the body, at most 1000 per call (the app batches).
 create function public.guests_bulk(p_ids uuid[], p_op text, p_target uuid default null)
 returns jsonb
 language plpgsql
@@ -331,7 +340,8 @@ begin
   if p_op is null or p_op not in ('assign_group', 'assign_table', 'delete', 'restore') then
     raise exception 'invalid_op' using errcode = 'P0001';
   end if;
-  if p_ids is null then
+  -- Per-call bound (REV-7); the app splits larger selections into batches of 1000: no total cap.
+  if p_ids is null or cardinality(p_ids) > 1000 then
     raise exception 'invalid_ids' using errcode = 'P0001';
   end if;
 
@@ -404,6 +414,7 @@ begin
     raise exception 'forbidden' using errcode = '42501';
   end if;
   if p_previous is null or jsonb_typeof(p_previous) <> 'array'
+     or jsonb_array_length(p_previous) > 1000
      or exists (
        select 1 from jsonb_array_elements(p_previous) x
        where jsonb_typeof(x) <> 'object'

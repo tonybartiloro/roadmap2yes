@@ -2,7 +2,7 @@
 -- their undo, no expiry (AC2, AC4, AC5, AC7, AC10, AC11, AC13, BR5, BR10, ADR-0002). All emails are FAKE.
 begin;
 \set su 'reset role; do $x$ begin perform set_config(''request.jwt.claims'','''',true); perform set_config(''request.jwt.claim.sub'','''',true); end $x$;'
-select plan(134);
+select plan(153);
 
 select * from tests.make_wedding('gm1') \gset w1_
 select * from tests.make_wedding('gm2') \gset w2_
@@ -259,15 +259,65 @@ select throws_ok($$select public.guests_bulk_undo('["x"]')$$, 'P0001', 'invalid_
 select is((public.guests_bulk_undo('[]') ->> 'restored')::int, 0, 'undo: an empty list restores nothing');
 :su
 
--- Scale: 1200 ids travel in the body (more than a URL filter can carry).
+-- Scale (REV-7): 1000 ids per call is the bound; the app batches larger selections, so there is no total cap.
 insert into public.guests (wedding_id, first_name, import_batch_id)
 select :'w1_wedding'::uuid, 'Bulk' || n, 'abcdef00-0000-4000-8000-000000000001' from generate_series(1, 1200) n;
 select tests.login(:'w1_founder'::uuid);
-select * from public.guests_bulk((select array_agg(id) from public.guests where import_batch_id = 'abcdef00-0000-4000-8000-000000000001'), 'delete') as guests_bulk \gset big_
-select is((:'big_guests_bulk'::jsonb ->> 'changed')::int, 1200, '1200 guests deleted in one bulk call');
-select is((public.guests_bulk_undo(:'big_guests_bulk'::jsonb -> 'previous') ->> 'restored')::int, 1200, '... and restored by the undo');
+select array_agg(id) as all_ids from public.guests where import_batch_id = 'abcdef00-0000-4000-8000-000000000001' \gset
+select throws_ok(format($$select public.guests_bulk(%L::uuid[], 'delete')$$, :'all_ids'), 'P0001', 'invalid_ids', '1200 ids in one call are refused (the cap is per call)');
+select array_agg(id) as ids_a from (select id from public.guests where import_batch_id = 'abcdef00-0000-4000-8000-000000000001' order by id limit 1000) x \gset
+select array_agg(id) as ids_b from (select id from public.guests where import_batch_id = 'abcdef00-0000-4000-8000-000000000001' order by id offset 1000) x \gset
+select public.guests_bulk(:'ids_a'::uuid[], 'delete') as guests_bulk \gset big_a_
+select public.guests_bulk(:'ids_b'::uuid[], 'delete') as guests_bulk \gset big_b_
+select is((:'big_a_guests_bulk'::jsonb ->> 'changed')::int + (:'big_b_guests_bulk'::jsonb ->> 'changed')::int, 1200, '1200 guests deleted in two batches (1000 + 200)');
+select is((public.guests_bulk_undo(:'big_a_guests_bulk'::jsonb -> 'previous') ->> 'restored')::int, 1000, 'undo of a 1000 batch');
+select is((public.guests_bulk_undo(:'big_b_guests_bulk'::jsonb -> 'previous') ->> 'restored')::int, 200, 'undo of the 200 batch');
 select is((select count(*)::int from public.guests where import_batch_id = 'abcdef00-0000-4000-8000-000000000001' and deleted_at is null), 1200, 'all 1200 are live again');
+select throws_ok(format($$select public.guests_bulk_undo(%L::jsonb)$$, (select jsonb_agg(jsonb_build_object('id', id, 'op', 'delete', 'deleted', false)) from (select id from public.guests where import_batch_id = 'abcdef00-0000-4000-8000-000000000001' limit 1001) y)),
+  'P0001', 'invalid_previous', 'undo: more than 1000 entries in one call are refused');
+select throws_ok(format($$select public.create_guest_family('Grande', 'A', %L::jsonb)$$, (select jsonb_agg(jsonb_build_object('first_name', 'P' || n)) from generate_series(1, 101) n)),
+  'P0001', 'too_many_rows', 'family: 101 people are refused');
+select lives_ok(format($$select public.create_guest_family('Grande', 'A', %L::jsonb)$$, (select jsonb_agg(jsonb_build_object('first_name', 'P' || n)) from generate_series(1, 100) n)),
+  'family: 100 people are accepted');
 :su
+
+-- ===== REV-6 / REV-9: the stored length is bounded too (padding), last_name has no blank ============
+select throws_ok(format($$insert into public.guests (wedding_id, first_name) values (%L, %L)$$, :'w1_wedding'::uuid, repeat(' ', 100) || 'a'), '23514', null, 'first_name: padding + text above 80 stored chars refused');
+select throws_ok(format($$insert into public.guests (wedding_id, first_name, last_name) values (%L, 'A', %L)$$, :'w1_wedding'::uuid, repeat(' ', 100) || 'a'), '23514', null, 'last_name: padding refused');
+select throws_ok(format($$insert into public.guest_groups (wedding_id, name) values (%L, %L)$$, :'w1_wedding'::uuid, repeat(' ', 100) || 'a'), '23514', null, 'group name: padding refused');
+select throws_ok(format($$insert into public.guest_tables (wedding_id, name) values (%L, %L)$$, :'w1_wedding'::uuid, repeat(' ', 100) || 'a'), '23514', null, 'table name: padding refused');
+select throws_ok(format($$insert into public.guests (wedding_id, first_name, last_name) values (%L, 'A', '')$$, :'w1_wedding'::uuid), '23514', null, 'last_name: empty string refused (the app stores null)');
+select throws_ok(format($$insert into public.guests (wedding_id, first_name, last_name) values (%L, 'A', '   ')$$, :'w1_wedding'::uuid), '23514', null, 'last_name: blank refused');
+select lives_ok(format($$insert into public.guests (wedding_id, first_name, last_name) values (%L, 'A', null)$$, :'w1_wedding'::uuid), 'last_name: null ok');
+
+-- ===== REV-5: fail-closed audit. A new column must be classified by its author ======================
+-- columns minus the ones excluded from the audit == the structural allowlist. A personal column added
+-- later (dietary, address...) fails here until it is added to the audit_row arguments AND classified.
+select is(
+  (select array_agg(a.attname::text order by a.attname::text) from pg_attribute a
+   where a.attrelid = 'public.guests'::regclass and a.attnum > 0 and not a.attisdropped
+     and a.attname::text <> all (array['first_name', 'last_name', 'phone', 'email', 'notes'])),
+  array['category', 'created_at', 'created_by', 'deleted_at', 'deleted_by', 'group_id', 'id', 'import_batch_id',
+        'side', 'table_id', 'updated_at', 'updated_by', 'version', 'wedding_id']::text[],
+  'guests: the non-excluded columns are exactly the structural allowlist (a new column fails until classified)');
+select is(
+  (select array_agg(a.attname::text order by a.attname::text) from pg_attribute a
+   where a.attrelid = 'public.guest_groups'::regclass and a.attnum > 0 and not a.attisdropped and a.attname::text <> 'name'),
+  array['created_at', 'created_by', 'deleted_at', 'deleted_by', 'id', 'import_batch_id', 'updated_at', 'updated_by',
+        'version', 'wedding_id']::text[],
+  'guest_groups: the non-excluded columns are exactly the structural allowlist');
+select is(
+  (select array_agg(a.attname::text order by a.attname::text) from pg_attribute a
+   where a.attrelid = 'public.guest_tables'::regclass and a.attnum > 0 and not a.attisdropped and a.attname::text <> 'name'),
+  array['capacity', 'created_at', 'created_by', 'deleted_at', 'deleted_by', 'id', 'pos_x', 'pos_y', 'shape',
+        'updated_at', 'updated_by', 'version', 'wedding_id']::text[],
+  'guest_tables: the non-excluded columns are exactly the structural allowlist');
+select is(
+  (select array_agg(distinct x.arg order by x.arg) from pg_trigger t join pg_class c on c.oid = t.tgrelid
+     cross join lateral unnest(string_to_array(encode(t.tgargs, 'escape'), '\000')) x(arg)
+   where c.relname = 'guests' and t.tgname = 'guests_audit' and x.arg <> ''),
+  array['email', 'first_name', 'last_name', 'notes', 'phone']::text[],
+  'the guests audit trigger excludes exactly the five personal columns');
 
 -- ===== No expiry (AC11): nothing purges soft-deleted rows ==========================================
 insert into public.guests (id, wedding_id, first_name, deleted_at, deleted_by)
@@ -280,6 +330,20 @@ select is(
   (select count(*)::int from pg_proc p where p.pronamespace in ('public'::regnamespace, 'private'::regnamespace)
      and p.prosrc ~* 'delete\s+from\s+(public\.)?guest'),
   0, 'no function purges guests, groups or tables: only the user''s "Elimina definitivamente" deletes');
+
+-- ===== REV-10: the personal-key scan again, after EVERY section (undo, 1200 rows, families) =========
+select cmp_ok((select count(*)::int from public.audit_log where table_name = 'guests'), '>', 2400, 'the final audit scan is not vacuous (1200-row sections are in it)');
+select is(
+  (select count(*)::int from public.audit_log a
+   where a.table_name in ('guests', 'guest_groups', 'guest_tables')
+     and (coalesce(a.old_data, '{}'::jsonb) ?| array['first_name', 'last_name', 'phone', 'email', 'notes', 'name']
+       or coalesce(a.new_data, '{}'::jsonb) ?| array['first_name', 'last_name', 'phone', 'email', 'notes', 'name'])),
+  0, 'at the end of the file: still no personal key in any audit row of the three tables');
+select is(
+  (select count(*)::int from public.audit_log a
+   where a.table_name in ('guests', 'guest_groups', 'guest_tables')
+     and (coalesce(a.old_data::text, '') || coalesce(a.new_data::text, '')) ~* 'zed|zeta|segretissim|example\.test|\+39 000|Bulk[0-9]|Nuovo|Famiglia'),
+  0, 'at the end of the file: no personal value in any audit row');
 
 select * from finish();
 rollback;
