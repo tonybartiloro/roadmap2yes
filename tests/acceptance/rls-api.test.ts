@@ -761,6 +761,9 @@ describe("catalog matrix through the API (AC1, AC10, AC11, AC21)", () => {
         budgetCategories: [],
         budgetItems: [],
         payments: [],
+        guests: [],
+        guestGroups: [],
+        guestTables: [],
       };
       const json = buildExportJson(input, new Date("2026-11-25T10:00:00Z"));
       expect(json).not.toMatch(/token_hash/i);
