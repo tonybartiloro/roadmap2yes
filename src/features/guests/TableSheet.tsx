@@ -247,6 +247,7 @@ export function TableSheet({
           groups={groups}
           actions={actions}
           onClose={() => setAdding(null)}
+          onDone={onClose}
         />
       ) : null}
       {conflict.dialog}

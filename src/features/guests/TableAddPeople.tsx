@@ -52,6 +52,7 @@ export function TableAddPeople({
   groups,
   actions,
   onClose,
+  onDone,
 }: {
   mode: "people" | "group";
   table: GuestTable;
@@ -61,6 +62,8 @@ export function TableAddPeople({
   groups: readonly GroupView[];
   actions: Actions;
   onClose: () => void;
+  /** Seated (or nothing to seat): close this sheet AND the table sheet, so the Annulla toast is reachable. */
+  onDone: () => void;
 }) {
   const [query, setQuery] = useState("");
   const [onlyFree, setOnlyFree] = useState(true);
@@ -84,7 +87,7 @@ export function TableAddPeople({
     if (ids.length === 0) {
       // Nobody to seat (all already at a table): say so and close, never a silent no-op.
       toast("Nessuno da aggiungere: sono già tutti seduti.");
-      onClose();
+      onDone();
       return;
     }
     setBusy(true);
@@ -95,7 +98,7 @@ export function TableAddPeople({
       table.id,
     );
     setBusy(false);
-    if (ok) onClose();
+    if (ok) onDone();
   }
 
   function addGroup() {

@@ -692,6 +692,21 @@ describe("tables (AC14-AC16)", () => {
     );
   });
 
+  it("closes every sheet after seating people, so the Annulla toast can be clicked (AC7)", async () => {
+    actions.bulkGuestsAction.mockResolvedValue(ok({ previous: [], changed: 1 }));
+    const mario = guest({ firstName: "Mario" });
+    renderScreen({ guests: [mario], tables: [tbl("t1", "Rossi", 8)] });
+    await userEvent.click(screen.getByRole("tab", { name: "Tavoli" }));
+    await userEvent.click(screen.getByRole("button", { name: /^Rossi/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Aggiungi persone" }));
+    await userEvent.click(screen.getByRole("checkbox", { name: "Aggiungi Mario Rossi" }));
+    await userEvent.click(screen.getByRole("button", { name: "Aggiungi 1 persona" }));
+    await waitFor(() => expect(actions.bulkGuestsAction).toHaveBeenCalled());
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    const toastButton = await screen.findAllByRole("button", { name: "Annulla" });
+    expect(toastButton.some((b) => b.closest("[data-sonner-toast]"))).toBe(true);
+  });
+
   describe("a whole group (AC15)", () => {
     const setup = async () => {
       actions.bulkGuestsAction.mockResolvedValue(ok({ previous: [], changed: 1 }));
