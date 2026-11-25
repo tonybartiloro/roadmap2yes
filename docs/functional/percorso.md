@@ -56,7 +56,7 @@ Il badge **Da rivedere** compare sui compiti collegati a una data che è stata r
 
 ## Invitati
 
-Alcune tappe riguardano gli invitati, per esempio la **lista invitati preliminare**. Nel dettaglio di queste tappe trovi il link **Vai a Invitati**, che apre la pagina [Invitati](invitati.md).
+Due tappe riguardano gli invitati: **Fare la lista preliminare degli invitati** e **Raccogliere le conferme degli invitati**. Nel dettaglio di ciascuna trovi il link **Vai a Invitati**, che apre la pagina [Invitati](invitati.md).
 
 Il link non completa nulla: la tappa si segna fatta solo da te, anche se avete già aggiunto tutti gli invitati.
 
