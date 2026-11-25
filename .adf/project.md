@@ -60,3 +60,4 @@ Repo pubblico GitHub tonybartiloro/roadmap2yes (CI GitHub Actions, minuti illimi
 - Supabase free mette in pausa i progetti dopo ~7 giorni di inattività del DB (ripristino manuale): keep-alive con cron giornaliero Vercel + workflow GitHub settimanale.
 - Codice d'accesso: minimo 10 caratteri con lettere e cifre, imposto da Supabase Auth; nessun CAPTCHA in R1.
 - Utenti: Tony e Jessica (pari permessi); previsti ruoli futuri famiglia e wedding planner (opzionale).
+- e2e in locale: la porta 3000 della macchina di sviluppo è occupata da un'altra app Docker e Playwright la riusa (test falliti in massa). Usare `E2E_PORT=3300 npm run e2e` (con `npm run db:start` attivo); WebKit (`webkit-smoke`) richiede `npm run e2e:install`, altrimenti resta alla CI. Approvato dallo sviluppatore il 2026-11-25 (FEAT-2026-002).

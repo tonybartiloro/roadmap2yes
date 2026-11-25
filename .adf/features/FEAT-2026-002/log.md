@@ -96,3 +96,7 @@ QA:
 - Integrazione: `adf verify --with-e2e` fallito solo per ambiente (porta 3000 occupata da un'altra app Docker sulla macchina). Run pulito del QA (`qa-1`, `E2E_PORT=3300`): 264 test, 259 pass, 1 skip, 4 fail non legati al branch (3 WebKit non installato in locale, 1 flake Percorso che passa 3/3 da solo). Nessun bug.
 - Design (`design-1`): approvato; DES-20 (focus solo navigando dentro la Guida) e DES-21 (H1 sulla pagina non trovata) corretti in 565d775; REV-11 (`code-4`, robustezza col caricamento in streaming) risolto in 271f1d5 con `GuideShell` nel layout della Guida; e2e 34/34 su build di produzione; tracce di build con `docs/functional` verificate.
 - Seguiti proposti: nota `E2E_PORT` nei comandi di `.adf/project.md` (serve approvazione); flake Percorso (chore a parte); commenti "Altro >" nel codice.
+
+## F4 — 2026-11-25
+- Sviluppatore: "Sì, con la nota" → nota `E2E_PORT=3300` aggiunta ai Gotchas di `.adf/project.md`.
+- Documentazione (e92033f): docs tecniche (architettura, sicurezza, sviluppo-locale-e-test, ambienti-e-rilascio, README), README radice, righe "Storico" nelle pagine funzionali toccate. REV-8 e REV-9 chiusi. Test dei docs 72/72.
