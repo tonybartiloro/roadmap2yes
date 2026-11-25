@@ -2,7 +2,7 @@
 
 | Status | Date | Deciders | Related feature | Supersedes |
 |---|---|---|---|---|
-| proposed | 2026-11-25 | architect (proposta); tonybartiloro (da approvare al Gate B) | FEAT-2026-003 (`.adf/features/FEAT-2026-003/plan.md`) | — |
+| accepted | 2026-11-25 | architect (proposta); tonybartiloro (approvata al Gate B, 2026-11-25) | FEAT-2026-003 (`.adf/features/FEAT-2026-003/plan.md`) | — |
 
 ## Context
 - **Dati di terzi**: con R-03 l'app conserva per la prima volta dati di persone che non sono utenti: nome, cognome, telefono, email, note (anche allergie, cioè dati sulla salute), gruppo familiare, lato, tavolo.

@@ -74,9 +74,30 @@ Tutto passa da `EmailSender`. `emailEnabled()` è l'unico interruttore: è vero 
 
 Se Supabase è in pausa o non risponde, il proxy e il layout riscrivono su `/servizio`, una pagina che non legge il database. `global-error.tsx` è autosufficiente e non importa dati.
 
+## Modulo invitati (`guests`)
+
+Costruito come budget e Percorso, senza dipendenze nuove. Le regole sui dati personali sono in [ADR-0002](../adr/0002-dati-personali-invitati.md).
+
+| Parte | Dove | Cosa fa |
+|---|---|---|
+| Dominio puro | `src/domain/guests` | Conteggi per categoria e lato, filtri, duplicati, validazioni, `bandOf`, occupazione dei tavoli, parser CSV (`csv-import.ts`), CSV di export (`csv-export.ts`). Nessuna chiamata di rete |
+| Letture | `src/features/guests/data.ts`, `tables-data.ts` | Gruppi, tavoli e invitati (anche eliminati) con `all-pages.ts`, ordinati per `id`, senza tetto. Una tabella non ancora migrata dà `not_migrated` |
+| Scritture | `actions.ts`, `tables-actions.ts`, `import-actions.ts` | Server action con zod e `ActionResult`. Modifiche da modulo con `versionedUpdate` e `ConflictDialog`; assegnazioni rapide con `update` diretto; massa e Annulla con `guests_bulk` e `guests_bulk_undo`; eliminazione logica con `deleted_at`; `DELETE` fisico solo per "Elimina definitivamente" e "Svuota" |
+| Importazione | `import-actions.ts` più `import_guests` | Il file si legge nel browser. La server action rivalida le righe con lo stesso schema e chiama la RPC |
+| Esportazione | `src/domain/guests/csv-export.ts`, `src/features/export` | CSV dei vivi generato nel client; nel JSON completo `guests`, `guestGroups`, `guestTables` |
+| Navigazione | `src/components/AppNav.tsx`, `HelpLink.tsx`, `src/app/(app)/layout.tsx` | Sei voci. Invitati è nascosta senza permesso `guests/read`; `/invitati` senza permesso mostra il pannello "Questo spazio è su invito" |
+
+Limiti per non rompere il rendering e il body delle server action:
+
+- liste a 100 righe per volta, con "Mostra altre 100"; i gruppi grandi sono chiusi;
+- importazione: 500 righe, payload sotto 900 KB (il body delle server action è 1 MB);
+- `guests_bulk`: 1000 id per chiamata, e il client lavora a lotti; la selezione totale ha un tetto di 5000 id.
+
+Gli errori mostrano codici e messaggi fissi. Né il database né il server restituiscono `message` o `details` di Postgres, perché possono contenere la riga.
+
 ## Guida d'uso (`/guida`)
 
-La voce **Guida** del menu mostra le pagine di `docs/functional`. Il contenuto arriva dagli stessi file Markdown, senza copie nel codice: un file modificato appare alla build successiva.
+La **Guida** sta in cima alla pagina Opzioni (non più nella barra) e mostra le pagine di `docs/functional`. Il contenuto arriva dagli stessi file Markdown, senza copie nel codice: un file modificato appare alla build successiva.
 
 - **Route**: `src/app/(app)/guida/`. `page.tsx` è l'indice (la tabella di `docs/functional/README.md`, nel suo ordine); `[...pagina]/page.tsx` è una pagina. Stessa area autenticata delle altre pagine, senza guard nuovi.
 - **Lettura**: `src/features/guide/source.ts` (`server-only`) legge la cartella da `process.cwd()`. In produzione il risultato è tenuto in memoria per istanza; in sviluppo si rilegge a ogni richiesta. Una cartella mancante è un errore visibile, mai una Guida vuota.
@@ -94,3 +115,4 @@ La voce **Guida** del menu mostra le pagine di `docs/functional`. Il contenuto a
 |---|---|---|
 | 2026-11-24 | FEAT-2026-001 | Prima stesura (F4, T18) |
 | 2026-11-25 | FEAT-2026-002 | Guida d'uso in app: route, lettura dei file, tracciamento Vercel, renderer e regole dei link |
+| 2026-11-25 | FEAT-2026-003 | Modulo invitati: dominio, letture, scritture, importazione ed esportazione; Guida in Opzioni; link Aiuto |
