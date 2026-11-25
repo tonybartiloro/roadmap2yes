@@ -105,6 +105,9 @@ test.describe("axe on the main screens (WCAG 2.2 AA)", () => {
       "/altro/promemoria",
       "/altro/esporta",
       "/altro/info",
+      "/guida",
+      "/guida/budget",
+      "/guida/temi-e-aspetto",
     ];
     const failures: string[] = [];
     for (const route of screens) {
@@ -167,6 +170,9 @@ test.describe("reflow, zoom, keyboard, motion", () => {
         "/altro",
         "/altro/account",
         "/altro/profili",
+        "/guida",
+        "/guida/budget",
+        "/guida/temi-e-aspetto",
       ]) {
         await page.goto(route);
         const overflow = await noScroll(page);
