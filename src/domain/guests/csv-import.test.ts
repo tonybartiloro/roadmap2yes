@@ -94,7 +94,26 @@ describe("separator, quotes, lines", () => {
   it("an unclosed quote is an error on that row, not a crash", () => {
     const preview = parse('nome;note\nMario;"mai chiusa\nLuca;ok');
     expect(preview.rows).toHaveLength(1);
-    expect(preview.rows[0]?.errors).toContain("virgolette non chiuse");
+    expect(preview.rows[0]?.errors[0]).toMatch(/^virgolette non chiuse/);
+    // the swallowed rest of a big file is not copied whole into `source` (REV-43)
+    const big = parse(`nome;note\nMario;"${"x".repeat(100_000)}`);
+    expect(big.rows[0]?.source.length).toBeLessThan(600);
+  });
+
+  it("line numbers are physical lines: a quoted field with line breaks moves the next row (REV-43)", () => {
+    const preview = parse('nome;note\r\nUno;"a\r\nb\nc"\r\nDue;ok\rTre;ok');
+    expect(preview.rows.map((r) => [r.line, r.guest?.firstName])).toEqual([
+      [2, "Uno"],
+      [5, "Due"],
+      [6, "Tre"],
+    ]);
+  });
+
+  it("a NUL in the text is dropped, so it cannot break the import later (REV-41)", () => {
+    const preview = parse("nome;note\nMa\u0000rio;ci\u0000ao");
+    expect(preview.rows[0]?.guest).toMatchObject({ firstName: "Mario", notes: "ciao" });
+    // also for UTF-16 files
+    expect(decodeCsvBytes(bytes(0xff, 0xfe, 0x41, 0x00, 0x00, 0x00, 0x42, 0x00))).toBeNull();
   });
 
   it("skips blank lines but keeps line numbers (BOM and CR/LF/CRLF endings)", () => {
@@ -151,6 +170,24 @@ describe("header and columns", () => {
   it("a header may reorder and omit columns", () => {
     const preview = parse("email;nome\nlu@example.test;Luca");
     expect(preview.rows[0]?.guest).toMatchObject({ firstName: "Luca", email: "lu@example.test" });
+  });
+
+  it("common spellings of a header are accepted (E-mail, Cellulare)", () => {
+    const preview = parse("Nome;E-mail;Cellulare\nLuca;lu@example.test;+39 000 000 0001");
+    expect(preview.hasHeader).toBe(true);
+    expect(preview.rows[0]?.guest).toMatchObject({
+      email: "lu@example.test",
+      phone: "+39 000 000 0001",
+    });
+  });
+
+  it("a one-column list that starts with a title gets a warning, not a silent guest (REV-42)", () => {
+    const preview = parse("Nome e cognome\nMario Rossi");
+    expect(preview.rows[0]?.warnings).toEqual([
+      "sembra un titolo, non un invitato: se è così, toglilo",
+    ]);
+    expect(preview.rows[1]?.warnings).toEqual([]);
+    expect(parse("Mario Rossi\nNome e cognome").rows[1]?.warnings).toEqual([]);
   });
 
   it("a single column is the whole text in the name", () => {
@@ -326,7 +363,9 @@ describe("formula guard (the exact inverse of csvCell)", () => {
     expect(stripFormulaGuard("'\tx")).toBe("\tx");
     expect(stripFormulaGuard("'\rx")).toBe("\rx");
     expect(stripFormulaGuard("'ciao")).toBe("'ciao");
-    expect(stripFormulaGuard("''+1")).toBe("''+1");
+    // one apostrophe comes off apostrophes + trigger: the guard is injective (REV-39)
+    expect(stripFormulaGuard("''+1")).toBe("'+1");
+    expect(stripFormulaGuard("''ciao")).toBe("''ciao");
     expect(stripFormulaGuard("+39")).toBe("+39");
   });
 
@@ -350,7 +389,7 @@ describe("round trip: export, then import", () => {
       side: "A",
       phone: "+39 000 000 0001",
       email: "nic@example.test",
-      notes: 'Allergia (finta); "senza noci"\nsecondo rigo',
+      notes: `Allergia (finta); "senza noci"\nsecondo rigo`,
       groupId: "g1",
       tableId: null,
       deletedAt: null,
@@ -363,7 +402,8 @@ describe("round trip: export, then import", () => {
       side: "both",
       phone: null,
       email: null,
-      notes: null,
+      // text that already starts with an apostrophe + trigger comes back unchanged (REV-39)
+      notes: "'=ok",
       groupId: "g1",
       tableId: "t1",
       deletedAt: null,
@@ -389,7 +429,7 @@ describe("round trip: export, then import", () => {
       side: null,
       phone: null,
       email: null,
-      notes: null,
+      notes: "''+1",
       groupId: "g2",
       tableId: null,
       deletedAt: null,

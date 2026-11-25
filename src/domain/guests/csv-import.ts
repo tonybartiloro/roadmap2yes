@@ -62,7 +62,8 @@ export function decodeCsvBytes(bytes: Uint8Array): { text: string; encoding: Csv
     encoding = "windows-1252";
     text = new TextDecoder("windows-1252").decode(body);
   }
-  if (encoding !== "utf-16le" && encoding !== "utf-16be" && text.includes("\u0000")) return null;
+  // A NUL is never in a text list, whatever the encoding (REV-41): binary file, or garbage.
+  if (text.includes("\u0000")) return null;
   return { text: text.replace(/^﻿/, ""), encoding };
 }
 
@@ -72,11 +73,18 @@ export function decodeCsvBytes(bytes: Uint8Array): { text: string; encoding: Csv
 
 interface RawRecord {
   cells: string[];
-  /** Original text of the record (for "Copia le righe saltate"), without the line break. */
+  /**
+   * Original text of the record (for "Copia le righe saltate"), without the line break. For an
+   * unclosed quote, which swallows the rest of the text, only the start is kept.
+   */
   source: string;
+  /** Physical line (1-based, in the editor's sense) where the record starts (REV-43). */
+  line: number;
   unclosedQuote: boolean;
   blank: boolean;
 }
+
+const MAX_BROKEN_SOURCE = 500;
 
 /** `;` or `,`, from the first non-blank line outside quotes; a tie or none = `;` (Italian default). */
 export function detectSeparator(text: string): ";" | "," {
@@ -117,11 +125,18 @@ function tokenize(text: string, separator: string): RawRecord[] {
   let inQuotes = false;
   let atFieldStart = true;
   let start = 0;
+  let line = 1; // physical line of the current position
+  let startLine = 1;
   const finish = (end: number, unclosed: boolean) => {
     cells.push(field);
+    const source = text.slice(start, end);
     records.push({
       cells,
-      source: text.slice(start, end),
+      source:
+        unclosed && source.length > MAX_BROKEN_SOURCE
+          ? `${source.slice(0, MAX_BROKEN_SOURCE)}…`
+          : source,
+      line: startLine,
       unclosedQuote: unclosed,
       blank: cells.every((c) => c.trim() === ""),
     });
@@ -137,7 +152,11 @@ function tokenize(text: string, separator: string): RawRecord[] {
           field += '"';
           i += 1;
         } else inQuotes = false;
-      } else field += ch;
+      } else {
+        field += ch;
+        // a line break inside a quoted field still moves the physical line (CRLF counts once)
+        if (ch === "\n" || (ch === "\r" && text[i + 1] !== "\n")) line += 1;
+      }
       continue;
     }
     if (ch === '"' && atFieldStart) {
@@ -151,6 +170,8 @@ function tokenize(text: string, separator: string): RawRecord[] {
       finish(i, false);
       if (ch === "\r" && text[i + 1] === "\n") i += 1;
       start = i + 1;
+      line += 1;
+      startLine = line;
     } else {
       field += ch;
       atFieldStart = false;
@@ -164,10 +185,12 @@ function tokenize(text: string, separator: string): RawRecord[] {
 
 /**
  * Exact inverse of the export's formula guard: `csvCell` prefixes text that starts with
- * `= + - @ TAB CR` with an apostrophe; here that apostrophe (and only that one) is removed.
+ * `= + - @ TAB CR`, or with apostrophes followed by one of them, with an apostrophe; here one
+ * apostrophe is removed from such a start (REV-39: the guard is injective, so `'=ok`
+ * written by the user comes back as `'=ok`).
  */
 export function stripFormulaGuard(cell: string): string {
-  return /^'[=+\-@\t\r]/.test(cell) ? cell.slice(1) : cell;
+  return /^'+[=+\-@\t\r]/.test(cell) ? cell.slice(1) : cell;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -256,8 +279,34 @@ const textOrNull = (value: string | undefined): string | null => {
   return trimmed === "" ? null : trimmed;
 };
 
+/** Common spellings of a column in a header (REV-42); the exported names are the canonical ones. */
+const HEADER_ALIASES: Readonly<Record<string, Column>> = {
+  "e-mail": "email",
+  mail: "email",
+  cellulare: "telefono",
+  tel: "telefono",
+  cell: "telefono",
+};
+
+/** A first line like this in a one-column list is probably a title, not a guest (REV-42). */
+const TITLE_LIKE: ReadonlySet<string> = new Set([
+  "nome e cognome",
+  "nome cognome",
+  "nome completo",
+  "nominativo",
+  "invitato",
+  "invitati",
+  "ospite",
+  "ospiti",
+  "elenco invitati",
+  "lista invitati",
+]);
+
 function headerMap(record: RawRecord): Column[] | null {
-  const names = record.cells.map((c) => normalizeText(stripFormulaGuard(c)));
+  const names = record.cells.map((c) => {
+    const name = normalizeText(stripFormulaGuard(c));
+    return HEADER_ALIASES[name] ?? name;
+  });
   const known = names.filter((n) => n !== "");
   if (known.length === 0 || !known.includes("nome")) return null;
   if (!known.every((n) => COLUMN_SET.has(n))) return null;
@@ -350,7 +399,8 @@ export function parseGuestsCsv(
   if (text.length > MAX_INPUT_CHARS) {
     return { ok: false, code: "too_large", message: IMPORT_TOO_LARGE };
   }
-  const input = text.replace(/^﻿/, "");
+  // A NUL typed or pasted is dropped: Postgres refuses it in jsonb and one cell would fail the import.
+  const input = text.replace(/^﻿/, "").replaceAll("\u0000", "");
   const records = tokenize(input, detectSeparator(input));
   const firstData = records.findIndex((r) => !r.blank);
   if (firstData === -1) return { ok: false, code: "empty", message: IMPORT_EMPTY };
@@ -360,8 +410,9 @@ export function parseGuestsCsv(
   const singleColumn = header === null && records.every((r) => r.blank || r.cells.length === 1);
 
   const dataRecords = records
-    .map((record, index) => ({ record, line: index + 1 }))
+    .map((record) => ({ record, line: record.line }))
     .filter(({ record }, index) => !record.blank && !(header && index === firstData));
+  const firstLine = dataRecords[0]?.line;
   if (dataRecords.length === 0) return { ok: false, code: "empty", message: IMPORT_EMPTY };
   if (dataRecords.length > MAX_IMPORT_ROWS) {
     return { ok: false, code: "too_many_rows", message: IMPORT_TOO_MANY_ROWS };
@@ -387,7 +438,9 @@ export function parseGuestsCsv(
     };
     const errors: string[] = [];
     const warnings: string[] = [];
-    if (record.unclosedQuote) errors.push("virgolette non chiuse");
+    if (record.unclosedQuote) {
+      errors.push("virgolette non chiuse: da qui in poi il testo è incluso in questa riga");
+    }
 
     const categoryRaw = cell("tipo");
     const category =
@@ -434,6 +487,9 @@ export function parseGuestsCsv(
       };
     }
 
+    if (singleColumn && line === firstLine && TITLE_LIKE.has(normalizeText(guest.firstName))) {
+      warnings.push("sembra un titolo, non un invitato: se è così, toglilo");
+    }
     const key = duplicateKey(guest.firstName, guest.lastName);
     if (liveNames.has(key))
       warnings.push(`c'è già ${[guest.firstName, guest.lastName].filter(Boolean).join(" ")}`);
