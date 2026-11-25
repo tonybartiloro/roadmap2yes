@@ -12,6 +12,7 @@ import { MoneyInput } from "./MoneyInput";
 import { MonthYearField } from "./MonthYearField";
 import { OfflineBanner } from "./OfflineBanner";
 import { ServiceDownPage } from "./ServiceDownPage";
+import { OPTIONS_SECTION_LABEL } from "./section-label";
 
 let mockPathname = "/percorso/oggi";
 vi.mock("next/navigation", () => ({ usePathname: () => mockPathname }));
@@ -280,7 +281,7 @@ describe("AppNav", () => {
       "Percorso",
       "Scelte",
       "Budget",
-      "Altro",
+      OPTIONS_SECTION_LABEL,
       "Guida",
     ]);
     expect(screen.getByRole("navigation", { name: "Principale" })).toBeTruthy();

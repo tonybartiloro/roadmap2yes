@@ -142,7 +142,7 @@ export interface DigestEmailInput {
   /** Max 3 are shown. */
   news: readonly string[];
   appUrl: string;
-  /** Link to Altro > Promemoria. */
+  /** Link to Opzioni > Promemoria. */
   preferencesUrl: string;
   unsubscribeUrl: string;
   palette?: EmailPalette;
@@ -184,7 +184,7 @@ export function renderDigestEmail(input: DigestEmailInput): RenderedEmail | null
   }
   const intro = "Ecco cosa ti aspetta questa settimana.";
   const footer = "Non vuoi più il riepilogo del lunedì? Disattivalo con un tocco:";
-  const change = "Cambi idea? Puoi riattivarlo da Altro > Promemoria:";
+  const change = "Cambi idea? Puoi riattivarlo da Opzioni > Promemoria:";
   const bodyHtml = [
     paragraph(escapeHtml(`Ciao ${name},`)),
     paragraph(escapeHtml(intro)),

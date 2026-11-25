@@ -167,7 +167,7 @@ describe("digest", () => {
     expect(m!.text).toContain("e altri 1");
     expect(m!.html).toContain(ESCAPED);
     expect(m!.html).not.toContain("<img");
-    expect(m!.text).toContain("Altro > Promemoria");
+    expect(m!.text).toContain("Opzioni > Promemoria");
     expect(m!.headers?.["List-Unsubscribe"]).toBe(`<${UNSUB}>`);
   });
 });

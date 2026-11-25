@@ -35,7 +35,7 @@ const formatDay = (iso: string): string =>
   );
 
 /**
- * Altro > Invito partner (AC5, AC57, AC58, design §3.1.5). The state comes from the DB (RLS reads):
+ * Opzioni > Invito partner (AC5, AC57, AC58, design §3.1.5). The state comes from the DB (RLS reads):
  * nothing here authorizes anything, the RPCs behind the forms do. With emails off the invite by email
  * is explained, not offered (AC59); the access with a code is always there.
  */
@@ -176,7 +176,7 @@ export default async function InvitePage() {
 
       <p>
         <Link href="/altro" className="text-primary underline underline-offset-4">
-          Torna ad Altro
+          Torna a Opzioni
         </Link>
       </p>
     </div>

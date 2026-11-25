@@ -6,12 +6,13 @@ import {
   BookOpen,
   CalendarCheck,
   Home,
-  Menu,
   Scale,
+  Settings,
   Wallet,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { OPTIONS_SECTION_LABEL } from "./section-label";
 
 export interface NavItem {
   href: string;
@@ -19,13 +20,13 @@ export interface NavItem {
   icon: LucideIcon;
 }
 
-/** The six sections (design §2 + the in-app guide). Future areas (R2-R6) grow under "Altro" and "Scelte". */
+/** The six sections (design §2 + the in-app guide). Future areas (R2-R6) grow under "Opzioni" and "Scelte". */
 export const NAV_ITEMS: readonly NavItem[] = [
   { href: "/", label: "Home", icon: Home },
   { href: "/percorso", label: "Percorso", icon: CalendarCheck },
   { href: "/scelte", label: "Scelte", icon: Scale },
   { href: "/budget", label: "Budget", icon: Wallet },
-  { href: "/altro", label: "Altro", icon: Menu },
+  { href: "/altro", label: OPTIONS_SECTION_LABEL, icon: Settings },
   { href: "/guida", label: "Guida", icon: BookOpen },
 ];
 
