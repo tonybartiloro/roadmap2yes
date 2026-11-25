@@ -1,19 +1,17 @@
 # Code review 6 - FEAT-2026-003 / T5 (Persone UI at /invitati) + closure of code-4
 
-Reviewer: adf:reviewer. Commit 7555fb6 (T5), plus 8f0d557 (code-4 fixes). Round 1.
+Reviewer: adf:reviewer. Commit 7555fb6 (T5), plus 8f0d557 (code-4 fixes). Round 1, then round 2 (6adc63e, 2d228e0).
 
-**Verdict: changes requested** (0 blocking, 4 should, 4 nit). The screen follows the design and the privacy
-rules; the "should" items are a covered end of list in selection mode, a selection that outlives its
-filter, a duplicate group on retry, and re-rendering cost at 1200 people.
+**Verdict round 1: changes requested** (0 blocking, 4 should, 4 nit). **Verdict round 2: approved** (all closed).
 
 ## code-4 closure (verified in 8f0d557)
 - REV-17 closed: `bulkGuests` returns `partial` when the rollback fails or restores fewer rows (`data.ts:637-641`),
   `undo` returns `PARTIAL_UNDO` after a first batch, `partial` is in `STALE_CODES`, tests added. The UI reloads on it
   (`use-guest-actions.ts:36`) and shows the server text.
 - REV-18 closed: `MAX_SELECTION` 5,000 with its own fixed text; the UI also disables the actions (`SelectionBar.tsx:57`).
-  Open for the coordinator: the "per selection, not per wedding" note in the brief's Decision 10.
+  The Decision 10 note ("per selection, not per wedding") is in the brief (44e98b3).
 - REV-19 closed (`unique` by id, `data.ts:190`). REV-20 closed (`versioned`: same version = `forbidden`).
-- Question 2 answered (partial Svuota message). Question 1 (ADR-0002 line) still with the coordinator/technical-writer.
+- Question 2 answered (partial Svuota message). Question 1 (ADR-0002 line) written in 9c93cb9.
 
 ## Verified OK (no finding)
 Privacy: no search term, filter or name in URLs (state only in React), no `console`, no storage, Ripristina/Elimina
@@ -25,63 +23,43 @@ as 8 existing boundaries; `loading.tsx`; "su invito" in page; `not_migrated` car
 imported by settings, so a precedent; moving it to a shared place is a later clean-up, no action here.
 Extension points exist: `menuActions`, `emptyExtra` (screen), `extra` (row, Summary), `extraActions` (SelectionBar).
 
-## Findings
+## Findings (status after round 2)
 
-**REV-24 (should)** `GuestsScreen.tsx:313`, `SelectionBar.tsx:79`, layout `pb-28` (`(app)/layout.tsx:32`) - in selection
-mode the bar sits at `bottom: 4.5rem` and wraps to 3 rows at 320 px (about 8 rem), but the page only reserves 7 rem, so
-the last rows and "Mostra altre 100" are covered and cannot be scrolled into view; and "Seleziona" needs to reach them.
-The FAB also overlaps the right end of the last row. Why: reachability of content (design §7, 320 px). Fix: when
-`selecting`, add bottom padding to the screen wrapper (e.g. `pb-44`), and a little (`pb-12`) for the FAB; check at 320 px.
+**REV-24 (should) CLOSED** - selection bar and FAB cover the end of the list (layout `pb-28`, bar up to ~8 rem at 320 px).
+Fix verified: wrapper `pb-44` while selecting, `pb-12` otherwise. The 320 px check stays with the QA e2e.
 
-**REV-25 (should)** `GuestsScreen.tsx:105,280` / `SelectionBar.tsx:59` - the selection is kept when filters change, and
-`selectedIds` includes people no longer visible. "Elimina" then acts on people the user cannot see (Annulla exists, but
-this is a destructive action on a hidden set), and `allSelected = selectedCount >= filteredCount` shows "Deseleziona
-tutti" when 5 hidden people are selected and 3 are shown, none of them selected. Fix: either clear the selection in
-`setFilters` while selecting, or intersect `selectedIds` with the filtered ids and say "{n} selezionati (di cui m
-nascosti dai filtri)"; compute `allSelected` on the intersection. Add a test (select, change the filter, delete).
+**REV-25 (should) CLOSED** - the selection outlived the filter, so "Elimina" could act on hidden people. Fix verified:
+`setFilters` clears the selection; test added (select all, type in search, "0 selezionati", Elimina disabled).
 
-**REV-26 (should)** `SelectionBar.tsx:61-73` - with "Nuovo gruppo..." the group is created by `resolveGroup`, then if
-`onAssignGroup` fails (conflict, network) the choice stays `{kind:"new"}`, so "Assegna" on retry creates a second group
-with the same name. `GuestSheet.tsx:187` handles this exact case ("stays chosen") but the bar does not. Fix: after
-`resolved`, if `choice.kind === "new"` call `setChoice({kind:"existing", id: resolved.groupId})`. Test it.
+**REV-26 (should) CLOSED** - assign to "Nuovo gruppo" then retry created a second group. Fix verified: after
+`resolveGroup` the choice becomes `existing`; test asserts one `addGroupAction` call.
 
-**REV-27 (should)** `GuestList.tsx:53-64`, `GuestsScreen.tsx:121,220`, `view.ts:92` - performance at 500-1200. `GuestRow` is
-not memoised and `Rows` passes fresh closures, so every keystroke in the search and every checkbox toggle re-renders all
-shown rows (up to 1200 after "Mostra altre"; each has a Radix checkbox in selection mode). `buildSections` copies the
-array on every guest (`[...(members.get(key) ?? []), guest]`, O(n^2) for a big group) and `liveGroupId` does `groups.find`
-per guest. Fix: `useDeferredValue(filters.query)` for the filter; `memo(GuestRow)` with `onSelect(id, on)`/`onOpen(guest)`
-passed by stable reference (use the `handlers` from `useMemo`/`useCallback`, the row binds its own id); push into the
-array and build a `Map` of groups once. Measure with 1200 rows.
+**REV-27 (should) CLOSED** - re-render cost at 1200 rows. Fix verified: `memo(GuestRow)`, stable `useCallback`
+`onSelect(id, on)`/`onOpen(guest)`, `useDeferredValue` on the query, `buildSections` linear (push + `Set`), `groupNames` via
+`Map`. Not measured in the browser (QA desktop e2e).
 
-**REV-28 (nit)** `GroupPicker.tsx:75`, `RenameGroupSheet.tsx:87` - `maxLength={80}` literal; use `LIMITS.name` like
-`FamilySheet.tsx:127` (single source, REV-1).
+**REV-28 (nit) CLOSED** `LIMITS.name` in GroupPicker and RenameGroupSheet. **REV-29 (nit) CLOSED** `SectionDef` type, no
+`as never`; non-paged lists noted in code. **REV-30 (nit) CLOSED** focus goes to "Altro" (`id` on the trigger), count
+follows the deferred query. **REV-31 (nit) CLOSED** `plural` in the undo toast, "tutti i N" without filters, tests for
+`forbidden` and assign-from-bar.
 
-**REV-29 (nit)** `RecentlyDeleted.tsx:158` - `as never` hides the section typing; type the array (`Section[]`) instead. The
-lists are unbounded (hundreds of deleted people render at once): acceptable now, "Svuota" is the escape; note it.
+## Round 2: 2d228e0 (QA a11y fix on guest rows) - accepted
+The row button has no `aria-label`; its name is its visible text plus an sr-only "Adulto" (WCAG 2.5.3, label in name).
+The group still shows in the flat list and the side is now part of the name: fine. Remark, not blocking: the focus sent
+by `stopSelecting` may race with Radix restoring focus when the assign sheet closes; QA e2e will show it.
 
-**REV-30 (nit)** `GuestsScreen.tsx:274-317`, `SelectionBar.tsx:69-71` - after "Assegna" the bar unmounts while its sheet
-is closing, so focus drops to `body`; send it to the list heading or the "Altro" button. `Summary.tsx:36` announces
-the count at every keystroke; debounce through the deferred query of REV-27.
-
-**REV-31 (nit)** Copy: `use-guest-actions.ts:92` "Annullato: 1 ripristinati" (use `plural`); `SelectionBar.tsx:87`
-"Seleziona tutti i 40 filtrati" when no filter is active (say "tutti i 40"). Tests missing for `forbidden` (toast, no
-reload) and for assign-to-group from the bar; add them with REV-25/26.
-
-## Risposte
-- **REV-24**: fatto. Il contenitore della schermata ha `pb-44` in selezione (barra fino a 3 righe) e `pb-12` altrimenti (FAB). Non misurato a 320 px nel browser: lo verifica l'e2e di QA.
-- **REV-25**: scelta la prima strada: `setFilters` svuota la selezione (ricerca e filtri). Così "Elimina" agisce solo su ciò che si vede e `allSelected` resta coerente. Test: seleziona tutti, scrivi nella ricerca, "0 selezionati", Elimina disattivato.
-- **REV-26**: fatto. Dopo `resolveGroup`, se la scelta era "Nuovo gruppo" diventa `existing` con l'id creato. Test: primo "Assegna" fallisce, il secondo non richiama `addGroupAction` (1 chiamata) e usa `target: g-new`.
-- **REV-27**: fatto. `GuestRow` in `memo` con `onSelect(id, on)`/`onOpen(guest)` stabili (`useCallback`); `useDeferredValue` sulla ricerca (anche il conteggio annunciato segue il valore differito, REV-30); `buildSections` lineare (push + `Set` dei gruppi vivi); `groupNames` con una `Map`. Non misurato con 1200 righe nel browser (lo fa l'e2e desktop di QA).
-- **REV-28**: fatto, `LIMITS.name` in `GroupPicker` e `RenameGroupSheet`.
-- **REV-29**: fatto, tipo `SectionDef`, niente `as never`. Liste non paginate: annotato nel codice, "Svuota" è la via d'uscita.
-- **REV-30**: fatto. `stopSelecting` rimanda il focus al pulsante "Altro" (`id` sul trigger di `ActionMenu`).
-- **REV-31**: fatto. "Annullato: N persona/persone ripristinata/e" con `plural`; "Seleziona tutti i N" senza filtri e "... filtrati" con filtri. Test aggiunti per `forbidden` (toast, nessun reload) e per assegna-a-gruppo dalla barra.
+## Risposte (developer B)
+- REV-24: `pb-44` in selezione, `pb-12` altrimenti; non misurato a 320 px, lo verifica l'e2e di QA.
+- REV-25: `setFilters` svuota la selezione. Test incluso.
+- REV-26: la scelta diventa `existing` dopo la creazione. Test incluso.
+- REV-27: `memo`, callback stabili, `useDeferredValue`, `buildSections` lineare, `groupNames` con `Map`. Non misurato con 1200 righe nel browser.
+- REV-28..31: fatti (`LIMITS.name`, `SectionDef`, focus su "Altro", `plural` e etichetta "filtrati" solo con filtri, test `forbidden` e assegna-da-barra).
 
 ## AC coverage
-AC1 empty state ok; AC2/AC3/AC4 sheet, validation, duplicate warning ok; AC5 family and groups ok (REV-26 retry);
-AC6 conflict dialog tested; AC7 multi-select, Annulla, partial/too-large handled (REV-24/25); AC8 summary ok; AC9 filters
-and chips ok; AC10 recently deleted ok; AC12 collapse above 100 and "Mostra altre" ok (REV-27 for speed); AC23 "su
-invito" in page ok (no e2e seen for it in this commit). T9/T13 hooks are present.
+AC1 empty state ok; AC2/AC3/AC4 sheet, validation, duplicate warning ok; AC5 family and groups ok; AC6 conflict dialog
+tested; AC7 multi-select, Annulla, partial/too-large handled; AC8 summary ok; AC9 filters and chips ok; AC10 recently
+deleted ok; AC12 collapse above 100 and "Mostra altre" ok; AC23 "su invito" in page, covered by QA e2e
+(`e2e/invitati.nav.spec.ts`; the family role is redirected by the proxy to /su-invito, accepted as QA-1). T9/T13 hooks present.
 
 ## Questions for the developer
-1. Is the e2e for the "su invito" panel (`e2e/invitati.nav.spec.ts`, QA) going to cover a user without `guests/read`?
+None open.
