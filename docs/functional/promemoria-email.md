@@ -40,10 +40,6 @@ Ciascun partner decide per sé:
 
 Le email di accesso e di invito non si possono disattivare, perché servono a entrare.
 
-## Note per chi gestisce l'app
-
-Come si accendono le email, con le variabili e i passaggi da fare, è scritto in `docs/technical/ambienti-e-rilascio.md` (sezione "Attivare Resend"). È un cambio di configurazione in produzione che richiede approvazione.
-
 ## Storico delle modifiche
 
 | Data | Feature | Modifica |

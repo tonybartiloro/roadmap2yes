@@ -43,7 +43,7 @@ Ci sono due strade.
 - **Il partner imposta un codice temporaneo (sempre disponibile).** Il partner che è dentro l'app va in **Altro > Invito** e imposta un codice temporaneo per l'altro. Lo consegna di persona. Al primo accesso chi l'ha dimenticato deve scegliere subito un codice nuovo. Il partner riceve nell'app la novità "codice temporaneo impostato da ...", così la cosa resta visibile a entrambi.
 - **Link di recupero via email (solo con le email accese).** Dalla pagina di accesso, "Hai dimenticato il codice?" manda un link. Il link vale una volta e porta a una pagina dove scegliete il nuovo codice. Con le email spente questa voce non compare e la pagina spiega di chiedere al partner.
 
-Se nessuno dei due ricorda il codice e le email sono spente, serve un intervento di chi gestisce l'app (vedi il runbook in `docs/technical/ambienti-e-rilascio.md`).
+Se nessuno dei due ricorda il codice e le email sono spente, serve un intervento di chi gestisce l'app.
 
 ## Invitare il partner
 

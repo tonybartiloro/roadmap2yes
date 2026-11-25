@@ -1,6 +1,12 @@
 # Documentazione funzionale
 
-Come si usa roadmap2yes, pagina per pagina. Per il funzionamento interno vedi [`docs/technical`](../technical/README.md).
+Come si usa roadmap2yes, pagina per pagina. Queste pagine sono anche la **Guida** dentro l'app.
+
+Convenzioni per chi scrive qui:
+
+- ogni pagina della cartella deve comparire nella tabella qui sotto: l'indice della Guida è costruito da quella tabella;
+- i link vanno solo verso altre pagine di questa cartella;
+- la sezione "Storico delle modifiche" in fondo a ogni pagina non è mostrata nell'app.
 
 | Pagina | Di cosa parla |
 |---|---|
