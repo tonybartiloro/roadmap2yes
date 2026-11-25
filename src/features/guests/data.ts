@@ -355,7 +355,8 @@ function tableFields(row: Tables<"guest_tables">): Record<string, unknown> {
   return { name: row.name, capacity: row.capacity, version: row.version };
 }
 
-async function conflictResult(
+/** Builds the `conflict` result of a versioned write (who changed it, when, and the current row). */
+export async function conflictResult(
   db: Db,
   userId: string,
   current: Record<string, unknown> | null,
@@ -375,8 +376,11 @@ async function conflictResult(
   };
 }
 
-/** One optimistic-concurrency write (AC6, BR9): a conflict never overwrites. */
-async function versioned<T extends VersionedTable>(
+/**
+ * One optimistic-concurrency write (AC6, BR9): a conflict never overwrites; zero rows at the same
+ * version is `forbidden`. `fields` maps the current row to the keys of the conflict dialog.
+ */
+export async function versioned<T extends VersionedTable>(
   db: Db,
   userId: string,
   table: T,
