@@ -63,6 +63,7 @@ const view: SettingsView = {
   completed: true,
   rite: "civile",
   guestBand: "50_80",
+  guestCount: 0,
   styleLabel: "Boho",
   styleNote: null,
   region: "Toscana",
@@ -176,6 +177,20 @@ describe("Impostazioni nozze (AC16, AC48)", () => {
       screen.getByText("Aggiungi, cambia o scegli le date in Scelte").getAttribute("href"),
     ).toBe("/scelte/date");
     expect(screen.getByText(/Ora è/).textContent).toContain("20.000");
+  });
+
+  it("with guests the band is computed, read-only, with a link to the list (BR6)", async () => {
+    render(<SettingsForm view={{ ...view, guestCount: 62 }} scope="u:w" />);
+    const computed = await screen.findByTestId("settings-guests-computed");
+    expect(computed.textContent).toContain("Sei a 62 persone: fascia 50-80.");
+    expect(screen.getByText("Vedi la lista").getAttribute("href")).toBe("/invitati");
+    expect(screen.queryByTestId("settings-guests")).toBeNull();
+  });
+
+  it("with an empty list (or no table yet) the band stays editable", async () => {
+    render(<SettingsForm view={view} scope="u:w" />);
+    expect(await screen.findByTestId("settings-guests")).toBeTruthy();
+    expect(screen.queryByTestId("settings-guests-computed")).toBeNull();
   });
 
   it("saving a changed rite sends the version and points to the suggestions in Percorso", async () => {

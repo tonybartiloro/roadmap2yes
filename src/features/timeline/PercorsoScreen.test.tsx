@@ -585,6 +585,27 @@ describe("scenario selector and preview (AC32)", () => {
     });
   });
 
+  it("the guest tasks show 'Vai a Invitati' in the sheet, the others do not; nothing completes", async () => {
+    renderScreen({
+      tasks: [
+        templateTask("lista-invitati-preliminare", { dueDate: at(2), title: "Lista" }),
+        task("b", { title: "Fiori", dueDate: at(3) }),
+      ],
+    });
+    const [first, second] = screen.getAllByTestId("task-title");
+    await userEvent.click(first!);
+    const sheet = await screen.findByTestId("task-sheet");
+    expect(within(sheet).getByRole("link", { name: "Vai a Invitati" }).getAttribute("href")).toBe(
+      "/invitati",
+    );
+    await userEvent.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByTestId("task-sheet")).toBeNull());
+    await userEvent.click(second!);
+    const other = await screen.findByTestId("task-sheet");
+    expect(within(other).queryByRole("link", { name: "Vai a Invitati" })).toBeNull();
+    expect(actions.setTaskStatusAction).not.toHaveBeenCalled();
+  });
+
   it("closing the sheet with Escape gives focus back to the task title (QA-6)", async () => {
     renderScreen({ tasks: [task("a", { title: "Fiori", dueDate: at(2) })] });
     const title = screen.getByTestId("task-title");

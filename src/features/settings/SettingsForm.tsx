@@ -33,7 +33,13 @@ import { formatCents, formatEuro, parseEuroToCents } from "@/lib/money";
 import { saveSettingsAction } from "./actions";
 import type { ScenarioView, SettingsView } from "./data";
 import { SETTINGS_FIELD_LABELS, formatSettingsValue } from "./field-labels";
-import { GENERIC_ERROR, SUGGESTIONS_HREF, type SettingsValues } from "./model";
+import {
+  GENERIC_ERROR,
+  GUESTS_HREF,
+  SUGGESTIONS_HREF,
+  guestBandText,
+  type SettingsValues,
+} from "./model";
 import type { VersionedResult } from "@/features/decisions/types";
 
 /** Impostazioni nozze (AC16, AC46, AC48): the answers of the onboarding, editable by either partner. */
@@ -215,13 +221,25 @@ function Form({
           <h2 id="set-guests" className="text-xl font-semibold">
             Invitati
           </h2>
-          <ChoiceCards
-            legend="Quanti invitati"
-            value={(value.guestBand as (typeof GUEST_BANDS)[number] | null) ?? null}
-            onChange={(guestBand) => change({ guestBand })}
-            options={GUEST_BANDS.map((band) => ({ value: band, label: GUEST_BAND_LABELS[band] }))}
-            testId="settings-guests"
-          />
+          {view.guestCount > 0 ? (
+            <p className="text-base" data-testid="settings-guests-computed">
+              {guestBandText(view.guestCount)}{" "}
+              <Link href={GUESTS_HREF} className="text-primary underline underline-offset-2">
+                Vedi la lista
+              </Link>
+            </p>
+          ) : (
+            <ChoiceCards
+              legend="Quanti invitati"
+              value={(value.guestBand as (typeof GUEST_BANDS)[number] | null) ?? null}
+              onChange={(guestBand) => change({ guestBand })}
+              options={GUEST_BANDS.map((band) => ({
+                value: band,
+                label: GUEST_BAND_LABELS[band],
+              }))}
+              testId="settings-guests"
+            />
+          )}
         </section>
 
         <section aria-labelledby="set-style" className="flex flex-col gap-3">
