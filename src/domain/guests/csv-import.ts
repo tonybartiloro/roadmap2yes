@@ -305,7 +305,8 @@ const TITLE_LIKE: ReadonlySet<string> = new Set([
 function headerMap(record: RawRecord): Column[] | null {
   const names = record.cells.map((c) => {
     const name = normalizeText(stripFormulaGuard(c));
-    return HEADER_ALIASES[name] ?? name;
+    // own keys only: a header cell like "constructor" must not reach Object.prototype (REV-52)
+    return Object.hasOwn(HEADER_ALIASES, name) ? HEADER_ALIASES[name]! : name;
   });
   const known = names.filter((n) => n !== "");
   if (known.length === 0 || !known.includes("nome")) return null;

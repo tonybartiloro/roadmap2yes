@@ -181,6 +181,11 @@ describe("header and columns", () => {
     });
   });
 
+  it("a header cell named like an Object property is data, not an alias (REV-52)", () => {
+    expect(parse("nome;constructor\nA;B").hasHeader).toBe(false);
+    expect(parse("nome;toString\nA;B").hasHeader).toBe(false);
+  });
+
   it("a one-column list that starts with a title gets a warning, not a silent guest (REV-42)", () => {
     const preview = parse("Nome e cognome\nMario Rossi");
     expect(preview.rows[0]?.warnings).toEqual([

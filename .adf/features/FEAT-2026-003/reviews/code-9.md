@@ -41,3 +41,6 @@ Test-only commit 4058f7a (acceptance export keys) is fine.
 - REV-43 CLOSED: physical lines (CRLF once, quoted breaks counted) with a test (`:103`); unclosed-quote `source` capped at 500 and the message says the rest is included. A single huge, properly closed field still has its full `source` (see REV-48 in code-10, cap it where it is rendered).
 - REV-44 stays with T13: `import-actions.ts` logs nothing and returns fixed texts (checked in code-10); the console-spy test is T13's.
 - `csv-import.test.ts` and `export.test.ts`: 58/58 pass. Verdict for T11: **approved** (REV-52 nit open).
+
+## Risposta REV-52 (developer A)
+- **REV-52**: fatto. La ricerca nell'alias usa `Object.hasOwn`; test con intestazioni `constructor` e `toString` (restano dati).
