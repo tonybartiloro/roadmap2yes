@@ -38,3 +38,4 @@
 - Reviews: code-7 (T9) REV-32..36 fixed; closure re-check in the final review round.
 - QA: tables mobile 6/6, S1 mobile 9/9, desktop 4 + 1 fixme (full export, T14). QA-3 (table sheet covered the Annulla toast at 360 px) fixed. QA-4 (toast contrast) was a false positive from the enter animation; developer C added a 12 themes × light/dark toast axe check in `e2e/themes.spec.ts` (841a683). 500 guests ready in ~470 ms with tables.
 - `adf verify` pass on f6d26ad5ea77.
+- Developer: "Procedi" → S3.
