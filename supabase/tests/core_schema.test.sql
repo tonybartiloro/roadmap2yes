@@ -17,11 +17,11 @@ select is(
     'authorize_account_op(text,text,text)', 'choose_option(uuid,uuid,integer,date)', 'complete_onboarding(jsonb,jsonb)',
     'create_guest_family(text,text,jsonb)', 'create_invitation(text,text,uuid,bytea)',
     'create_wedding()', 'dismiss_welcome()', 'guests_bulk(uuid[],text,uuid)', 'guests_bulk_undo(jsonb)',
-    'has_permission(uuid,text,text)', 'insert_template_tasks(jsonb)',
+    'has_permission(uuid,text,text)', 'import_guests(jsonb)', 'insert_template_tasks(jsonb)',
     'last_heartbeat(text)',
     'move_budget_items(uuid,uuid)', 'record_export()', 'record_seen()',
     'reopen_decision(uuid,text,integer)', 'revoke_invitation(uuid)',
-    'rotate_invitation(uuid,bytea)', 'set_reference_scenario(uuid)', 'sync_my_email()', 'update_partner_email(text,text)',
+    'rotate_invitation(uuid,bytea)', 'set_reference_scenario(uuid)', 'sync_my_email()', 'undo_guest_import(uuid)', 'update_partner_email(text,text)',
     'upsert_partner_b(text,text,text,text)'
   ]::text[], 'authenticated can execute exactly the allowlist (T8/T9 extend it)');
 

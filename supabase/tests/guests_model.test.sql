@@ -328,8 +328,9 @@ select lives_ok($$select public.job_recipients()$$, 'the daily job runs');
 select is((select count(*)::int from public.guests where id = '99000000-0000-4000-8000-000000000001'), 1, 'a guest deleted 400 days ago survives the daily job');
 select is(
   (select count(*)::int from pg_proc p where p.pronamespace in ('public'::regnamespace, 'private'::regnamespace)
-     and p.prosrc ~* 'delete\s+from\s+(public\.)?guest'),
-  0, 'no function purges guests, groups or tables: only the user''s "Elimina definitivamente" deletes');
+     and p.prosrc ~* 'delete\s+from\s+(public\.)?guest'
+     and p.proname <> 'undo_guest_import'),  -- the ONE exception: "Annulla importazione" (P4, T12)
+  0, 'no function purges guests, groups or tables, except undo_guest_import: otherwise only the user''s "Elimina definitivamente" deletes');
 
 -- ===== REV-10: the personal-key scan again, after EVERY section (undo, 1200 rows, families) =========
 select cmp_ok((select count(*)::int from public.audit_log where table_name = 'guests'), '>', 2400, 'the final audit scan is not vacuous (1200-row sections are in it)');

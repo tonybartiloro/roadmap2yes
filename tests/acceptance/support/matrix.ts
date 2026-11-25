@@ -334,6 +334,8 @@ export const FUNCTIONS: Record<string, "user" | "service"> = {
   create_guest_family: "user",
   guests_bulk: "user",
   guests_bulk_undo: "user",
+  import_guests: "user",
+  undo_guest_import: "user",
   record_heartbeat: "service",
   login_gate: "service",
   login_record: "service",

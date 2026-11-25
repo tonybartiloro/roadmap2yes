@@ -587,6 +587,9 @@ isOneToOne: false
 "has_permission":
 { Args: { "p_action": string,"p_area": string,"p_wedding_id": string }; Returns: boolean
                            },
+"import_guests":
+{ Args: { "p_rows": Json }; Returns: Json
+                           },
 "insert_template_tasks":
 { Args: { "p_tasks": Json }; Returns: Json
                            },
@@ -654,6 +657,9 @@ isOneToOne: false
                            },
 "sync_timeline":
 { Args: { "p_wedding_id"?: string }; Returns: number
+                           },
+"undo_guest_import":
+{ Args: { "p_batch_id": string }; Returns: Json
                            },
 "update_partner_email":
 { Args: { "p_email": string,"p_slot": string }; Returns: Json

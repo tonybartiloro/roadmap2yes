@@ -83,6 +83,7 @@ insert into qa_functions (name, klass) values
   ('has_permission', 'user'),        -- *
   ('move_budget_items', 'user'),     -- *
   ('create_guest_family', 'user'), ('guests_bulk', 'user'), ('guests_bulk_undo', 'user'),  -- FEAT-2026-003
+  ('import_guests', 'user'), ('undo_guest_import', 'user'),
   ('record_heartbeat', 'service'), ('login_gate', 'service'), ('login_record', 'service'),
   ('auth_user_id_by_email', 'service'), ('invitation_by_token', 'service'), ('sync_timeline', 'service'),
   ('job_claim_notification', 'service'), ('job_fail_notification', 'service'),
