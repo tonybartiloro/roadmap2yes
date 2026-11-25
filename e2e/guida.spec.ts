@@ -2,8 +2,8 @@
  * QA T9: Guida (FEAT-2026-002). Real docs/functional files, real login, no mocks.
  *
  * AC map
- *  - AC1  "Guida" is the 6th and last nav item, active on every guide page; the index lists the
- *         README table rows in order
+ *  - AC1  "Guida" is a card in Opzioni (not a bar item); Opzioni is the active bar item on every
+ *         guide page; the index lists the README table rows in order
  *  - AC2  no sideways scroll at 320 px, tables focusable and scrollable, links underlined
  *  - AC3  internal link stays in the Guida and moves focus to the title; no "Storico", no technical
  *         references
@@ -70,7 +70,7 @@ test.describe("index and menu (AC1)", () => {
     }
   });
 
-  test("'Guida' is the last of 6 items and the active one on the index and on a page", async ({
+  test("Guida is not a bar item: 'Opzioni' is the active one on the index and on a page", async ({
     page,
   }) => {
     await enter(page);
@@ -78,17 +78,30 @@ test.describe("index and menu (AC1)", () => {
       await page.goto(route);
       const links = nav(page).getByRole("link");
       await expect(links, route).toHaveCount(6);
+      await expect(nav(page).getByRole("link", { name: "Guida" }), route).toHaveCount(0);
       const last = links.last();
-      await expect(last, route).toHaveText("Guida");
+      await expect(last, route).toHaveText("Opzioni");
       await expect(last, route).toHaveAttribute("aria-current", "page");
       await expect(nav(page).locator('[aria-current="page"]'), route).toHaveCount(1);
     }
     // and not active elsewhere
     await page.goto("/budget");
-    await expect(nav(page).getByRole("link", { name: "Guida" })).not.toHaveAttribute(
+    await expect(nav(page).getByRole("link", { name: "Opzioni" })).not.toHaveAttribute(
       "aria-current",
       "page",
     );
+  });
+
+  test("Opzioni opens with the Guida card first; 'Aiuto' opens the page of the section", async ({
+    page,
+  }) => {
+    await enter(page);
+    await page.goto("/altro");
+    const card = page.getByRole("main").locator('a[href="/guida"]');
+    await expect(card).toContainText("Come si usa roadmap2yes, passo passo");
+    await page.goto("/budget");
+    await page.getByRole("main").getByRole("link", { name: "Aiuto" }).click();
+    await expect(page).toHaveURL(/\/guida\/budget$/);
   });
 });
 
@@ -121,7 +134,7 @@ test.describe("links, focus and hidden changelog (AC3)", () => {
     await enter(page);
     // arriving from the options section (href, so the label can change): no focus
     await page.goto("/altro");
-    await nav(page).getByRole("link", { name: "Guida" }).click();
+    await page.getByRole("main").locator('a[href="/guida"]').click();
     await expect(page).toHaveURL(/\/guida$/);
     await expect(page.locator("h1")).toHaveText("Guida");
     await expect(page.locator("h1")).not.toBeFocused();
@@ -133,7 +146,7 @@ test.describe("links, focus and hidden changelog (AC3)", () => {
 
     // and back from another section again: no focus
     await page.goto("/altro");
-    await nav(page).getByRole("link", { name: "Guida" }).click();
+    await page.getByRole("main").locator('a[href="/guida"]').click();
     await expect(page).toHaveURL(/\/guida$/);
     await page.getByRole("main").locator("ul li a").first().click();
     await expect(page.locator("h1")).toBeFocused();
@@ -207,14 +220,18 @@ test.describe("reading at 320 px (AC2, AC6)", () => {
     );
   });
 
-  test("touch targets are at least 44 px: nav item, card, '← Guida', 'Torna alla Guida'", async ({
+  test("touch targets are at least 44 px: Guida card, nav item, card, '← Guida', 'Torna alla Guida'", async ({
     page,
   }) => {
     await enter(page);
     await page.setViewportSize({ width: 320, height: 800 });
+    await page.goto("/altro");
+    expect(
+      await heights(page, page.getByRole("main").locator('a[href="/guida"]')),
+    ).toBeGreaterThanOrEqual(44);
     await page.goto("/guida");
     expect(
-      await heights(page, nav(page).getByRole("link", { name: "Guida" })),
+      await heights(page, nav(page).getByRole("link", { name: "Opzioni" })),
     ).toBeGreaterThanOrEqual(44);
     expect(await heights(page, page.locator("main ul li a").first())).toBeGreaterThanOrEqual(44);
 

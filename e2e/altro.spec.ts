@@ -22,7 +22,10 @@ test("the index lists every area and 'Esci'", async ({ page }) => {
   const w = await seedWedding();
   await loginAs(page, w.wedding.founder, uniqueIp());
   await page.goto("/altro");
+  // the Guida card comes first (it left the bar, FEAT-2026-003 AC23)
+  await expect(page.getByRole("main").locator('a[href="/guida"] + ul')).toHaveCount(1);
   for (const name of [
+    "Guida",
     "Il tuo accesso",
     "Profili",
     "Impostazioni nozze",

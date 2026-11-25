@@ -281,8 +281,8 @@ describe("AppNav", () => {
       "Percorso",
       "Scelte",
       "Budget",
+      "Invitati",
       OPTIONS_SECTION_LABEL,
-      "Guida",
     ]);
     expect(screen.getByRole("navigation", { name: "Principale" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "Percorso" }).getAttribute("aria-current")).toBe(
@@ -291,16 +291,32 @@ describe("AppNav", () => {
     expect(screen.getByRole("link", { name: "Home" }).getAttribute("aria-current")).toBeNull();
   });
 
-  it("marks Guida, the last item, active on a guide page", () => {
+  it("marks Opzioni, the last item, active on a guide page", () => {
     mockPathname = "/guida/budget";
     try {
       render(<AppNav />);
       const links = screen.getAllByRole("link");
       expect(links).toHaveLength(6);
       const last = links[5]!;
-      expect(last.textContent).toBe("Guida");
+      expect(last.textContent).toBe(OPTIONS_SECTION_LABEL);
       expect(last.getAttribute("aria-current")).toBe("page");
       expect(screen.getByRole("link", { name: "Percorso" }).getAttribute("aria-current")).toBeNull();
+    } finally {
+      mockPathname = "/percorso/oggi";
+    }
+  });
+
+  it("marks Invitati active on /invitati and leaves it out without the guests permission", () => {
+    mockPathname = "/invitati";
+    try {
+      const { unmount } = render(<AppNav />);
+      expect(screen.getByRole("link", { name: "Invitati" }).getAttribute("aria-current")).toBe(
+        "page",
+      );
+      unmount();
+      render(<AppNav showGuests={false} />);
+      expect(screen.getAllByRole("link")).toHaveLength(5);
+      expect(screen.queryByRole("link", { name: "Invitati" })).toBeNull();
     } finally {
       mockPathname = "/percorso/oggi";
     }

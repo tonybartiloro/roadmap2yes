@@ -3,11 +3,11 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  BookOpen,
   CalendarCheck,
   Home,
   Scale,
   Settings,
+  UsersRound,
   Wallet,
   type LucideIcon,
 } from "lucide-react";
@@ -18,16 +18,21 @@ export interface NavItem {
   href: string;
   label: string;
   icon: LucideIcon;
+  /** Other path prefixes that make this item the active one (the guide lives under Opzioni). */
+  alsoActiveOn?: readonly string[];
 }
 
-/** The six sections (design §2 + the in-app guide). Future areas (R2-R6) grow under "Opzioni" and "Scelte". */
+/** Route of the guests section: hidden (`showGuests` false) for users without the `guests` read permission. */
+export const GUESTS_HREF = "/invitati";
+
+/** The six sections (design §1). The guide is a card in "Opzioni", not a bar item. */
 export const NAV_ITEMS: readonly NavItem[] = [
   { href: "/", label: "Home", icon: Home },
   { href: "/percorso", label: "Percorso", icon: CalendarCheck },
   { href: "/scelte", label: "Scelte", icon: Scale },
   { href: "/budget", label: "Budget", icon: Wallet },
-  { href: "/altro", label: OPTIONS_SECTION_LABEL, icon: Settings },
-  { href: "/guida", label: "Guida", icon: BookOpen },
+  { href: GUESTS_HREF, label: "Invitati", icon: UsersRound },
+  { href: "/altro", label: OPTIONS_SECTION_LABEL, icon: Settings, alsoActiveOn: ["/guida"] },
 ];
 
 export function isActivePath(pathname: string, href: string): boolean {
@@ -39,16 +44,26 @@ export function isActivePath(pathname: string, href: string): boolean {
  * One `<nav>`: fixed bottom bar under 768 px, left rail from 768 px (icons + labels from 1024 px).
  * Targets are at least 44 px; text and icon together, active state not only by colour (bold + bar).
  */
-export function AppNav({ items = NAV_ITEMS }: { items?: readonly NavItem[] }) {
+export function AppNav({
+  items: allItems = NAV_ITEMS,
+  showGuests = true,
+}: {
+  items?: readonly NavItem[];
+  /** False when the user lacks the `guests` read permission: the item is left out. */
+  showGuests?: boolean;
+}) {
   const pathname = usePathname();
+  const items = showGuests ? allItems : allItems.filter((item) => item.href !== GUESTS_HREF);
   return (
     <nav
       aria-label="Principale"
       className="border-border bg-card fixed inset-x-0 bottom-0 z-30 border-t pb-[env(safe-area-inset-bottom)] md:inset-y-0 md:right-auto md:w-20 md:border-t-0 md:border-r md:pb-0 lg:w-56"
     >
       <ul className="flex md:flex-col md:gap-1 md:p-2 md:pt-6 lg:p-4 lg:pt-6">
-        {items.map(({ href, label, icon: Icon }) => {
-          const active = isActivePath(pathname, href);
+        {items.map(({ href, label, icon: Icon, alsoActiveOn }) => {
+          const active =
+            isActivePath(pathname, href) ||
+            (alsoActiveOn ?? []).some((prefix) => isActivePath(pathname, prefix));
           return (
             <li key={href} className="flex-1 md:flex-none">
               <Link

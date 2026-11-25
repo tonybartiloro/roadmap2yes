@@ -34,6 +34,7 @@ const measure = async (label: string | null) => {
   return items.map((li, i) => {
     const link = li.querySelector("a")!;
     const span = link.querySelector("span:not([aria-hidden])")!;
+    // the 5th item (Invitati) is the one swapped for the proof; the last is Opzioni
     if (label && i === items.length - 2) span.textContent = label;
     const range = document.createRange();
     range.selectNodeContents(span);
@@ -67,7 +68,14 @@ test("6 menu labels fit in their item: 12 themes x 320/768/1024 px", async ({ pa
       await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
       const rows = await page.evaluate(measure, null);
       expect(rows).toHaveLength(6);
-      expect(rows.map((r) => r.text)).toContain(OPTIONS_SECTION_LABEL);
+      expect(rows.map((r) => r.text)).toEqual([
+        "Home",
+        "Percorso",
+        "Scelte",
+        "Budget",
+        "Invitati",
+        OPTIONS_SECTION_LABEL,
+      ]);
       for (const r of rows) {
         // the rail at 768 px is narrower than the labels' own width budget only if text overflows
         if (r.text_w > r.li_w + 0.5) {

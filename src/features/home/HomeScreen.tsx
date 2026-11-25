@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Countdown } from "@/components/Countdown";
 import { EmailOffBanner } from "@/components/EmailOffBanner";
 import { formatShortDate } from "@/components/format";
+import { HelpLink } from "@/components/HelpLink";
 import { Button } from "@/components/ui/button";
 import type { UpcomingPayment } from "@/domain/budget";
 import type { NewsItem } from "@/domain/news";
@@ -23,11 +24,14 @@ export function HomeScreen({ data }: { data: HomeData }) {
   const noDate = data.reference.ok && data.reference.data.value.kind === "none";
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-2xl leading-8 font-semibold">
-        {data.myName
-          ? `Ciao ${data.myName}, ecco cosa ti aspetta oggi`
-          : "Ciao, ecco cosa ti aspetta oggi"}
-      </h1>
+      <div className="flex items-start justify-between gap-2">
+        <h1 className="text-2xl leading-8 font-semibold">
+          {data.myName
+            ? `Ciao ${data.myName}, ecco cosa ti aspetta oggi`
+            : "Ciao, ecco cosa ti aspetta oggi"}
+        </h1>
+        <HelpLink route="/" />
+      </div>
 
       <EmailOffBanner />
 

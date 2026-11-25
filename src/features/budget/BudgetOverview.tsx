@@ -7,6 +7,7 @@ import { ChevronRight, Clock, History, Pencil, Plus, Wallet } from "lucide-react
 import { BudgetBar } from "@/components/BudgetBar";
 import { EmptyState } from "@/components/EmptyState";
 import { formatShortDate, plural } from "@/components/format";
+import { HelpLink } from "@/components/HelpLink";
 import { Button } from "@/components/ui/button";
 import { budgetTotals, budgetWarnings, upcomingPayments } from "@/domain/budget";
 import type { PlainDate } from "@/lib/dates/plain-date";
@@ -49,7 +50,10 @@ export function BudgetOverview({
   return (
     <div className="flex flex-col gap-6" data-testid="budget-overview">
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl leading-8 font-semibold">Budget</h1>
+        <div className="flex items-center justify-between gap-2">
+          <h1 className="text-2xl leading-8 font-semibold">Budget</h1>
+          <HelpLink route="/budget" />
+        </div>
         <p className="text-muted-foreground">
           Quanto spendere, dove e quando pagare: tutto in un posto, con lo storico delle modifiche.
         </p>
