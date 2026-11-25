@@ -44,3 +44,6 @@ Test-only commit 4058f7a (acceptance export keys) is fine.
 
 ## Risposta REV-52 (developer A)
 - **REV-52**: fatto. La ricerca nell'alias usa `Object.hasOwn`; test con intestazioni `constructor` e `toString` (restano dati).
+
+## Closure REV-52 (reviewer, 44dabf1)
+- REV-52 CLOSED: `headerMap` uses `Object.hasOwn(HEADER_ALIASES, name) ? HEADER_ALIASES[name]! : name` (`csv-import.ts:309`), so prototype keys stay plain data; the new test covers `constructor` and `toString`. No open item left in code-9.
