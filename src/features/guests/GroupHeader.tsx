@@ -10,6 +10,10 @@ export interface MenuAction {
   label: string;
   icon?: React.ReactNode;
   destructive?: boolean;
+  /** Off, with the reason in `description`. */
+  disabled?: boolean;
+  /** Always-visible text under the button (not part of its name). */
+  description?: string;
   onSelect: () => void;
 }
 
@@ -53,19 +57,24 @@ export function ActionMenu({
           </SheetHeader>
           <div className="flex flex-col gap-2">
             {actions.map((action) => (
-              <Button
-                key={action.label}
-                type="button"
-                variant="outline"
-                className={`justify-start ${action.destructive ? "text-destructive" : ""}`}
-                onClick={() => {
-                  setOpen(false);
-                  action.onSelect();
-                }}
-              >
-                {action.icon}
-                {action.label}
-              </Button>
+              <div key={action.label} className="flex flex-col gap-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={action.disabled ?? false}
+                  className={`justify-start ${action.destructive ? "text-destructive" : ""}`}
+                  onClick={() => {
+                    setOpen(false);
+                    action.onSelect();
+                  }}
+                >
+                  {action.icon}
+                  {action.label}
+                </Button>
+                {action.description ? (
+                  <p className="text-muted-foreground px-1 text-sm">{action.description}</p>
+                ) : null}
+              </div>
             ))}
           </div>
         </PanelContent>

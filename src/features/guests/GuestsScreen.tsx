@@ -2,7 +2,15 @@
 
 import { useCallback, useDeferredValue, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CheckSquare, History, Plus, TriangleAlert, UserPlus, UsersRound } from "lucide-react";
+import {
+  CheckSquare,
+  History,
+  Plus,
+  TriangleAlert,
+  Upload,
+  UserPlus,
+  UsersRound,
+} from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import { plural } from "@/components/format";
 import { HelpLink } from "@/components/HelpLink";
@@ -31,6 +39,8 @@ import { GuestSheet } from "./GuestSheet";
 import { RecentlyDeleted, ConfirmDialog, type ConfirmRequest } from "./RecentlyDeleted";
 import { RenameGroupSheet } from "./RenameGroupSheet";
 import { SelectionBar } from "./SelectionBar";
+import { exportMenuAction } from "./ExportButton";
+import { ImportSheet } from "./ImportSheet";
 import { Summary } from "./Summary";
 import { TablesTab } from "./TablesTab";
 import { TableSheet } from "./TableSheet";
@@ -53,26 +63,31 @@ type Sheet_ =
   | { kind: "add" }
   | { kind: "deleted" }
   | { kind: "table"; table: TableView | null }
+  | { kind: "import" }
   | null;
 
 /**
  * Persone (design §2.1): header with "Aiuto", summary and "Per lato", search, filters with chips,
  * the list by groups (flat while filtering), multiple selection and "Eliminati di recente".
- * Extension points for later steps: `menuActions` (Importa, Esporta CSV: T13) and `emptyExtra`
- * (the "Importa" button of the empty state); the Tavoli tab and fields join with T9.
+ * "Importa" and "Esporta CSV" are in the Altro menu (and "Importa" in the empty state); `menuActions`
+ * and `emptyExtra` stay as extension points.
  */
 export function GuestsScreen({
   snapshot,
   partners,
+  importNames,
   menuActions = [],
   emptyExtra,
 }: {
   snapshot: GuestsSnapshot;
   partners: PartnerNames;
+  /** Real first names (`null` = not set) for the `lato` column of the import and export. */
+  importNames?: { a: string | null; b: string | null };
   menuActions?: readonly MenuAction[];
   emptyExtra?: React.ReactNode;
 }) {
   const router = useRouter();
+  const names = importNames ?? partners;
   const actions = useGuestActions();
   const [filters, setFiltersState] = useState<GuestFilters>(NO_FILTERS);
   const [list, setList] = useState<ListState>({ shown: {}, open: {} });
@@ -208,6 +223,12 @@ export function GuestsScreen({
       icon: <History aria-hidden />,
       onSelect: () => setSheet({ kind: "deleted" }),
     },
+    {
+      label: "Importa",
+      icon: <Upload aria-hidden />,
+      onSelect: () => setSheet({ kind: "import" }),
+    },
+    exportMenuAction(live, groups, names),
     ...menuActions,
   ];
 
@@ -275,6 +296,13 @@ export function GuestsScreen({
                     onClick={() => setSheet({ kind: "guest", guest: null, groupId: null })}
                   >
                     Aggiungi invitato
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setSheet({ kind: "import" })}
+                  >
+                    Importa
                   </Button>
                   {emptyExtra}
                 </div>
@@ -507,6 +535,15 @@ export function GuestsScreen({
           actions={actions}
           onClose={() => setSheet(null)}
           onDelete={askDeleteTable}
+          onStale={stale}
+        />
+      ) : null}
+      {sheet?.kind === "import" ? (
+        <ImportSheet
+          onClose={() => setSheet(null)}
+          names={names}
+          groups={groups}
+          guests={live}
           onStale={stale}
         />
       ) : null}

@@ -8,13 +8,20 @@ import { LoadError } from "./LoadError";
 export const metadata: Metadata = { title: "Invitati" };
 
 /** Names of the two partners by slot, for the "lato" labels (fallbacks "Partner A"/"Partner B"). */
-async function partnerNames(db: Db): Promise<{ a: string; b: string }> {
+async function partnerNames(
+  db: Db,
+): Promise<{ shown: { a: string; b: string }; real: { a: string | null; b: string | null } }> {
   const rows = await db.from("wedding_partners").select("slot, first_name, label");
   const nameOf = (slot: string, fallback: string) => {
     const row = rows.data?.find((p) => p.slot === slot);
     return displayName(row ? { firstName: row.first_name, label: row.label } : null, fallback);
   };
-  return { a: nameOf("A", "Partner A"), b: nameOf("B", "Partner B") };
+  // The CSV `lato` column uses a real name only: no fallback text such as "Partner A".
+  const real = (slot: string) => nameOf(slot, "") || null;
+  return {
+    shown: { a: nameOf("A", "Partner A"), b: nameOf("B", "Partner B") },
+    real: { a: real("A"), b: real("B") },
+  };
 }
 
 /**
@@ -44,5 +51,6 @@ export default async function GuestsRoute() {
     }
     throw error;
   }
-  return <GuestsScreen snapshot={snapshot} partners={await partnerNames(db)} />;
+  const names = await partnerNames(db);
+  return <GuestsScreen snapshot={snapshot} partners={names.shown} importNames={names.real} />;
 }
