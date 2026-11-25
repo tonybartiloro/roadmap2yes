@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { parseGuestsCsv } from "@/domain/guests/csv-import";
 import {
   CSV_BOM,
   buildExport,
@@ -237,6 +238,52 @@ describe("export (AC42, AC60, plan §10)", () => {
     expect(lines[1]).toBe("Catering;Menu;Concordato;;9000,00;11200,50;3000,00;8200,50");
     expect(lines[2]).toBe("Catering;Torta;Previsto;;150,50;;0,00;");
     expect(lines[3]).toBe("Catering;(assegnato);;10000,00;;;;");
+  });
+});
+
+describe("guests CSV of the full export, read back by the import (AC21, REV-38)", () => {
+  const person = (id: string, side: "A" | "B" | "both" | null) => ({
+    ...input.guests[0]!,
+    id,
+    firstName: `Prova${id}`,
+    lastName: null,
+    side,
+    groupId: null,
+    tableId: null,
+    phone: null,
+    email: null,
+    notes: null,
+  });
+  const guests = [person("1", "A"), person("2", "B"), person("3", "both"), person("4", null)];
+
+  /** Partner rows as the export carries them; the import gets the names the Invitati page shows. */
+  function roundTrip(partners: ExportInput["partners"], names: { a: string; b: string }) {
+    const { guestsCsv } = buildExport({ ...input, partners, guests }, now);
+    const preview = parseGuestsCsv(guestsCsv, { partners: names, groups: [], guests: [] });
+    if (!preview.ok) throw new Error(preview.code);
+    expect(preview.invalid).toBe(0);
+    return preview.rows.map((row) => row.guest?.side);
+  }
+
+  it("a partner without a first name: the side comes back as the same A/B", () => {
+    const sides = roundTrip(
+      [
+        { slot: "A", first_name: null, label: null },
+        { slot: "B", first_name: "Jessica" },
+      ],
+      { a: "Partner A", b: "Jessica" },
+    );
+    expect(sides).toEqual(["A", "B", "both", null]);
+  });
+
+  it("both partners with the same name: letters are written and read back exactly", () => {
+    const rows = [
+      { slot: "A", first_name: "Alex" },
+      { slot: "B", first_name: "Alex" },
+    ];
+    const { guestsCsv } = buildExport({ ...input, partners: rows, guests }, now);
+    expect(guestsCsv).not.toContain("Alex");
+    expect(roundTrip(rows, { a: "Alex", b: "Alex" })).toEqual(["A", "B", "both", null]);
   });
 });
 

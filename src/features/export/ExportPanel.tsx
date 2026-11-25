@@ -32,7 +32,7 @@ const BUTTONS: ReadonlyArray<{ which: Which; label: string; hint: string; mime: 
   {
     which: "guestsCsv",
     label: "Invitati (CSV)",
-    hint: "Esporta tutti gli invitati, anche se hai dei filtri attivi. Gli eliminati non ci sono.",
+    hint: "Esporta tutti gli invitati, anche se hai dei filtri attivi. Gli eliminati non sono inclusi.",
     mime: "text/csv;charset=utf-8",
   },
 ];

@@ -17,3 +17,8 @@ Verdict: **approved** (0 blocking, 0 should, 2 nit). Checked against AC21, AC22,
 **REV-38 (nit)** `src/domain/export/export.test.ts`: the CSV test uses one partner setup. Add a `buildExport` -> `parseGuestsCsv` round trip with (a) a partner with no first name and (b) both partners with the same name, since the contract between `guestsCsvOf` and `sideOf` is the fragile part. Developer A's import may still change: pin it with a test.
 
 Questions: none.
+
+## Risposte
+
+- **REV-37**: Testo corretto in "Gli eliminati non sono inclusi.". Il numero {N} NON e' aggiunto (respinto): la pagina `altro/esporta/page.tsx` carica solo "ultimo export" e non e' tra i miei file; per avere N servirebbe una lettura in piu' (conteggio invitati) nella pagina. Il testo "Esporta tutti gli invitati, anche se hai dei filtri attivi" soddisfa l'AC21; la riga del piano con {N} vale per il pulsante in Invitati (T13), dove il conteggio e' gia' a schermo.
+- **REV-38**: Aggiunti due test in `export.test.ts` (`buildExport` -> `parseGuestsCsv`): partner senza nome (esportato come "Partner A", riletto come A) e due partner con lo stesso nome (nel CSV solo lettere, il nome non compare; riletto come A/B). Entrambi verificano anche `invalid === 0` e che "Entrambi" e "Non indicato" tornino uguali. Se A cambia l'import e i test si rompono, lo segnalo.
