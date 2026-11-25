@@ -17,7 +17,7 @@ Vision: `.adf/project.md → What this project is` · Stack decision: [ADR-0001]
 | ID | Title | Size | Depends on | Status | Feature |
 |---|---|---|---|---|---|
 | R-01 | Fondamenta, onboarding guidato, Percorso e budget | L | — | done | FEAT-2026-001 |
-| R-02 | Guida d'uso nell'app | S | R-01 | in-progress | FEAT-2026-002 |
+| R-02 | Guida d'uso nell'app | S | R-01 | done | FEAT-2026-002 |
 | R-03 | Invitati: anagrafica, gruppi/famiglie, tavoli facoltativi | L | R-01 | todo | |
 | R-04 | Conferme di presenza (RSVP) con link personale | L | R-03 | todo | |
 | R-05 | Lista nozze | M | R-01 | todo | |

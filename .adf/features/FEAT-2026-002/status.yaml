@@ -3,7 +3,7 @@ id: FEAT-2026-002
 title: "Guida d'uso nell'app"
 type: feature
 size: S
-phase: F5
+phase: done
 branch: feature/FEAT-2026-002-guida-in-app
 ticket: ""
 roadmap: R-02
@@ -12,10 +12,10 @@ updated: 2026-11-25
 gates:
   a_requirements: "approved 2026-11-25 via roadmap R-02"
   b_plan: "approved 2026-11-25 by tonybartiloro"
-  c_production: pending      # pending | approved <date> by <name> | not-needed
+  c_production: "approved 2026-11-25 by tonybartiloro"
 environments:
-  staging: pending           # pending | deployed <date> | not-applicable
-  production: pending
+  staging: "deployed 2026-11-25 (Vercel preview PR #4)"
+  production: "deployed 2026-11-25 (https://roadmap2yes-tony-bartiloro.vercel.app, dpl_FQNAz2k9Kb8Pkb73NejQdPqtgt9j)"
 links:
   pr: "https://github.com/tonybartiloro/roadmap2yes/pull/4"
   brief: ""
