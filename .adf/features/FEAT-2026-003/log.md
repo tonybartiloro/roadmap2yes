@@ -39,3 +39,10 @@
 - QA: tables mobile 6/6, S1 mobile 9/9, desktop 4 + 1 fixme (full export, T14). QA-3 (table sheet covered the Annulla toast at 360 px) fixed. QA-4 (toast contrast) was a false positive from the enter animation; developer C added a 12 themes × light/dark toast axe check in `e2e/themes.spec.ts` (841a683). 500 guests ready in ~470 ms with tables.
 - `adf verify` pass on f6d26ad5ea77.
 - Developer: "Procedi" → S3.
+
+## F3 step S3 checkpoint — 2026-11-26
+- Done: T11 CSV domain (A), T12 import migration (A, 5ec1f7d), T13 import UI (B, 2bca800), T14 full export (C, c1d87a2), T15 QA (7726741), T16 docs (9b5b2aa, bd820c7; ADR-0002 accepted), T17 QA (8dc2ea9, dcbdad5).
+- Reviews: code-7 closed; code-8 (T14) approved; code-9 (T11) REV-39..44 closed; code-10 (T13) REV-45..51, 57 closed; code-11 (T12 security round) REV-52..56 closed, REV-58/59 fixed; design-1: DES-01/02/04-07 fixed, DES-03 (desktop columns) waits for the developer.
+- Coordinator decisions: REV-47 unknown import outcome = wording ("Non so se…", no retry, list reload), no client batch id; REV-53 `undo_guest_import` removes only untouched batch people (live, version 1, unseated), no time window; DES-02 toast above the mobile nav.
+- QA: full suite via verify 288 pass; the 18 failures were environmental (wrong port first run; degraded/email-off need their own servers, 12/12 pass when selected; WebKit not installed, 3 not run; `partner.spec.ts:415` recovery mail uses the local Supabase CLI default template, not from this branch, 2 fail locally). Themes: /invitati and toast with description, 12 themes × light/dark, axe clean.
+- `adf verify` pass on 428b63d6aedc.
