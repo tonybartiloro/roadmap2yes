@@ -11,137 +11,74 @@
 - Evidenze: menu in `src/components/AppNav.tsx:15` (5 voci, barra mobile piena; commento: nuove aree sotto "Altro"); guida = 12 pagine Markdown in `docs/functional/` con link relativi e un indice in `README.md`.
 - Ticket: nessun tracker.
 
-## F1 round 1 — architect — 2026-11-25
-Size S confermata. Nessun dato, nessuna migrazione, nessun cambio ad auth.
+## F1 round 1 — sintesi per ruolo (esito PO) — 2026-11-25
+Size S confermata. Nessun dato, nessuna migrazione, nessun cambio ad auth. Conteggio designer: blocking 0, should 9, note 4. Dettagli in `plan.md → Solution` e `design.md`.
 
-- **ARC-1 (should) — "pre-generate" non è possibile; i file `docs/` devono finire nel bundle Vercel.** Evidenza: il root layout legge il tema da cookie/DB a ogni richiesta (`src/app/layout.tsx:29-30`) e il proxy mette `Cache-Control: private, no-store` (`src/proxy.ts:44`), quindi le pagine della Guida sono dinamiche. Una lettura `fs` a runtime di file fuori da `src/` non è garantita nel bundle della funzione: `outputFileTracingIncludes` esiste per questo (`node_modules/next/dist/docs/01-app/03-api-reference/05-config/01-next-config-js/output.md:93-137`). `next build && next start` in locale e negli e2e ha sempre i file su disco, quindi un trace mancante emerge solo su Vercel. Proposta: lettura server-only da `docs/functional` con memo a livello di modulo, più `outputFileTracingIncludes` per le route della Guida in `next.config.ts`; controllo obbligatorio sulla Preview prima del merge (indice + 1 pagina). NFR del brief: "pagine veloci (contenuto letto dal server, nessun JS lato client per il Markdown)" al posto di "pre-generate". Alternativa (F2): script di prebuild che genera un modulo TS ignorato da git (niente rischio di tracing, ma un passaggio di codegen in più in dev, build e typecheck).
-- **ARC-2 (should) — renderer Markdown = nuova dipendenza da approvare.** Evidenza: nessuna libreria Markdown in `package.json`; `security.md` 6 / `coding.md` 5 richiedono l'approvazione. Costrutti usati oggi: h1-h3, paragrafi, liste piatte numerate e puntate, tabelle GFM, grassetto, codice inline, link relativi; nessun blocco di codice, HTML, immagine, link esterno o lista annidata. Proposta: `react-markdown` + `remark-gfm` (versioni fissate) solo in un Server Component: 0 KB lato client, l'HTML grezzo non viene reso (nessun `rehype-raw`), `components` mappa `a` su `next/link` e avvolge `table` in un contenitore scorrevole, `urlTransform` riscrive i link. Costo: circa 60-70 pacchetti transitivi (unified/micromark), solo lato server. Alternative: `marked` (1 pacchetto, 0 dipendenze, ma produce una stringa HTML da sanificare a mano e da iniettare con `dangerouslySetInnerHTML`); renderer scritto a mano per il sottoinsieme attuale (0 dipendenze, ma AC4 implica che i file futuri possono usare qualunque costrutto GFM: ogni costrutto nuovo diventa lavoro di parser). → question-for-developer A.
-- **ARC-3 (should) — la route segue Q1; slug da allowlist.** Evidenza: `isActivePath` evidenzia "Altro" su qualunque `/altro/*` (`src/components/AppNav.tsx:23-26`); una route `/guida` raggiunta da "Altro" non evidenzierebbe alcuna voce (AC6). Proposta: con Q1 = "Altro" → `src/app/(app)/altro/guida/page.tsx` (indice) e `altro/guida/[pagina]/page.tsx`, più una voce nell'array `LINKS` (`src/app/(app)/altro/page.tsx:19`). `pagina` = nome del file senza `.md`, accettato solo se compare nella lista dei file della cartella (`^[a-z0-9-]+$`, escluso `README`); il percorso non viene mai costruito dall'input. Pagina sconosciuta → `notFound()` + `not-found.tsx` con ritorno all'indice (stesso pattern di `scelte/[key]/not-found.tsx`) (R3, AC5).
-- **ARC-4 (note) — l'auth c'è già, nessun codice nuovo.** Evidenza: il proxy nega per default ogni percorso non pubblico senza sessione (`src/features/auth/guards.ts:112-116`), e `(app)/layout.tsx:8` lo conferma. Proposta: non toccare `PUBLIC_PREFIXES`; AC5 si copre con un test e2e (anonimo → `/accesso`), senza un nuovo guard.
-- **ARC-5 (should) — R2 deve scegliere una regola, non "oppure".** Evidenza: brief R2; l'indice oggi è la tabella di `docs/functional/README.md:5-18` (12/12). Proposta: l'indice è `README.md` reso così com'è (resta fonte unica, con l'ordine e le descrizioni scelti dagli autori) più un test unitario che fallisce se un `*.md` della cartella non è collegato da `README.md`. Così "l'indice deve restare completo" è verificato in CI e non lasciato alla memoria.
-- **ARC-6 (note) — regole per i link e le sezioni.** I link: `x.md` → `/altro/guida/x`; `README.md` → indice; `../technical/...` → solo testo (Q2); `http(s)` → `target=_blank rel="noopener noreferrer"` (oggi non ce ne sono). Q3: nascondere "Storico delle modifiche" significa togliere l'h2 con quel testo esatto fino al prossimo h2 o alla fine del file: va documentato in `docs/functional/README.md` come convenzione, altrimenti un titolo rinominato ricompare in silenzio.
-- **ARC-7 (note) — 320 px e stile senza plugin.** `@tailwindcss/typography` non è installato: niente plugin, si usano classi per elemento con i token del tema (nessun colore fisso, così i 12 temi restano AA). Tabella dentro una regione scorrevole che riceve il focus (`tabIndex=0`, `role="region"`, nome accessibile: regola axe `scrollable-region-focusable`); codice inline lungo (`docs/technical/ambienti-e-rilascio.md`) con `overflow-wrap:anywhere`, altrimenti a 320 px la pagina scorre in orizzontale.
-- **question-for-developer A — dipendenza Markdown.** Proposta: approvare `react-markdown` + `remark-gfm`, fissati, solo lato server.
-- **question-for-developer B — "Note per chi gestisce l'app"** (`docs/functional/promemoria-email.md:43-45`) è scritta per chi amministra l'app. Proposta: lasciarla visibile; il riferimento a `docs/technical` resta testo come da Q2, senza eccezioni nel codice.
+Architect:
+- ARC-1 (should) file `docs/` nel bundle Vercel, pagine dinamiche → accepted: NFR "letto dal server, nessun JS per il Markdown", controllo su Preview.
+- ARC-2 (should) dipendenza Markdown → accepted as question (Q5).
+- ARC-3 (should) route e slug da allowlist → accepted: slug solo da elenco reale dei file, `notFound` (R3, AC5).
+- ARC-4 (note) auth già presente → accepted: nessun nuovo guard, AC5 via e2e.
+- ARC-5 (should) indice completo → accepted: indice = tabella di `README`, più test (R2, AC4).
+- ARC-6 (note) regole per link e sezioni → accepted: R4; taglio "Storico" in Q3.
+- ARC-7 (note) 320 px, stile senza plugin → accepted: AC2.
+- ARC-B (question) "Note per chi gestisce l'app" → accepted as question (Q6).
 
-## F1 round 1 — designer
-Evidenze: `AppNav.tsx` (5 voci, `isActivePath` usa `startsWith`, quindi `/altro/guida/*` accende già "Altro"); `altro/page.tsx` (lista `LINKS`, scheda con icona + descrizione, 8 voci); sottopagine di Altro senza link "indietro" (si torna con la nav); `docs/functional`: 12 pagine + README, solo `#`/`##`, tabelle (indice e "Storico"), 17 link relativi `*.md`, 1 link a `../technical/README.md`, nessun anchor, immagine o HTML. Bozza in `design.md`.
+Designer:
+- DES-1 (should) 6ª voce vs "Altro" → accepted (proposta: scheda in Altro); superata da Q1 dello sviluppatore.
+- DES-2 (should) H1 e title → accepted: AC6, un solo H1, indice "Guida".
+- DES-3 (should) link `../technical` → accepted: testo senza link (Q2, R5).
+- DES-4 (should) tabelle a 320 px → accepted: AC2.
+- DES-5 (should) riscrittura dei link `.md` → accepted: R4, AC3.
+- DES-6 (should) "Storico delle modifiche" → accepted: Q3.
+- DES-7 (should) stati mancanti (404, errore, non autenticato) → accepted: AC5.
+- DES-8 (should) focus e gerarchia → accepted: AC3, AC6.
+- DES-9 (should) indice come schede → accepted; "Altre pagine" rejected (il test AC4 garantisce l'indice completo).
+- DES-10, DES-11 (note) leggibilità e link sottolineati → accepted: AC2.
+- DES-12 (note) link "← Guida" → accepted; precedente/successiva out.
+- DES-13 (note) riga "Guida" in `altro.md` → accepted, rinviata a F4.
+- Q4 (descrizione scheda) → superata.
 
-| ID | Sev. | Evidenza | Proposta |
-|---|---|---|---|
-| DES-1 | should | Q1: 6ª voce nella barra mobile = 6 target da ~60 px a 360 px, etichette a 12 px che si stringono ("Impostazioni"/"Percorso"); rompe la regola "nuove aree sotto Altro" (AppNav.tsx:14). | Voce "Guida" in Altro, scheda con icona `BookOpen`, **prima di "Info"** (aiuto vicino a Info, sopra "Esci"). Percorso: `/altro/guida` e `/altro/guida/[slug]`; "Altro" resta attivo grazie a `startsWith`. Nessuna modifica a `NAV_ITEMS`. |
-| DES-2 | should | L'H1 dell'indice nel file è "Documentazione funzionale" (lessico da repo, non da utente) e il testo dice "pagina per pagina… vedi docs/technical". | Titolo della pagina indice = "Guida" (H1 della pagina, non il Markdown); il corpo di README si mostra da "Come si usa…" in poi senza il suo H1. Stessa regola per ogni pagina: **un solo H1** (quello del file) e `title` documento "Percorso · Guida · roadmap2yes". Nessun secondo H1 aggiunto dal contenitore. |
-| DES-3 | should | Q2: il link `../technical/README.md` è fuori guida; reso link porterebbe a 404; reso testo mantiene la frase "Per il funzionamento interno vedi docs/technical" priva di senso per la coppia. | Come proposto in Q2 (testo senza link, in `<span>`, non focalizzabile). Frase residua: segnalare a PO/dev la riscrittura del sorgente (fuori scope qui; il renderer non deve inventare testo). |
-| DES-4 | should | Tabelle: indice (2 col) e "Storico" (3 col) a 320 px; `temi-e-aspetto.md` ha righe lunghe. Una `<table>` non scorre da sola senza contenitore. | Ogni tabella in un wrapper `overflow-x-auto` con `tabindex="0"`, `role="region"`, `aria-label` ("Tabella: <intestazione 1ª colonna>"), anello di focus visibile; celle con `min-w` ragionevole e `text-pretty`; bordi con `--border`. La pagina non scorre mai in orizzontale (AC2). |
-| DES-5 | should | Il link relativo `x.md` va riscritto in `/altro/guida/x`; un `.md` sconosciuto o un link con `#anchor`/query/`..` non deve diventare un link rotto. | Riscrittura solo per slug esistenti; altrimenti testo semplice (come DES-3) o pagina non trovata. Link esterni `https:`: `target="_blank"` + `rel="noopener noreferrer"` + icona e testo nascosto "(si apre in una nuova scheda)"; `mailto:` invariato. Link interni: stesso tab, il focus va all'H1 della nuova pagina (vedi DES-8). |
-| DES-6 | should | Q3 "Storico delle modifiche" (tabella di lavoro in fondo a ogni file e in README): per la coppia è rumore. | Come proposto in Q3: nascondere la sezione H2 "Storico delle modifiche" e il suo contenuto fino a fine file. Regola di taglio documentata (un solo punto nel codice). |
-| DES-7 | should | Stati mancanti: slug inesistente/`..`, file illeggibile, utente non autenticato, voce attiva in nav. | `notFound()` con `not-found.tsx` dedicato nel segmento Guida: titolo "Pagina non trovata", frase, pulsante "Torna alla Guida"; stato `error.tsx` come le altre sottopagine di Altro; non autenticato → redirect all'accesso già gestito dal gruppo `(app)` (da verificare in F3 senza contenuto nel markup). |
-| DES-8 | should | Focus e struttura: dopo un clic su link interno il lettore deve sapere dove è; gerarchia H1→H2→H3 senza salti; "Vai al contenuto" esiste già. | Dopo la navigazione tra pagine il focus va all'H1 (`tabindex=-1`, come l'onboarding); H2 del file restano H2, H3→H3; nessun livello saltato (se un file saltasse da H2 a H4 il renderer non lo corregge: nota per QA). Indice: elenco di link (`<ul>`), non tabella, vedi DES-9. |
-| DES-9 | should | La tabella indice di README (2 col) è l'unico elenco di pagine: su mobile è stretta e il link è solo nel nome. | L'indice della Guida si rende come **elenco di schede** (stesso pattern di `altro/page.tsx`: icona, nome, descrizione, chevron, riga ≥56 px tutta cliccabile) con le righe lette dalla tabella di README (ordine del file). Se una pagina non è in README, in coda sotto "Altre pagine" (R2: indice completo). |
-| DES-10 | note | Leggibilità: prose senza `@tailwindcss/typography` (nessuna nuova dipendenza pesante, NFR). | Stili propri in un wrapper `.guide-prose` che legge solo i token (`--foreground`, `--muted-foreground`, `--primary`, `--border`, `--muted`, `--font-heading`); larghezza `max-w-prose` (~65ch), corpo 16/24, liste con marker; codice in `--muted`. Nessun colore letterale → AA nei 12 temi come i token già verificati. |
-| DES-11 | note | Link nel testo: distinguibili non solo dal colore (WCAG 1.4.1). | Sottolineati sempre (`underline underline-offset-2`), colore `--primary`; focus ring 2 px. |
-| DES-12 | note | Navigazione: le sottopagine di Altro non hanno "indietro"; in una guida a 12 pagine serve. | In cima alle pagine: link "← Guida" (min 44 px); in fondo: "Pagina precedente / successiva" non previste (ordine del README non sempre lineare): solo "Torna alla Guida". Nessuna breadcrumb. |
-| DES-13 | note | Il contenuto citerà "Altro > …" o nomi di pagine; la Guida stessa non compare in `panoramica.md`/`altro.md`. | Fuori da questa feature: suggerire al PO una riga "Guida" in `altro.md` (F4, aggiornamento docs). |
+## F1 — risposte dello sviluppatore — 2026-11-25
+"Q1 Guida = ultima voce del menu (6ª), non in Altro; Q2 nessuna doc tecnica nella Guida, sorgenti ripuliti; Q3 "Storico" nascosto; Q4 superata, ma "Altro" va rinominato (nuovo AC7, nome finale = Q7 aperta); Q5 `react-markdown` + `remark-gfm` delegato al team; Q6 "Note per chi gestisce l'app" non mostrato, passa alle docs tecniche."
 
-Questions for the developer (con risposta proposta):
-- **Q1** voce: dentro "Altro", scheda prima di "Info" (DES-1). Proposta confermata dal design.
-- **Q2** link tecnici: testo senza collegamento (DES-3).
-- **Q3** "Storico delle modifiche": nascosto (DES-6).
-- **Q4 (nuova)**: in "Altro" la scheda ha descrizione "Come si usa ogni sezione dell'app." — ok? Proposta: sì, tono e lunghezza come le altre schede.
+## F2 — design e piano
+- `design.md` finale (designer): Guida = 6ª voce, `/guida`; DES-1 superata. Q7: "Impostazioni" non entra nella barra a 320 px; raccomandato "Opzioni", alternativa "Profilo".
+- `plan.md` (architect): route `/guida` e `/guida/[...pagina]` (slug da allowlist, 404 propria); lettura server di `docs/functional` con `outputFileTracingIncludes`; renderer `react-markdown@10.1.0` + `remark-gfm@4.0.1` solo server; 6ª voce. 3 step, 10 task. Nessuna migrazione, nessun cambio ad auth, nessun ADR.
+- Decisioni: D1 URL `/altro` invariato (proposta, Q8); D3/D4 rinomina `altro.md` → `opzioni.md` in F3, slug = nome confermato; S2 parte solo dopo Q7.
 
-Conteggio: blocking 0, should 9 (DES-1…9), note 4 (DES-10…13).
+## F2 round 1 — sintesi per ruolo (esito architect) — 2026-11-25
+Blocking 0 per PO, designer e QA.
 
-## F1 round 1 — product-owner response
-- ARC-1: accepted — NFR riscritto (lettura server, nessun JS Markdown, controllo su Preview).
-- ARC-2: accepted as question — Q5, nessuna decisione presa.
-- ARC-3: accepted — slug solo da elenco reale dei file, notFound (R3, AC5); percorsi/route restano al piano.
-- ARC-4: accepted — nessun nuovo guard; AC5 coperto da e2e.
-- ARC-5: accepted — indice = tabella di README, test in AC4 (R2).
-- ARC-6: accepted — regole link in R4; taglio "Storico" in Q3.
-- ARC-7: accepted — AC2 (320 px, tabelle scorrevoli da tastiera, token del tema).
-- ARC-A: see ARC-2 / Q5. ARC-B: accepted as question — Q6.
-- DES-1: accepted — Q1 (scheda in Altro prima di Info).
-- DES-2: accepted — AC6 (un solo H1, indice "Guida", title del documento).
-- DES-3: accepted — Q2 e R5; la frase residua nel README si corregge in F4 (piano, non scope del brief).
-- DES-4: accepted — AC2.
-- DES-5: accepted — R4, AC3 (focus sul titolo).
-- DES-6: accepted — Q3.
-- DES-7: accepted — AC5.
-- DES-8: accepted — AC3 (focus), AC6 (gerarchia).
-- DES-9: accepted, "Altre pagine" rejected — il test di AC4 garantisce l'indice completo (R2).
-- DES-10, DES-11: accepted — AC2 (leggibilità, link riconoscibili senza colore); stili al piano.
-- DES-12: accepted — "← Guida" in scope; precedente/successiva in Out.
-- DES-13: accepted, left to the F4 documentation plan (riga "Guida" in `altro.md`).
-- Open for developer: Q1–Q6 (Q4 = descrizione scheda).
+Product owner:
+- PO-1 (should) D1 presentata come decisione → accepted in parte: D1 in attesa (Q8); correzione della testata respinta (Gate A già registrato via R-02).
+- PO-2 (should) S2 dipende da Q7 → accepted: S2 solo dopo Q7; etichetta in `src/components/section-label.ts`.
+- PO-3 (note) testi "Altro > X" in email e onboarding → accepted, elencato per il Gate B.
+- PO-4 (note) AC7 con etichetta neutra → preso atto, AC7 neutro.
 
-## F1 — developer answers, 2026-11-25
-Q1 Guida = ultima voce del menu (6ª), non in Altro; Q2 nessuna doc tecnica nella Guida, sorgenti ripuliti; Q3 "Storico" nascosto; Q4 superata, ma "Altro" va rinominato (nuovo AC7, nome finale = Q7 aperta); Q5 `react-markdown` + `remark-gfm` delegato al team; Q6 "Note per chi gestisce l'app" non mostrato, passa alle docs tecniche.
+Designer:
+- DES-14 (should) link sottolineati e icona link esterno nel piano → accepted: Solution 3, test di render e stile in e2e.
+- DES-15 (should) `th scope="col"` → accepted, test unit.
+- DES-16 (should) `px-0.5` spostato in T6 → accepted.
+- DES-17 (should) `altro.md` → `opzioni.md` in T8, con link e riga README → accepted.
+- DES-18 (note) stati vuoti non nel piano → rejected (irraggiungibili con i file reali).
+- DES-19 (note) 1024 px → accepted in `guida.nav.spec.ts`; 360/390 px solo in verifica visiva.
 
-## F2 — design final (designer)
-`design.md` finale. DES-1 superata (Guida = 6ª voce, `/guida`). Q7: "Impostazioni" NON entra nella barra a 320 px (45,3 px utili per voce, "Impostazioni" ~67-71 px a 12 px; sborda anche nel rail 768 px). Raccomando "Opzioni" (~42 px, icona `Settings`; "Impostazioni nozze" resta, niente doppione); alternativa "Profilo" (meno esatta). Anche "Percorso" è al limite con 6 voci: `px-0.5` sotto `md` in `AppNav`. Elenco dei testi "Altro" da cambiare nel design (esclusi PersonForm, budget, style-tips). Check visivi F3 definiti.
+QA:
+- QA-1 (should) misura "etichetta che trabocca" a 320 px falsa → accepted: 12 temi × 320/768/1024, `Range` su `li`, dopo `document.fonts.ready`.
+- QA-2 (should) contrasto di `/guida/budget` → accepted: in `SCREENS` di `themes.spec.ts` (T9); coppie in `contrast.test.ts` (T4).
+- QA-3 (should) test AC3/AC4 non provati → accepted con variante: `checkIndex` puro con fixture; `guide-docs.test.tsx` rende i file veri con `GuideMarkdown`; H1 e salti di livello in unit; e2e su 2 pagine.
+- QA-4 (should) accesso alla Preview → accepted: T11, lo sviluppatore entra da sé (risposta sotto).
+- QA-5 (should) anonimo e 404 → accepted: `/guida/xyz` in `login.spec` con `maxRedirects:0`; nessuna asserzione sullo stato 404; `aria-current` sulla pagina 404.
+- QA-6 (should) target 44 px, tastiera, sottolineatura → accepted: asserzioni nel test a 320 px.
+- QA-7 (note) test su "Altro" in `altro.spec` → accepted: H1 e voce nav da costante; commenti invariati.
+- QA-8 (note) focus sull'H1 → accepted: focus dopo clic interno, nessun focus al primo caricamento, `goBack()` senza asserire il focus.
+- QA-9 (note) ordine T9/T10 → accepted: T9 dopo S1, T10 dopo S2.
 
-## F2 — plan written — architect — 2026-11-25
-- `plan.md`: route `/guida` + `/guida/[...pagina]` (catch-all, slug da allowlist, 404 propria), lettura server di `docs/functional` con `outputFileTracingIncludes`, renderer `react-markdown@10.1.0` + `remark-gfm@4.0.1` solo server (`skipHtml`), 6ª voce "Guida". Nome sezione: segue il design ("Opzioni", "Impostazioni nozze" resta); con "Impostazioni" cambiano solo testi e larghezza voci.
-- D1: URL `/altro` invariato (guard del cambio codice, URL nelle email già inviate, ~85 riferimenti); redirect possibili in futuro come chore XS.
-- D3: pulizia e rinomina delle docs funzionali in F3 (i test di AC3/AC4 leggono i file veri); `altro.md` → `opzioni.md`.
-- 3 step, 10 task; in S1 e S2 due developer in parallelo su file disgiunti; QA e2e + controllo Preview in S3. Nessuna migrazione, nessun cambio ad auth, nessun ADR.
+## Gate A+B — risposte dello sviluppatore
+- Gate B: "Approvo tutto".
+- Q7 = "Opzioni"; Q8 = URL `/altro` invariato; T11 = lo sviluppatore entra da sé sull'anteprima nel browser integrato; dipendenze `react-markdown@10.1.0` e `remark-gfm@4.0.1` approvate.
 
-## F2 round 1 — product-owner
-Copertura: ogni AC1–AC7 ha task e test; nessuna funzione fuori scope (il renderer, il test sui file veri e `FocusHeading` servono AC3/AC4/AC6). Nessun blocking.
-
-| ID | Sev. | Evidenza | Proposta |
-|---|---|---|---|
-| PO-1 | should | `plan.md` D1 (URL `/altro` invariato) è una scelta dell'architetto, ma Q7 del brief assegna l'esito allo sviluppatore al Gate A+B; D1 e il testo "Gate A via R-02" in testata non lo riflettono. | Presentare D1 al Gate A+B insieme a Q7 (risposta proposta: URL invariato, l'utente vede l'etichetta, non l'URL). Correggere la testata del piano: Gate A non ancora approvato. |
-| PO-2 | should | S2 (T7, T8, T9 sul nome) e il rinomino `altro.md` → `opzioni.md` (D4) dipendono dal nome scelto. | Non avviare S2 prima della conferma di Q7; D4 segue il nome confermato (slug = nome della sezione); i test e2e/unit asseriscono l'etichetta confermata, non "Opzioni" in modo fisso. |
-| PO-3 | note | T7 cambia anche email di promemoria, onboarding e login (testo "Altro > X"). È coerente con AC7 (la coppia vede un solo nome) e non cambia i link. | Accettato; elencarlo nelle note per lo sviluppatore al Gate B, così non è una sorpresa. |
-| PO-4 | note | La rinomina compare in AC7 con "voce interna rinominata": con "Opzioni" non serve; con "Impostazioni" sì. | AC7 reso neutro sull'etichetta (brief aggiornato). |
-
-## F2 round 1 — designer (plan check)
-Il piano copre flussi, 404 (anche `/guida/a/b`), loading/error, focus sull'H1 (solo dopo navigazione), regioni scorrevoli, rinomina e check a 320/768 px nei 12 temi. Lacune:
-
-| ID | Severity | Evidence | Proposal |
-|---|---|---|---|
-| DES-14 | should | Passo 3 dice "stili per elemento con soli token" ma non cita link sempre sottolineati (AC2, WCAG 1.4.1) né l'icona dei link esterni; nessun test li verifica. | Nel passo 3: `a` con `underline underline-offset-2` + colore `--primary`, icona `ExternalLink` aria-hidden sui link esterni. Test di `GuideMarkdown`: classe di sottolineatura presente. |
-| DES-15 | should | Il design chiede `<th scope="col">`; il piano mappa solo `table`. | Mappare anche `th` con `scope="col"` e testarlo nel render statico. |
-| DES-16 | should | `px-0.5` è in T7 (S2) ma la 6ª voce arriva in T6 (S1): il checkpoint S1 ("menu con 6ª voce") mostra "Percorso" al limite a 320 px. | Spostare `px-0.5` in T6 (stesso file `AppNav.tsx`), non in T7. |
-| DES-17 | should | `altro.md` → `opzioni.md`: T8 cita solo "Altro > X → Opzioni > X"; i link `altro.md` dentro le altre pagine e la riga README non sono nominati e romperebbero il test di completezza. | In T8 aggiungere "link `altro.md` → `opzioni.md` in tutti i file e nella tabella README (nome scheda e descrizione)". |
-| DES-18 | note | Stati vuoti del design (README senza righe: "Per ora non c'è nulla da leggere."; file vuoto: "Questa pagina è ancora vuota.") non sono nel piano né nei test. | Una riga nel passo 4 e un caso in `GuideMarkdown.test`; oppure il developer li dichiara fuori scope (i test sui file reali li rendono quasi irraggiungibili). |
-| DES-19 | note | E2E del menu solo a 320 e 768 px; la barra a 360/390 e il rail a 1024 non sono coperti. | Aggiungere 1024 px (etichette intere, "Guida" ultima e attiva) nello stesso spec; 360/390 solo in verifica visiva F3. |
-
-## F2 round 1 — qa-engineer
-Ogni AC1–AC7 ha almeno un test e il livello è giusto (unit sulla logica, e2e solo dove serve browser, Preview manuale per il bundle). Nessun blocking. Niente matrici superflue: la matrice 12 temi è giustificata solo se riusa l'infrastruttura esistente (QA-2). Setup verificato: `playwright.config.ts` ha progetti `mobile` (360 px) e `desktop` (1280 px) sullo stesso `next start`; `vitest.config.ts` unit include `src/**/*.test.*` con cwd = root, quindi `docs/functional` è leggibile dai test.
-
-| ID | Sev. | Evidenza | Proposta |
-|---|---|---|---|
-| QA-1 | should | Check "etichetta che trabocca" a 320 px (AC7). Il progetto `mobile` è a 360 px, non 320: va forzato `page.setViewportSize({width:320})`. Un `scrollWidth ≤ clientWidth` su uno `<span>` inline vale sempre 0 (falso verde). I font del tema si caricano a richiesta: misurare prima di `document.fonts.ready` dà larghezze del fallback. Il rail a 768/1024 px esiste solo nel progetto con viewport ≥768. | Misurare sul `Link` (blocco/flex) o con `Range.getBoundingClientRect()` del testo contro il `li`; attendere `document.fonts.ready` dopo `goto`; asserire anche che l'etichetta non sia vicina al limite per un caso noto (controllo di sanità: stesso test con la stringa "Impostazioni" deve fallire a 320, una volta in locale, non in CI). Spec in file `guida.nav.spec.ts` o `test.use` con viewport propri; 12 temi × {320, 768, 1024} solo luce (il font non cambia con lo schema): 36 render brevi, un solo seed e un solo login. |
-| QA-2 | should | T9 propone `color-contrast` su `/guida/budget` × 12 temi × chiaro/scuro come test nuovo; `e2e/themes.spec.ts` ha già il ciclo 12 × 2 (seed, login, `axeFindings`, timeout 180 s) con `SCREENS` estendibile, e `themes/contrast.test.ts` verifica già le palette. Un secondo ciclo identico raddoppia seed e tempo (proporzione S). `themes.spec.ts` non è nei file di T9. | Aggiungere `/guida/budget` a `SCREENS` in `themes.spec.ts` (non nel solo ramo `E2E_AXE_MATRIX`: è la richiesta esplicita di AC2) e inserire il file nei file di T9. In più, un controllo unitario (o riga in `contrast.test.ts`) delle coppie che `.guide-prose` usa: `--primary`/sfondo, `--foreground`/`--muted` (codice), `--muted-foreground`/sfondo, `--border`: se mancano, gli stili del renderer possono introdurre una coppia mai verificata. axe su `/guida`, `/guida/budget`, `/guida/temi-e-aspetto` in Giardino resta in `a11y.spec.ts` (3 URL nella lista esistente, costo basso). |
-| QA-3 | should | I test unit sui file veri (T3) sono la sola prova di AC3 ("fallisce se una pagina rimanda fuori") e AC4 ("fallisce se un `.md` non è in README"), ma nessuno prova che falliscano davvero; il piano elenca "nessun link fuori cartella né `docs/technical`" senza dire come (regex su testo grezzo = falsi negativi su link in tabella/riferimento, falsi positivi in blocchi di codice). Inoltre "nessun salto di livello" (AC6) è pianificato solo come e2e su 12 pagine (lento, 12 goto autenticati) mentre è una proprietà del file. | (a) `source.ts` espone funzioni pure che accettano una cartella/mappa (`listPages(dir)`, `checkPages(files)`); i test sui file veri le chiamano con `docs/functional`, e 3 casi su fixture in memoria dimostrano che falliscono: `.md` non in tabella, tabella che cita un file assente, link `../technical/x.md`, `[t](https://…)` ammesso, `docs/technical` in testo semplice rifiutato. (b) Estrarre i link dall'AST (`remark-parse` è già transitiva) o usare `resolveGuideHref` come unica fonte, mai una regex separata. (c) Controllare nel unit test sui file veri, dopo `stripChangelog`: un H1 (fuori dai blocchi di codice), nessun salto H1→H3, titolo non vuoto, ogni riga README ha etichetta e descrizione non vuote e il link a `.md` che esiste. (d) In e2e restano un H1 + gerarchia su 2 pagine (`budget`, `temi-e-aspetto`), non 12. |
-| QA-4 | should | T10 (controllo Preview) dà per scontato di poter vedere le pagine, ma tutte le route sono dietro login e la Preview ha dati finti: serve un account di test sullo staging e la Preview può avere Deployment Protection di Vercel. Senza credenziali posso verificare solo il redirect anonimo, che non prova il bundle dei file (il rischio principale, ARC-1). Regola: niente dati reali, niente password nei log. **question-for-developer** | Proposta: lo sviluppatore (o il team) crea sullo staging un account di test con il seed di staging e fornisce le credenziali nel canale previsto (non in chat/log); QA esegue indice + `/guida/budget` (tabella visibile, contenuto non vuoto, nessun errore) e il redirect anonimo. Alternativa se non si vuole un account: controllo manuale dello sviluppatore con checklist scritta da QA (2 URL, cosa deve comparire). Cartella mancante = `error.tsx`: la checklist include "nessuna pagina d'errore". |
-| QA-5 | should | AC5 e 404: casi plausibili ma con insidie. (1) Anonimo: il proxy nega per default (`guards.ts:112-116`), quindi anche `/guida/xyz` e `/guida/a/b` devono andare a `/accesso` (non 404, che rivelerebbe cosa esiste); il piano testa solo `/guida` e `/guida/budget`. "Nessun contenuto" va provato sul markup, non solo sull'URL finale. (2) `/guida/..%2Fpackage`: Playwright/Chromium e Next possono normalizzare o rifiutare il percorso prima della route: l'esito (404 nostra vs. 400/redirect) non è garantito; con `loading.tsx` il 404 può arrivare con stato HTTP 200 (stream già avviato, `noindex` nel meta). (3) AC1 dice "attiva su qualsiasi pagina della Guida": la 404 sta sotto `/guida/…` e va controllata. | (1) Aggiungere `/guida` e `/guida/budget` alla lista di rotte protette già in `login.spec.ts:33` (stesso test, costo zero) più `/guida/xyz`; per il markup: `request.get("/guida/budget", {maxRedirects:0})` → 3xx verso `/accesso` e corpo senza titoli della Guida. (2) Asserire sul contenuto ("Pagina non trovata", link "Torna alla Guida") e che non compaia contenuto di `package.json`; **non** asserire lo stato 404 (o asserirlo solo dopo averlo osservato in locale e documentarlo). Se il percorso `..%2F` viene normalizzato prima della route, tenere solo il caso come `request.get` e lasciare la copertura della sicurezza a R3 nel unit test di `source.ts` (slug `../package`, `README`, `Budget`, `budget.md` rifiutati: già nel piano, è la prova vera). (3) Nella 404 asserire `aria-current="page"` su "Guida". |
-| QA-6 | should | AC2/AC6 hanno 3 requisiti che il piano cita ma che axe non prova: target ≥ 44 px (axe `target-size` controlla solo 24 px, WCAG 2.2 AA), tabella raggiungibile da tastiera (la sola regola `scrollable-region-focusable` verifica `tabindex`, non lo scorrimento), link riconoscibili senza colore (solo unit sulla classe: non prova lo stile calcolato). | `guida.spec.ts`: `boundingBox().height ≥ 44` su voce nav "Guida", scheda dell'indice, "← Guida", "Torna alla Guida"; a 320 px `Tab` fino alla regione tabella (`toBeFocused`), poi `ArrowRight` e `scrollLeft > 0`; `getComputedStyle(a).textDecorationLine` contiene `underline` su un link interno. Sono 3 asserzioni nello stesso test di 320 px, non test nuovi. `document.documentElement.scrollWidth ≤ 320` va misurato su `/guida/budget` e `/guida/temi-e-aspetto` (le due con tabelle larghe) e su una pagina con codice lungo se esiste (`promemoria-email`/`ambienti` dopo la pulizia). |
-| QA-7 | note | Test e2e che toccano l'etichetta "Altro": nessun locator e2e usa il nome "Altro" (cerca per `/altro` URL e nomi delle voci interne). Occorrenze testuali solo in titoli/commenti: `altro.spec.ts:2`, `login.spec.ts:196`, `email-off.spec.ts:35,49`, `partner.spec.ts:6,28`, `export.spec.ts:5`. `altro.spec.ts:24-35` cerca le voci per regex (incl. "Impostazioni nozze": se Q7 = "Impostazioni" la voce diventa "Dati delle nozze" e il test fallisce). Quindi AC7 non ha oggi alcun assert e2e sul nome della sezione. | In `altro.spec.ts` (già in T9) estendere "the index lists every area": `getByRole("heading",{level:1})` = nome sezione, voce nav con quel nome e `aria-current="page"`, nessuna voce nav "Altro"; la lista di nomi interni letta da una costante, così Q7 (PO-2) cambia una riga. Non riscrivere i titoli/commenti cosmetici di `email-off`, `partner`, `export`, `login` (non sono nei file di T9 e non provano nulla): al più una riga in T9 se il developer li vuole allineati. Le asserzioni di testo "Altro > …" in email/onboarding restano ai test unit del developer (`templates.test.ts`, `onboarding.test.ts`, `interactive.test.tsx`); e2e di onboarding/email-off da rivedere solo se asseriscono quelle frasi (grep a fine S2). |
-| QA-8 | note | Focus sull'H1 (AC3): il rischio è doppio, flaky o falso verde. Next gestisce da sé scroll e focus dopo la navigazione client; un `toBeFocused()` su H1 con `tabIndex=-1` va atteso (polling) e l'assenza di focus al primo caricamento va provata a parte. Anche l'arrivo dall'indice è navigazione interna. | Test: `goto("/guida/panoramica")` → `document.activeElement` non è l'H1; click su un link interno → `await expect(h1).toBeFocused()` e URL cambiato; `goBack()` → URL precedente e pagina corretta, senza asserire il focus. Nessun `waitForTimeout`. |
-| QA-9 | note | Accordo con DES-16 (`px-0.5` in S1, altrimenti il checkpoint S1 mostra "Percorso" tagliato), DES-19 (aggiungere 1024 px: già in QA-1) e PO-2 (test legati all'etichetta confermata). T9 "può iniziare dopo S1": la parte menu/etichette e `altro.spec` aspetta Q7 e S2; guida.spec (indice, link, 404, anonimo) può iniziare dopo S1. Run: unit al termine di ogni step, e2e solo `guida.spec` + `altro.spec` + `login.spec`/`cache.spec` per `/guida`, poi la suite completa una volta sull'integrato; `E2E_AXE_MATRIX` non serve. | Nessuna azione sul piano oltre alle proposte sopra. |
-
-Conteggio: blocking 0, should 6 (QA-1…6), note 3 (QA-7…9). Domande per lo sviluppatore: QA-4.
-
-## F2 round 1 — architect response — 2026-11-25
-- PO-1: accettato in parte — D1 diventa proposta in attesa dello sviluppatore (Q8). Respinta la correzione della testata: il Gate A è già registrato via roadmap R-02 (`adf gate a roadmap`, 2026-11-25).
-- PO-2: accettato — S2 parte solo dopo Q7; D4 = slug del nome confermato; l'etichetta vive in una costante `src/components/section-label.ts` (T7), letta da unit ed e2e.
-- PO-3: accettato — in Impacts, "Testi visibili fuori dalla Guida", per il Gate B.
-- PO-4: preso atto — piano neutro sull'etichetta.
-- DES-14: accettato — link sempre sottolineati + icona `ExternalLink` (Solution 3); classe nel test di render, stile calcolato in e2e.
-- DES-15: accettato — `th scope="col"`, test unit.
-- DES-16: accettato — `px-0.5` spostato in T6 (S1).
-- DES-17: accettato — T8 include i link `altro.md` in tutti i file e la riga README (nome e descrizione).
-- DES-18: respinto — i test sui file veri rendono irraggiungibili README senza righe e pagina vuota; fuori piano.
-- DES-19: accettato — 1024 px in `guida.nav.spec.ts`; 360/390 px solo nella verifica visiva.
-- QA-1: accettato — `guida.nav.spec.ts`: 12 temi × 320/768/1024, solo chiaro, `Range` contro `li`, dopo `document.fonts.ready`; una prova locale con "Impostazioni" deve fallire.
-- QA-2: accettato — `/guida/budget` in `SCREENS` di `themes.spec.ts` (T9); coppie di token del renderer in `contrast.test.ts` (T4).
-- QA-3: accettato con variante — (a) `checkIndex` puro con fixture; (b) invece di importare `remark-parse` (transitiva → nuova dipendenza diretta), `guide-docs.test.tsx` rende ogni file vero con `GuideMarkdown` (stesso parser della produzione) e conta `[data-guide-unresolved]` prodotti da `resolveGuideHref`; (c) un H1 / nessun salto nel test unit; (d) gerarchia in e2e su 2 pagine.
-- QA-4: accettato — Release plan T11: lo sviluppatore accede lui stesso alla Preview nel browser integrato (gli agenti non digitano credenziali), poi QA controlla indice, `/guida/budget` e redirect anonimo; alternativa: checklist eseguita dallo sviluppatore.
-- QA-5: accettato — `/guida/xyz` anonimo + `maxRedirects:0` in `login.spec`; nessuna asserzione sullo stato 404; `..%2F` solo se arriva alla route (R3 provato in unit); `aria-current` sulla 404.
-- QA-6: accettato — altezza ≥ 44 px, Tab + `scrollLeft`, `textDecorationLine` calcolato nel test a 320 px.
-- QA-7: accettato — `altro.spec`: H1 e voce nav = costante, `aria-current`, nessuna voce "Altro"; commenti cosmetici invariati.
-- QA-8: accettato — niente focus al primo caricamento, `toBeFocused()` dopo un clic interno, `goBack()` senza asserire il focus.
-- QA-9: accettato — T9 (Guida, dopo S1) e T10 (menu/sezione, dopo S2) separati.
+## Gate A (roadmap) e Gate B — 2026-11-25
+- Gate A registrato tramite roadmap R-02; Gate B approvato dallo sviluppatore ("Approvo tutto"), copre anche commit, push del branch e PR (repo pubblico). Merge = produzione → Gate C.
+- F3 avviata: S1 con developer A (T1–T5) e developer B (T6) in parallelo.
