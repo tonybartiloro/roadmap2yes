@@ -1,0 +1,26 @@
+# Code review 7 - T9 tables (commit 8c90a12)
+
+Verdict: **approved with should-fix items** (0 blocking, 3 should, 2 nit). Checked against AC6, AC10 (tables), AC14-AC16, BR10, Decision 7, P2, PO-2, PO-5.
+
+## Verified OK
+- Seats exclude infants (`seating.ts:56-66`, `occupancyByTable`), over-capacity allowed and shown as text plus icon (`TableCard.tsx:43`), capacity 1-50 or none in domain, zod and the DB check (`guests.sql:58`).
+- Deleted table = "Senza tavolo" via `liveTableOf` (P2); restore brings members back (FK `table_id` only cleared on a hard delete, `on delete set null`).
+- Conditional UI: table filter dropped without a live table (`GuestsScreen.tsx` `visible`), "Assegna a tavolo" only with `tables.length > 0`; Tavoli tab always present with an empty state.
+- Tabs are the Radix primitive (tablist, arrows, roving focus); targets `h-11`/`min-h-11`; "Rimuovi dal tavolo {nome}" contains its visible text (QA-2 ok); card name = visible text.
+- Privacy: only fixed texts in toasts/errors, no personal values logged. Conflict: versioned update, RLS-denied = `forbidden`, dialog via `useConflict`.
+
+## Findings
+**REV-32 (should)** `tables-data.ts:70-115`: duplicates `versioned`/`conflictResult` logic of `data.ts`. Two copies of the conflict/forbidden rule will drift. Fix: once A exports them, delete the copy and call them (keep only `tableSchemas`, `addTable`, thin `updateTable`).
+
+**REV-33 (should)** `RecentlyDeleted.tsx` `purgeConsequence`: only tables name the member count; PO-5 asks for it on groups too. Agree with the coordinator: add the count for groups (same wording pattern, "restano senza gruppo"), keep people unchanged, and have QA update the S1 e2e assertion. Do not keep a code comment justifying wording by a test.
+
+**REV-34 (should)** `TableAddPeople.tsx:94-99, 228-235`: silent no-ops. A group with no live members, or "Lascia dove sono" when nobody is free (`toSeat` empty), calls `seat([])` which returns with no message and leaves the sheet open. Fix: if there is nothing to seat show a short line/toast ("Nessuno da aggiungere: sono già tutti seduti.") and close; disable "Aggiungi il gruppo" for an empty group or note the member count in the option.
+
+**REV-35 (nit)** `TablesTab.tsx:27`: comparator never returns 0 and ignores Italian collation; use `a.name.localeCompare(b.name, "it")` like groups (`TableAddPeople.tsx:79`).
+
+**REV-36 (nit)** `TableAddPeople.tsx:233`: `Sposta` when the plan has only `alreadyElsewhere` is fine; add a test for the "Lascia dove sono" no-op path together with REV-34.
+
+## Developer notes
+1. Duplicate: remove (REV-32). 2. Add the group count (REV-33). 3. `tables-data.ts` and `TableAddPeople.tsx` accepted as extra files: cohesive, keep `data.ts` from growing; update the plan file list.
+
+Questions: none blocking.
