@@ -6,14 +6,15 @@ export const emptyCounts = (): GuestCounts => ({ total: 0, adult: 0, child: 0, i
 
 export const sideKeyOf = (guest: Pick<Guest, "side">): SideKey => guest.side ?? "none";
 
+function add(counts: GuestCounts, guest: Guest): void {
+  counts[guest.category] += 1;
+  counts.total += 1;
+}
+
 /** People per category. Deleted guests are never counted; infants count in the total. */
 export function countGuests(guests: readonly Guest[]): GuestCounts {
   const counts = emptyCounts();
-  for (const g of guests) {
-    if (g.deletedAt) continue;
-    counts[g.category] += 1;
-    counts.total += 1;
-  }
+  for (const g of guests) if (!g.deletedAt) add(counts, g);
   return counts;
 }
 
@@ -25,11 +26,6 @@ export function countBySide(guests: readonly Guest[]): Record<SideKey, GuestCoun
     both: emptyCounts(),
     none: emptyCounts(),
   };
-  for (const g of guests) {
-    if (g.deletedAt) continue;
-    const c = result[sideKeyOf(g)];
-    c[g.category] += 1;
-    c.total += 1;
-  }
+  for (const g of guests) if (!g.deletedAt) add(result[sideKeyOf(g)], g);
   return result;
 }

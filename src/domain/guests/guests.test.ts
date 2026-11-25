@@ -12,6 +12,7 @@ import {
   validateEmail,
   validateFirstName,
   validateGuest,
+  validateLastName,
   validatePhone,
   type Guest,
   type GuestGroup,
@@ -139,6 +140,11 @@ describe("duplicates", () => {
     ).toEqual([]);
   });
 
+  it("treats a null and an empty last name as the same", () => {
+    const g = [guest({ firstName: "Anna", lastName: null })];
+    expect(findDuplicates({ firstName: "Anna", lastName: "" }, g)).toHaveLength(1);
+  });
+
   it("ignores an empty first name", () => {
     expect(findDuplicates({ firstName: "", lastName: "" }, existing)).toEqual([]);
   });
@@ -150,6 +156,12 @@ describe("validation", () => {
     expect(validateFirstName("   ")).not.toBeNull();
     expect(validateFirstName("a".repeat(80))).toBeNull();
     expect(validateFirstName("a".repeat(81))).not.toBeNull();
+  });
+
+  it("limits the last name to 80 characters", () => {
+    expect(validateLastName("")).toBeNull();
+    expect(validateLastName("a".repeat(80))).toBeNull();
+    expect(validateLastName("a".repeat(81))).not.toBeNull();
   });
 
   it("accepts phones of 6-20 allowed characters, empty included", () => {
@@ -185,6 +197,7 @@ describe("validation", () => {
 
 describe("bandOf", () => {
   it.each([
+    [-1, "up_to_50"],
     [0, "up_to_50"],
     [50, "up_to_50"],
     [51, "50_80"],
