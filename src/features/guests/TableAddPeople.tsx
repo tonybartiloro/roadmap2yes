@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -67,6 +68,7 @@ export function TableAddPeople({
   const [groupId, setGroupId] = useState("");
   const [shown, setShown] = useState(PAGE_SIZE);
   const [busy, setBusy] = useState(false);
+  const [emptyGroup, setEmptyGroup] = useState(false);
   const [ask, setAsk] = useState<ReturnType<typeof planGroupSeating> | null>(null);
 
   const candidates = guests
@@ -79,7 +81,12 @@ export function TableAddPeople({
     .toSorted((a, b) => a.name.localeCompare(b.name, "it"));
 
   async function seat(ids: readonly string[]) {
-    if (ids.length === 0) return;
+    if (ids.length === 0) {
+      // Nobody to seat (all already at a table): say so and close, never a silent no-op.
+      toast("Nessuno da aggiungere: sono già tutti seduti.");
+      onClose();
+      return;
+    }
     setBusy(true);
     const ok = await actions.bulk(
       "assign_table",
@@ -93,6 +100,11 @@ export function TableAddPeople({
 
   function addGroup() {
     const members = guests.filter((g) => g.groupId === groupId);
+    if (members.length === 0) {
+      setEmptyGroup(true);
+      return;
+    }
+    setEmptyGroup(false);
     const plan = planGroupSeating(members, tables, table.id);
     if (plan.alreadyElsewhere.length > 0) setAsk(plan);
     else void seat(plan.toSeat.map((g) => g.id));
@@ -190,7 +202,10 @@ export function TableAddPeople({
                   <NativeSelect
                     {...control}
                     value={groupId}
-                    onChange={(event) => setGroupId(event.target.value)}
+                    onChange={(event) => {
+                      setGroupId(event.target.value);
+                      setEmptyGroup(false);
+                    }}
                   >
                     <option value="">Scegli un gruppo</option>
                     {liveGroups.map((g) => (
@@ -201,6 +216,11 @@ export function TableAddPeople({
                   </NativeSelect>
                 )}
               </Field>
+              {emptyGroup ? (
+                <p role="status" className="text-muted-foreground">
+                  Questo gruppo non ha ancora persone: aggiungine prima dal gruppo.
+                </p>
+              ) : null}
               <SheetFooter>
                 <Button type="button" disabled={busy || groupId === ""} onClick={addGroup}>
                   {busy ? "Un attimo…" : "Aggiungi il gruppo"}

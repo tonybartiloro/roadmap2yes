@@ -24,3 +24,10 @@ Verdict: **approved with should-fix items** (0 blocking, 3 should, 2 nit). Check
 1. Duplicate: remove (REV-32). 2. Add the group count (REV-33). 3. `tables-data.ts` and `TableAddPeople.tsx` accepted as extra files: cohesive, keep `data.ts` from growing; update the plan file list.
 
 Questions: none blocking.
+
+## Risposte
+- **REV-32**: fatto. `updateTable` ora chiama `versioned` di `data.ts` (conflitto, `forbidden` e errori in un solo posto); in `tables-data.ts` restano `tableSchemas`, `addTable` e il piccolo mappatore dei campi per il dialogo di conflitto. Test d'integrazione invariati e verdi.
+- **REV-33**: fatto, per i gruppi come per i tavoli; tolto il commento sull'e2e. Testo nuovo dei gruppi: "Non si può annullare. Le N persone che ne fanno parte restano, senza gruppo." (N=1: "La persona che ne fa parte resta, senza gruppo."; N=0: "Nessuna persona ne fa parte."). Le persone restano invariate ("Spariscono anche dalle esportazioni."). Test aggiunto.
+- **REV-34**: fatto. Nessuno da sedere ("Lascia dove sono" con tutti già seduti): toast "Nessuno da aggiungere: sono già tutti seduti." e lo sheet si chiude. Gruppo senza persone vive: nota "Questo gruppo non ha ancora persone: aggiungine prima dal gruppo." e nessuna scrittura; la nota sparisce cambiando gruppo.
+- **REV-35**: fatto, `localeCompare(..., "it")`.
+- **REV-36**: fatto, due test (nessuno libero; gruppo vuoto) più quello sul conteggio dei gruppi.

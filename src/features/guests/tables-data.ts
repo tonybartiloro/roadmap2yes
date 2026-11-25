@@ -1,10 +1,8 @@
 import { z } from "zod";
 import { parseCapacity, validateTableName } from "@/domain/guests";
-import { nameBook, type PartnerRow } from "@/features/budget/model";
 import type { ActionResult, VersionedResult } from "@/features/decisions/types";
 import type { Tables } from "@/lib/supabase/database.types";
-import { versionedUpdate, VersionedUpdateError } from "@/lib/supabase/versioned-update";
-import { GENERIC_ERROR, mapDbError, type Db } from "./data";
+import { GENERIC_ERROR, mapDbError, versioned, type Db } from "./data";
 
 /**
  * Create and edit of a TABLE (name 1-60, capacity 1-50 or none). Deleting, restoring and deleting
@@ -79,37 +77,14 @@ export async function updateTable(
   userId: string,
   input: { tableId: string; version: number; table: TableValues },
 ): Promise<VersionedResult> {
-  try {
-    const result = await versionedUpdate(db, "guest_tables", input.tableId, input.version, {
-      name: input.table.name,
-      capacity: input.table.capacity,
-    });
-    if (!result.conflict) return { ok: true, data: { version: result.row.version } };
-    // Same version but zero rows: the UPDATE was denied (RLS), not a conflict.
-    if (result.current && result.current.version === input.version) {
-      return { ok: false, ...mapDbError({ code: "42501" }) };
-    }
-    const partners = await db
-      .from("wedding_partners")
-      .select("user_id, first_name, last_name, label");
-    const names = nameBook((partners.data ?? []) as PartnerRow[], userId);
-    return {
-      ok: false,
-      code: "conflict",
-      message: "Qualcuno ha modificato questo elemento mentre lo guardavi.",
-      conflict: {
-        current: result.current ? tableFields(result.current) : null,
-        changedByName: result.changedBy ? names.nameOf(result.changedBy) : null,
-        changedAt: result.changedAt,
-      },
-    };
-  } catch (error) {
-    if (error instanceof VersionedUpdateError) {
-      return {
-        ok: false,
-        ...mapDbError({ ...(error.code ? { code: error.code } : {}), message: error.message }),
-      };
-    }
-    return { ok: false, code: "unknown", message: GENERIC_ERROR };
-  }
+  // The conflict / forbidden / error mapping is the module's single `versioned` (data.ts).
+  return versioned(
+    db,
+    userId,
+    "guest_tables",
+    input.tableId,
+    input.version,
+    { name: input.table.name, capacity: input.table.capacity },
+    tableFields,
+  );
 }

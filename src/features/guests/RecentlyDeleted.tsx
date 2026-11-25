@@ -73,12 +73,12 @@ interface SectionDef {
 
 /** What happens to the members of ONE group or table that is deleted for good (a number, not a vague line). */
 function purgeConsequence(section: SectionDef, item: Item): string {
-  // People and groups keep the S1 wording (the e2e of S1 asserts it); tables say how many.
-  if (item.kind !== "table") return section.after;
+  if (item.kind === "guest") return section.after;
+  const without = item.kind === "table" ? "senza tavolo" : "senza gruppo";
   if (item.members === 0) return "Nessuna persona ne fa parte.";
   return item.members === 1
-    ? "La persona che ne fa parte resta, senza tavolo."
-    : `Le ${item.members} persone che ne fanno parte restano, senza tavolo.`;
+    ? `La persona che ne fa parte resta, ${without}.`
+    : `Le ${item.members} persone che ne fanno parte restano, ${without}.`;
 }
 
 const NO_RETURN = "Non si può annullare.";

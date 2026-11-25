@@ -3,7 +3,7 @@
 import { Plus, Table2 } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import { Button } from "@/components/ui/button";
-import { normalizeText, type Occupancy } from "@/domain/guests";
+import type { Occupancy } from "@/domain/guests";
 import type { TableView } from "./data";
 import { TableCard } from "./TableCard";
 
@@ -24,7 +24,7 @@ export function TablesTab({
 }) {
   const live = tables
     .filter((t) => !t.deletedAt)
-    .toSorted((a, b) => (normalizeText(a.name) < normalizeText(b.name) ? -1 : 1));
+    .toSorted((a, b) => a.name.localeCompare(b.name, "it"));
 
   if (live.length === 0) {
     return (

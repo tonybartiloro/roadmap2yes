@@ -735,6 +735,53 @@ describe("tables (AC14-AC16)", () => {
         }),
       );
     });
+
+    async function openGroupSheet(guests: GuestView[]) {
+      renderScreen({
+        guests,
+        groups: [group("g1", "Famiglia Rossi")],
+        tables: [tbl("t1", "Uno", 8), tbl("t2", "Due", 8)],
+      });
+      await userEvent.click(screen.getByRole("tab", { name: "Tavoli" }));
+      await userEvent.click(screen.getByRole("button", { name: /^Uno/ }));
+      await userEvent.click(screen.getByRole("button", { name: "Aggiungi un gruppo intero" }));
+      await userEvent.selectOptions(screen.getByLabelText("Gruppo"), "g1");
+      await userEvent.click(screen.getByRole("button", { name: "Aggiungi il gruppo" }));
+    }
+
+    it("'Lascia dove sono' with nobody free says so and closes, never a silent no-op", async () => {
+      await openGroupSheet([guest({ groupId: "g1", tableId: "t2" })]);
+      await userEvent.click(screen.getByRole("button", { name: "Lascia dove sono" }));
+      await waitFor(() =>
+        expect(toast).toHaveBeenCalledWith("Nessuno da aggiungere: sono già tutti seduti."),
+      );
+      expect(actions.bulkGuestsAction).not.toHaveBeenCalled();
+      expect(screen.queryByRole("button", { name: "Aggiungi il gruppo" })).toBeNull();
+    });
+
+    it("a group without people shows a note and writes nothing", async () => {
+      await openGroupSheet([guest()]);
+      expect(screen.getByText(/Questo gruppo non ha ancora persone/)).toBeTruthy();
+      expect(actions.bulkGuestsAction).not.toHaveBeenCalled();
+    });
+  });
+
+  it("deleting a group for good says how many people stay without a group", async () => {
+    actions.purgeEntityAction.mockResolvedValue({ ok: true, data: undefined });
+    renderScreen({
+      guests: [guest({ groupId: "g1" }), guest({ groupId: "g1" }), guest({ groupId: "g1" })],
+      groups: [group("g1", "Famiglia Rossi", "2026-11-01T10:00:00Z")],
+    });
+    await userEvent.click(screen.getByRole("button", { name: "Altro" }));
+    await userEvent.click(screen.getByRole("button", { name: /Eliminati di recente/ }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Elimina definitivamente Famiglia Rossi" }),
+    );
+    expect(
+      within(screen.getByRole("alertdialog")).getByText(
+        /Le 3 persone che ne fanno parte restano, senza gruppo\./,
+      ),
+    ).toBeTruthy();
   });
 
   it("shows a stale edit of a table as the conflict dialog", async () => {
