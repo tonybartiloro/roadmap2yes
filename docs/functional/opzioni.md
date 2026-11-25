@@ -1,6 +1,6 @@
-# Altro
+# Opzioni
 
-Altro raccoglie tutto ciò che non sta nelle quattro sezioni principali.
+Opzioni (l'icona a ingranaggio) raccoglie profili, impostazioni, account, aspetto, promemoria ed esportazione.
 
 ## Profili
 

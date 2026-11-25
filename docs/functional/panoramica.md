@@ -12,7 +12,8 @@ Dalla barra in basso (su tablet e PC, a sinistra):
 - **Percorso**: la lista delle tappe del matrimonio, raggruppate per urgenza, con le scadenze calcolate sulla data di riferimento.
 - **Scelte**: le decisioni da prendere (per ora la data e la location), con le opzioni, il confronto e lo storico.
 - **Budget**: il totale, le categorie, le voci e i pagamenti.
-- **Altro**: profili, impostazioni del matrimonio, invito del partner, account, aspetto, promemoria email, esportazione, informazioni ed Esci.
+- **Guida**: queste stesse pagine, lette dentro l'app, in qualsiasi momento: se non sai dove trovare qualcosa, parti da qui.
+- **Opzioni** (l'icona a ingranaggio): profili, impostazioni del matrimonio, invito del partner, account, aspetto, promemoria email, esportazione, informazioni ed Esci.
 
 ## Cosa ancora non c'è
 

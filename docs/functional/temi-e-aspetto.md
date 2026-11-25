@@ -2,7 +2,7 @@
 
 ## I 12 temi
 
-Potete scegliere uno dei 12 temi visivi. Il predefinito è **Giardino**. Lo scegliete all'ultimo passo dell'onboarding, con un'anteprima dal vivo, e lo cambiate quando volete in **Altro > Aspetto**.
+Potete scegliere uno dei 12 temi visivi. Il predefinito è **Giardino**. Lo scegliete all'ultimo passo dell'onboarding, con un'anteprima dal vivo, e lo cambiate quando volete in **Opzioni > Aspetto**.
 
 | Tema | Atmosfera |
 |---|---|

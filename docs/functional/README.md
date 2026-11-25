@@ -17,7 +17,7 @@ Convenzioni per chi scrive qui:
 | [Scelte](scelte.md) | Decisioni, date, location, confronto e riaperture |
 | [Budget](budget.md) | Totale, categorie, voci e pagamenti |
 | [Home e Novità](home-e-novita.md) | Cosa fare adesso e cosa è cambiato |
-| [Altro](altro.md) | Profili, impostazioni, aspetto, promemoria, esportazione, Esci |
+| [Opzioni](opzioni.md) | Profili, impostazioni, aspetto, promemoria, esportazione, Esci |
 | [Promemoria email](promemoria-email.md) | Email accese e spente |
 | [Temi e aspetto](temi-e-aspetto.md) | I 12 temi e il chiaro/scuro |
 | [Esportazione](esportazione.md) | Scaricare i propri dati |

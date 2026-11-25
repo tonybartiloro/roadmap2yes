@@ -4,7 +4,7 @@ Potete scaricare una copia dei vostri dati in qualunque momento: è l'unico modo
 
 ## Cosa scaricate
 
-In **Altro > Esporta** trovate tre pulsanti. Ognuno scarica un file separato, con la data di oggi nel nome.
+In **Opzioni > Esporta** trovate tre pulsanti. Ognuno scarica un file separato, con la data di oggi nel nome.
 
 | File | Contenuto |
 |---|---|

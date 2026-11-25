@@ -22,7 +22,7 @@ L'app decide dove mandarvi, in quest'ordine:
 
 ## Cambiare il proprio codice
 
-In **Altro > Account** inserite il codice attuale e poi il nuovo. Il nuovo codice vale da subito per il prossimo accesso.
+In **Opzioni > Account** inserite il codice attuale e poi il nuovo. Il nuovo codice vale da subito per il prossimo accesso.
 
 Se il codice è stato impostato da vostro partner come **codice temporaneo**, la schermata lo dice chiaramente e non potete continuare senza sceglierne uno vostro.
 
@@ -30,17 +30,17 @@ Il codice iniziale che vostro partner ha scelto per voi all'invito è un suggeri
 
 ## Cambiare la propria email
 
-Dopo il primo accesso ciascuno cambia solo la propria email, in **Altro > Account**: inserite la nuova email due volte e il codice attuale. Non serve confermare nulla via email. Se sbagliate a scriverla, potete correggerla finché siete collegati.
+Dopo il primo accesso ciascuno cambia solo la propria email, in **Opzioni > Account**: inserite la nuova email due volte e il codice attuale. Non serve confermare nulla via email. Se sbagliate a scriverla, potete correggerla finché siete collegati.
 
 Se avete cambiato email da scollegati o qualcosa non torna, va sistemato da chi gestisce l'app.
 
-Finché il partner invitato non è mai entrato, l'altro partner può correggerne l'email da **Altro > Invito**.
+Finché il partner invitato non è mai entrato, l'altro partner può correggerne l'email da **Opzioni > Invito**.
 
 ## Codice dimenticato
 
 Ci sono due strade.
 
-- **Il partner imposta un codice temporaneo (sempre disponibile).** Il partner che è dentro l'app va in **Altro > Invito** e imposta un codice temporaneo per l'altro. Lo consegna di persona. Al primo accesso chi l'ha dimenticato deve scegliere subito un codice nuovo. Il partner riceve nell'app la novità "codice temporaneo impostato da ...", così la cosa resta visibile a entrambi.
+- **Il partner imposta un codice temporaneo (sempre disponibile).** Il partner che è dentro l'app va in **Opzioni > Invito** e imposta un codice temporaneo per l'altro. Lo consegna di persona. Al primo accesso chi l'ha dimenticato deve scegliere subito un codice nuovo. Il partner riceve nell'app la novità "codice temporaneo impostato da ...", così la cosa resta visibile a entrambi.
 - **Link di recupero via email (solo con le email accese).** Dalla pagina di accesso, "Hai dimenticato il codice?" manda un link. Il link vale una volta e porta a una pagina dove scegliete il nuovo codice. Con le email spente questa voce non compare e la pagina spiega di chiedere al partner.
 
 Se nessuno dei due ricorda il codice e le email sono spente, serve un intervento di chi gestisce l'app.
@@ -55,7 +55,7 @@ Il primo partner crea l'account per l'altro. Ci sono due modi.
 2. Consegnate il codice di persona. L'app non lo mostra più dopo la conferma.
 3. Il partner entra con la sua email e il codice. Da quel momento è membro dello spazio e vede tutto con pari diritti.
 
-Finché il partner non è entrato potete revocare l'invito in **Altro > Invito**: l'account creato per lui viene eliminato e lui non entra più. Dopo il primo accesso l'invito non si può più revocare.
+Finché il partner non è entrato potete revocare l'invito in **Opzioni > Invito**: l'account creato per lui viene eliminato e lui non entra più. Dopo il primo accesso l'invito non si può più revocare.
 
 Un matrimonio ha al massimo due partner, e un solo invito in sospeso alla volta.
 
