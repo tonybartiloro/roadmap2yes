@@ -5,7 +5,7 @@
 ## 1. Navigazione e Guida (AC23, decisione 1)
 - **Barra a 6 voci** (320 px: 53 px a cella, come oggi): Home, Percorso, Scelte, Budget, **Invitati** (icona persone), Opzioni. Nessuna riduzione di etichette. Da 768 px rail laterale con le stesse 6 voci. La voce è assente senza permesso `guests`; `/invitati` senza permesso = pannello "Questo spazio è su invito" in pagina (P5).
 - **Guida** esce dalla barra: carta in cima a Opzioni (icona libro, titolo "Guida", testo "Come si usa roadmap2yes, passo passo"), prima delle altre voci e visivamente distinta (bordo `primary`, non solo posizione). Su `/guida/**` la voce attiva della barra è **Opzioni**.
-- **Link di aiuto** (`HelpLink`) nell'intestazione di ogni sezione: a destra del titolo, icona punto interrogativo + testo **"Aiuto"** (testo visibile da 360 px; sotto, solo icona con `aria-label="Aiuto su {sezione}"`, bersaglio 44 px). Apre la pagina della Guida di quella sezione. Nelle sottopagine di Opzioni senza pagina propria il link non c'è (niente link generici alla home della Guida).
+- **Link di aiuto** (`HelpLink`) nell'intestazione di ogni sezione: a destra del titolo, icona punto interrogativo + testo **"Aiuto"** (testo visibile da 360 px; sotto, solo icona con il testo "Aiuto" nascosto ma letto dagli screen reader, bersaglio 44 px; nome accessibile sempre "Aiuto", un solo link per pagina — REV-14). Apre la pagina della Guida di quella sezione. Nelle sottopagine di Opzioni senza pagina propria il link non c'è (niente link generici alla home della Guida).
 
 ## 2. Schermate e flussi
 Route `/invitati`, due schede (`Tabs`): **Persone** (predefinita) e **Tavoli**. I gruppi si gestiscono in Persone (menu dell'intestazione di gruppo). Titolo del documento "Invitati · roadmap2yes".
