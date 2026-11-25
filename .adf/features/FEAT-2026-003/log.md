@@ -24,3 +24,10 @@
 - Architect plan: 17 tasks in 3 steps, 2 additive migrations, 5 RPCs, no new dependency; ADR-0002 "Dati personali degli invitati" drafted.
 - Challenge: QA-1..11 (blocking QA-1 bulk undo, QA-2 TS oracle unowned), DES-17..26, PO-1..7. Architect accepted all but DES-22 (not-migrated state tested below e2e) and changed QA-7 (900 KB import guard instead of raising the global body limit).
 - Gate B approved 2026-11-25 by the developer ("Vai direttamente in produzione che tanto siamo ancora in sviluppo e non facciamo danni"): plan, ADR-0002, new `delete` permission action, routine git work. D-A = (c): no preview test on staging; Gate C on the local result before the merge, then production checks.
+
+## F3 step S1 checkpoint — 2026-11-25
+- Done: T1 migration (021a212, cc66cb6, 631e251), T2 domain (8add42d, d1e4678), T3 nav/help (1500e23, ed244ab), T4 data/actions (2d2c9db, 8f0d557), T5 Persone UI (7555fb6, 6adc63e, 2d228e0), T6 band/Percorso link (02a5d9b, 526a5b2), T7 docs (ab55a84, daf0ead), T8 QA (b0cdc40, f7dbc17).
+- Reviews: code-1 (T2) approved; code-2 (T1 security round) REV-5..10 closed; code-3 (T3) closed; code-4 (T4) REV-17..20 closed; code-5 (T6) fixed; code-6 (T5) REV-24..31 fixed, closure re-check in the final review round.
+- Coordinator decisions: per-action bounds (bulk 5,000 selected, family 100, bulk RPC 1,000 per call with transparent batching), not a cap on guests (brief Decision 10 note); ADR-0002 notes the Postgres log residual (REV-8); remote PG 17.12 verified; extra files recorded in plan Change log; QA-1 accepted (family role redirected to /su-invito by the existing proxy).
+- QA: acceptance 13/13, nav 4/4, mobile 9/9 after QA-2 fix (axe name mismatch on guest rows), desktop 4 pass + 1 fixme (1200 guests in the full export, waits for T14). 500 guests ready in ~250 ms; search over 1200 in 9 ms. db:test 1228 green.
+- `adf verify` pass on 33939b637e7b. Not run yet: full e2e suite (end of S3, T17).
