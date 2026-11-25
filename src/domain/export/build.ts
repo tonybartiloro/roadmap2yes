@@ -137,20 +137,23 @@ function budgetCsv(input: ExportInput): string {
 
 /**
  * CSV of the live guests, whatever filters any screen has (AC21): the same function and columns
- * as "Esporta CSV" in Invitati. The `lato` column uses the partners' names as the Invitati page
- * shows them (first name, else label, else "Partner A/B").
+ * as "Esporta CSV" in Invitati. The `lato` column uses a REAL partner name only (first name, else
+ * label); with none the letter is written, never a fallback text such as "Partner A", which the
+ * import cannot read (REV-45: same rule as `partnerNames().real` of the Invitati page).
  */
 function guestsCsvOf(input: ExportInput): string {
-  const nameOf = (slot: "A" | "B"): string => {
+  const nameOf = (slot: "A" | "B"): string | null => {
     const row = input.partners.find((p) => p["slot"] === slot);
-    return displayName(
-      row
-        ? {
-            firstName: typeof row["first_name"] === "string" ? row["first_name"] : null,
-            label: typeof row["label"] === "string" ? row["label"] : null,
-          }
-        : null,
-      `Partner ${slot}`,
+    return (
+      displayName(
+        row
+          ? {
+              firstName: typeof row["first_name"] === "string" ? row["first_name"] : null,
+              label: typeof row["label"] === "string" ? row["label"] : null,
+            }
+          : null,
+        "",
+      ) || null
     );
   };
   return guestsToCsv(input.guests, input.guestGroups, { a: nameOf("A"), b: nameOf("B") });

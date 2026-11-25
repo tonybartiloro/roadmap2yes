@@ -256,34 +256,51 @@ describe("guests CSV of the full export, read back by the import (AC21, REV-38)"
   });
   const guests = [person("1", "A"), person("2", "B"), person("3", "both"), person("4", null)];
 
-  /** Partner rows as the export carries them; the import gets the names the Invitati page shows. */
-  function roundTrip(partners: ExportInput["partners"], names: { a: string; b: string }) {
+  /**
+   * Partner rows as the export carries them. The import gets what the Invitati page gives it
+   * (`partnerNames().real`: first name, else label, `null` when unset), written here on its own so
+   * a different rule inside `guestsCsvOf` is caught (REV-45).
+   */
+  function roundTrip(partners: ExportInput["partners"]) {
+    const real = (slot: string): string | null => {
+      const row = partners.find((p) => p["slot"] === slot);
+      const first = typeof row?.["first_name"] === "string" ? row["first_name"].trim() : "";
+      const label = typeof row?.["label"] === "string" ? row["label"].trim() : "";
+      return first || label || null;
+    };
     const { guestsCsv } = buildExport({ ...input, partners, guests }, now);
-    const preview = parseGuestsCsv(guestsCsv, { partners: names, groups: [], guests: [] });
+    const preview = parseGuestsCsv(guestsCsv, {
+      partners: { a: real("A"), b: real("B") },
+      groups: [],
+      guests: [],
+    });
     if (!preview.ok) throw new Error(preview.code);
     expect(preview.invalid).toBe(0);
-    return preview.rows.map((row) => row.guest?.side);
+    return { guestsCsv, sides: preview.rows.map((row) => row.guest?.side) };
   }
 
   it("a partner without a first name: the side comes back as the same A/B", () => {
-    const sides = roundTrip(
-      [
-        { slot: "A", first_name: null, label: null },
-        { slot: "B", first_name: "Jessica" },
-      ],
-      { a: "Partner A", b: "Jessica" },
-    );
+    const { guestsCsv, sides } = roundTrip([
+      { slot: "A", first_name: null, label: null },
+      { slot: "B", first_name: "Jessica" },
+    ]);
+    expect(guestsCsv).not.toContain("Partner A"); // never the fallback text
+    expect(sides).toEqual(["A", "B", "both", null]);
+  });
+
+  it("no partner has a name: letters in the file, same A/B back", () => {
+    const { guestsCsv, sides } = roundTrip([{ slot: "A" }, { slot: "B", label: " " }]);
+    expect(guestsCsv).not.toContain("Partner");
     expect(sides).toEqual(["A", "B", "both", null]);
   });
 
   it("both partners with the same name: letters are written and read back exactly", () => {
-    const rows = [
+    const { guestsCsv, sides } = roundTrip([
       { slot: "A", first_name: "Alex" },
       { slot: "B", first_name: "Alex" },
-    ];
-    const { guestsCsv } = buildExport({ ...input, partners: rows, guests }, now);
+    ]);
     expect(guestsCsv).not.toContain("Alex");
-    expect(roundTrip(rows, { a: "Alex", b: "Alex" })).toEqual(["A", "B", "both", null]);
+    expect(sides).toEqual(["A", "B", "both", null]);
   });
 });
 

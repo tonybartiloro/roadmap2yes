@@ -26,3 +26,7 @@ Verdict: **changes requested**: 0 blocking, 3 should, 4 nit. Checked against AC1
 **REV-51 (nit)** `ImportSheet.tsx:86-97`: after choosing a file the text lands in the textarea with no announcement; add `role="status"` "File letto: N righe".
 
 Questions: none.
+
+## Risposte (developer C)
+
+- **REV-45**: Corretto. `guestsCsvOf` (`src/domain/export/build.ts`) usa ora `displayName(..., "") || null`, come `partnerNames().real` di Invitati: con un partner senza nome ne' etichetta nel CSV va la lettera, mai "Partner A". Test di andata e ritorno in `export.test.ts` riscritto: l'import riceve i nomi calcolati con una regola scritta nel test (nome o etichetta, `null` se vuoto), indipendente da `guestsCsvOf`, e verifica che il file non contenga "Partner"; casi: un partner senza nome, nessun partner con nome (`{a:null,b:null}`), due partner omonimi. Con il vecchio codice i primi due falliscono.
