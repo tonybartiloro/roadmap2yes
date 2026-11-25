@@ -14,7 +14,15 @@
 import { loginAs } from "./support/auth";
 import { axeFindings, describeFindings } from "./support/axe";
 import { expect, serviceClient, test, uniqueIp } from "./support/fixtures";
-import { addLocation, addTask, romeDate, seedWedding } from "./support/seed";
+import {
+  addGuest,
+  addGuestGroup,
+  addGuestTable,
+  addLocation,
+  addTask,
+  romeDate,
+  seedWedding,
+} from "./support/seed";
 
 test.describe.configure({ timeout: 360_000 });
 
@@ -119,6 +127,84 @@ test("12 themes x light/dark: the shared toast (title, action) passes axe contra
       }
       await expect(page.locator("li[data-sonner-toast]")).toHaveCount(0);
       await page.waitForLoadState("networkidle");
+    }
+  }
+  expect(failures, failures.join("\n\n")).toEqual([]);
+});
+
+test("12 themes x light/dark on /invitati: filter chips, selection, over-capacity table, import errors (FEAT-2026-003)", async ({
+  page,
+}) => {
+  const w = await seedWedding({ templateTasks: false, names: { a: "Tony", b: "Jessica" } });
+  const group = await addGuestGroup(w, "Famiglia Esempio");
+  const table = await addGuestTable(w, "Tavolo Uno", { capacity: 1 });
+  await addGuest(w, { firstName: "Anna", lastName: "Esempio", side: "A", groupId: group, tableId: table });
+  await addGuest(w, { firstName: "Bruno", lastName: "Esempio", side: "A", groupId: group, tableId: table });
+  await addGuest(w, { firstName: "Carla", lastName: "Prova", side: "B", category: "child" });
+  await addGuest(w, { firstName: "Neo", lastName: "Prova", side: "both", category: "infant" });
+  await loginAs(page, w.wedding.founder, uniqueIp());
+  const settled = () =>
+    expect
+      .poll(
+        () =>
+          page.evaluate(
+            () =>
+              document.getAnimations().filter((a) => a.effect?.getComputedTiming().iterations !== Infinity)
+                .length,
+          ),
+        { timeout: 10_000 },
+      )
+      .toBe(0);
+  const mixed = [
+    "nome;cognome;tipo;lato;gruppo;telefono;email;note",
+    "Dora;Nuova;adulto;Tony;Gruppo Nuovo;;;",
+    "anna;esempio;;;;;;",
+    ";Senzanome;;;;;;",
+    "Ennio;Errore;;Marte;;;;",
+  ].join("\n");
+  const failures: string[] = [];
+  const check = async (label: string) => {
+    await settled();
+    const findings = await axeFindings(page);
+    if (findings.length) failures.push(`${label}\n${describeFindings(findings)}`);
+  };
+  for (const theme of THEMES) {
+    const saved = await serviceClient()
+      .from("weddings")
+      .update({ theme_id: theme })
+      .eq("id", w.weddingId);
+    expect(saved.error).toBeNull();
+    for (const scheme of ["light", "dark"] as const) {
+      const at = `${theme} / ${scheme}`;
+      await page.emulateMedia({ colorScheme: scheme });
+      await page.goto("/invitati");
+      await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
+      await page.waitForLoadState("networkidle");
+      // 1. the list with an active filter (chip) and the summary notice of the table over capacity
+      await page.getByTestId("filters-button").click();
+      await page.getByRole("dialog").getByRole("radio", { name: "Tony" }).click();
+      await page.keyboard.press("Escape");
+      await expect(page.getByTestId("filter-chips")).toBeVisible();
+      await check(`${at} / filter chips`);
+      // 2. selection mode with one person selected
+      await page.getByRole("button", { name: "Altro", exact: true }).click();
+      await page.getByRole("dialog").getByRole("button", { name: "Seleziona" }).click();
+      await page.getByRole("checkbox", { name: "Seleziona Anna Esempio" }).check();
+      await check(`${at} / selection`);
+      await page.getByTestId("selection-bar").getByRole("button", { name: "Fine" }).click();
+      // 3. the Tavoli tab: a table over its capacity
+      await page.getByRole("tab", { name: "Tavoli" }).click();
+      await expect(page.getByText("Oltre la capienza di 1").first()).toBeVisible();
+      await check(`${at} / table over capacity`);
+      await page.getByRole("tab", { name: "Persone" }).click();
+      // 4. the import preview: error cards, a warning, a new group
+      await page.getByRole("button", { name: "Altro", exact: true }).click();
+      await page.getByRole("dialog").getByRole("button", { name: "Importa" }).click();
+      await page.getByLabel("Una persona per riga").fill(mixed);
+      await page.getByRole("button", { name: "Vedi l'anteprima" }).click();
+      await expect(page.getByTestId("import-row-error").first()).toBeVisible();
+      await check(`${at} / import preview`);
+      await page.keyboard.press("Escape");
     }
   }
   expect(failures, failures.join("\n\n")).toEqual([]);

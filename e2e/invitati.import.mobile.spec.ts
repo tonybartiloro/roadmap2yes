@@ -133,7 +133,9 @@ test("pasted text: preview cards, errors and warning, 'Torna indietro', import w
   // closing the result keeps the import and offers Annulla importazione
   await form.getByRole("button", { name: "Fine" }).click();
   await expect(page.getByText("4 invitati importati.", { exact: true })).toBeVisible();
-  await expect(page.getByText("Annulla importazione rimuove le 4 persone importate.")).toBeVisible();
+  await expect(
+    page.getByText("Annulla importazione rimuove le persone importate che non hai ancora modificato."),
+  ).toBeVisible();
   await toasts(page).getByRole("button", { name: "Annulla importazione" }).click();
   await expect(page.getByText("Importazione annullata: 4 persone rimosse.")).toBeVisible();
   // everything the import made is gone; what was there before is untouched
