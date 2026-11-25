@@ -201,6 +201,9 @@ export async function addGuest(
     side?: "A" | "B" | "both" | null;
     groupId?: string | null;
     tableId?: string | null;
+    phone?: string | null;
+    email?: string | null;
+    notes?: string | null;
     deleted?: boolean;
   },
 ): Promise<string> {
@@ -214,6 +217,9 @@ export async function addGuest(
       side: guest.side ?? null,
       group_id: guest.groupId ?? null,
       table_id: guest.tableId ?? null,
+      phone: guest.phone ?? null,
+      email: guest.email ?? null,
+      notes: guest.notes ?? null,
     })
     .select("id")
     .single();

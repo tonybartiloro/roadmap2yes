@@ -10,7 +10,7 @@
  */
 import { loginAs } from "./support/auth";
 import { expect, serviceClient, test, uniqueIp } from "./support/fixtures";
-import { addLocation, addTask, romeDate, seedWedding } from "./support/seed";
+import { addGuest, addGuestGroup, addGuestTable, addLocation, addTask, romeDate, seedWedding } from "./support/seed";
 
 test.describe.configure({ timeout: 60_000 });
 
@@ -122,4 +122,47 @@ test("the progress has a text equivalent and the page works at 360 px (AC42)", a
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
     ),
   ).toBeLessThanOrEqual(0);
+});
+
+test("guests: fourth button with the 'tutti' text; CSV of the live ones; JSON with guests, groups, tables, deleted marked (AC21, AC22)", async ({
+  page,
+}) => {
+  const w = await seedWedding({ names: { a: "Tony", b: "Jessica" } });
+  const group = await addGuestGroup(w, "Famiglia Esempio");
+  const table = await addGuestTable(w, "Tavolo Uno", { capacity: 8 });
+  await addGuestTable(w, "Tavolo Vecchio", { deleted: true });
+  await addGuest(w, { firstName: "Niccolò", lastName: "Prova", side: "A", groupId: group, tableId: table, phone: "+39 000 000401" });
+  await addGuest(w, { firstName: "Maria", lastName: "Esempio", category: "child" });
+  await addGuest(w, { firstName: "Cancellata", lastName: "Prova", deleted: true });
+  await loginAs(page, w.wedding.founder, uniqueIp());
+  await page.goto("/altro/esporta");
+  await expect(
+    page.getByText("Esporta tutti gli invitati, anche se hai dei filtri attivi. Gli eliminati non sono inclusi."),
+  ).toBeVisible();
+  await expect(page.getByText("Invitati (CSV)")).toBeVisible();
+
+  const csv = await download(page, "guestsCsv");
+  expect(csv.name).toBe(`roadmap2yes-invitati-${romeDate(0)}.csv`);
+  expect(csv.text.charCodeAt(0)).toBe(0xfeff); // UTF-8 with BOM: Excel opens "Niccolò" right
+  expect(csv.text).toContain("Niccolò");
+  expect(csv.text).toContain("'+39 000 000401"); // a "+" phone is neutralized like any formula start
+  expect(csv.text).toContain("Tony");
+  expect(csv.text).not.toContain("Cancellata");
+  expect(csv.text.replace(/^﻿/, "").split("\r\n").filter(Boolean)).toHaveLength(3);
+
+  const json = JSON.parse((await download(page, "json")).text) as {
+    guests: { firstName: string; deleted: boolean }[];
+    guestGroups: { name: string }[];
+    guestTables: { name: string; deleted: boolean }[];
+  };
+  expect(json.guests.map((g) => [g.firstName, g.deleted]).sort()).toEqual([
+    ["Cancellata", true],
+    ["Maria", false],
+    ["Niccolò", false],
+  ]);
+  expect(json.guestGroups.map((g) => g.name)).toEqual(["Famiglia Esempio"]);
+  expect(json.guestTables.map((t) => [t.name, t.deleted]).sort()).toEqual([
+    ["Tavolo Uno", false],
+    ["Tavolo Vecchio", true],
+  ]);
 });

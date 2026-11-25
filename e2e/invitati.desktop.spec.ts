@@ -7,7 +7,7 @@
  *          "Annulla" keeps the partner's version; nothing is overwritten silently
  *  - AC12  1200 guests (500, then +700 in the same wedding): all counted, one beyond the first
  *          thousand is searchable, nothing is cut without "Mostra altre"
- *  - AC22  the complete export holds the 1200 (S3, T14: marked `fixme` until the export carries guests)
+ *  - AC22  the complete export holds the 1200 (JSON marks the deleted one; the guests CSV has the live ones)
  *  - NFR   500 guests: list ready < 1 s measured in the page (median of 3 loads); 1200: search and
  *          "Mostra altre" stay responsive (REV-27)
  *  - AC13  the partner's Home ("Novita") shows nothing of the guest that was edited
@@ -192,17 +192,32 @@ test.describe.serial("scale: 500, then 1200 guests in one wedding", () => {
     await expect(page.getByTestId("guest-row")).toHaveCount(Math.min(200, matches));
   });
 
-  test.fixme("1200 guests are in the complete export, deleted ones marked (AC22; waits for T14 in S3)", async ({ page }) => {
+  test("the complete export holds all 1200: JSON marks the deleted one, the guests CSV has only the live ones (AC12, AC21, AC22)", async ({
+    page,
+  }) => {
+    await addGuest(w, { firstName: "Eliminata", lastName: "Prova", deleted: true });
     await loginAs(page, w.wedding.founder, uniqueIp());
     await page.goto("/altro/esporta");
-    const waiting = page.waitForEvent("download");
-    await page.getByTestId("export-json").click();
-    const file = await waiting;
-    const chunks: Buffer[] = [];
-    for await (const chunk of await file.createReadStream()) chunks.push(chunk as Buffer);
-    const parsed = JSON.parse(Buffer.concat(chunks).toString("utf8")) as {
-      guests: { firstName?: string; first_name?: string }[];
+    const download = async (which: string) => {
+      const waiting = page.waitForEvent("download");
+      await page.getByTestId(`export-${which}`).click();
+      const file = await waiting;
+      const chunks: Buffer[] = [];
+      for await (const chunk of await file.createReadStream()) chunks.push(chunk as Buffer);
+      return Buffer.concat(chunks).toString("utf8");
     };
-    expect(parsed.guests).toHaveLength(1200);
+    const parsed = JSON.parse(await download("json")) as {
+      guests: { firstName: string; deleted: boolean }[];
+      guestGroups: unknown[];
+      guestTables: unknown[];
+    };
+    expect(parsed.guests).toHaveLength(1201);
+    expect(parsed.guests.filter((g) => g.deleted).map((g) => g.firstName)).toEqual(["Eliminata"]);
+    expect(Array.isArray(parsed.guestGroups) && Array.isArray(parsed.guestTables)).toBe(true);
+
+    const lines = (await download("guestsCsv")).replace(/^﻿/, "").split("\r\n").filter(Boolean);
+    expect(lines).toHaveLength(1201); // header + 1200 live guests
+    const names = lines.slice(1).map((line) => line.split(";")[0]);
+    expect(new Set(names)).toEqual(new Set(seeded.flatMap((s) => s.firstNames)));
   });
 });
