@@ -17,7 +17,7 @@ import {
   type GuestFilters,
   type SideKey,
 } from "@/domain/guests";
-import type { GroupView } from "./data";
+import type { GroupView, TableView } from "./data";
 import { sideText, type PartnerNames } from "./view";
 
 const ALL = "all";
@@ -62,11 +62,13 @@ function RadioRow<T extends string>({
 export function FilterChips({
   filters,
   groups,
+  tables = [],
   partners,
   onChange,
 }: {
   filters: GuestFilters;
   groups: readonly GroupView[];
+  tables?: readonly TableView[];
   partners: PartnerNames;
   onChange: (filters: GuestFilters) => void;
 }) {
@@ -97,6 +99,17 @@ export function FilterChips({
       clear: () => onChange({ ...filters, groupId: null }),
     });
   }
+  if (filters.tableId !== null) {
+    const name =
+      filters.tableId === "none"
+        ? "Senza tavolo"
+        : (tables.find((t) => t.id === filters.tableId)?.name ?? "Tavolo");
+    chips.push({
+      key: "table",
+      label: `Tavolo: ${name}`,
+      clear: () => onChange({ ...filters, tableId: null }),
+    });
+  }
   if (chips.length === 0) return null;
   return (
     <ul className="flex flex-wrap gap-2" aria-label="Filtri attivi" data-testid="filter-chips">
@@ -119,23 +132,27 @@ export function FilterChips({
 
 /**
  * "Filtri (n)" button and its sheet: side, type and group (AC9). The count in the button of the
- * sheet is announced (`aria-live`). The table filter joins here with T9 (only with tables).
+ * sheet is announced (`aria-live`). The table filter appears only with at least one live table.
  */
 export function FiltersSheet({
   filters,
   onChange,
   groups,
+  tables = [],
   partners,
   matchCount,
 }: {
   filters: GuestFilters;
   onChange: (filters: GuestFilters) => void;
   groups: readonly GroupView[];
+  /** LIVE tables: the table filter exists only when there is at least one (AC16). */
+  tables?: readonly TableView[];
   partners: PartnerNames;
   matchCount: number;
 }) {
   const [open, setOpen] = useState(false);
   const groupId = useId();
+  const tableId = useId();
   const active = activeFilterCount(filters);
   const sides: { value: SideKey; label: string }[] = [
     { value: "A", label: partners.a },
@@ -205,6 +222,31 @@ export function FiltersSheet({
               ))}
             </NativeSelect>
           </div>
+          {tables.length > 0 ? (
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor={tableId} className="text-base font-semibold">
+                Tavolo
+              </Label>
+              <NativeSelect
+                id={tableId}
+                value={filters.tableId ?? ALL}
+                onChange={(event) =>
+                  onChange({
+                    ...filters,
+                    tableId: event.target.value === ALL ? null : event.target.value,
+                  })
+                }
+              >
+                <option value={ALL}>Tutti</option>
+                <option value="none">Senza tavolo</option>
+                {tables.map((table) => (
+                  <option key={table.id} value={table.id}>
+                    {table.name}
+                  </option>
+                ))}
+              </NativeSelect>
+            </div>
+          ) : null}
         </div>
         <div className="mt-2 flex flex-col gap-2 sm:flex-row-reverse">
           <Button type="button" onClick={() => setOpen(false)} aria-live="polite">

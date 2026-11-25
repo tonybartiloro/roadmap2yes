@@ -18,6 +18,7 @@ export const GuestRow = memo(function GuestRow({
   selected,
   onSelect,
   onOpen,
+  tableLabel = null,
   extra,
 }: {
   guest: GuestView;
@@ -29,6 +30,8 @@ export const GuestRow = memo(function GuestRow({
   /** Stable callbacks (the row binds its own id) so a memoised row skips needless renders. */
   onSelect: (id: string, selected: boolean) => void;
   onOpen: (guest: GuestView) => void;
+  /** "Tavolo 3": only passed when tables exist (AC16). */
+  tableLabel?: string | null;
   extra?: React.ReactNode;
 }) {
   const name = fullName(guest);
@@ -42,6 +45,12 @@ export const GuestRow = memo(function GuestRow({
           {[type, groupLabel].filter(Boolean).join(" · ")}
         </span>{" "}
         <span>{sideText(guest.side, partners)}</span>
+        {tableLabel ? (
+          <>
+            {" "}
+            <span>{tableLabel}</span>
+          </>
+        ) : null}
         {extra}
       </span>
     </>

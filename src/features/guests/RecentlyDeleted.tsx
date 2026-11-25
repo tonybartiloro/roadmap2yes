@@ -60,6 +60,8 @@ interface Item {
   version: number;
   name: string;
   note: string | null;
+  /** Live people pointing at it (a group or a table); 0 for a person. */
+  members: number;
 }
 
 interface SectionDef {
@@ -67,6 +69,16 @@ interface SectionDef {
   title: string;
   items: Item[];
   after: string;
+}
+
+/** What happens to the members of ONE group or table that is deleted for good (a number, not a vague line). */
+function purgeConsequence(section: SectionDef, item: Item): string {
+  // People and groups keep the S1 wording (the e2e of S1 asserts it); tables say how many.
+  if (item.kind !== "table") return section.after;
+  if (item.members === 0) return "Nessuna persona ne fa parte.";
+  return item.members === 1
+    ? "La persona che ne fa parte resta, senza tavolo."
+    : `Le ${item.members} persone che ne fanno parte restano, senza tavolo.`;
 }
 
 const NO_RETURN = "Non si può annullare.";
@@ -115,6 +127,7 @@ export function RecentlyDeleted({
           version: g.version,
           name: fullName(g),
           note: null,
+          members: 0,
         })),
     },
     {
@@ -130,6 +143,7 @@ export function RecentlyDeleted({
             id: g.id,
             version: g.version,
             name: g.name,
+            members: n,
             note:
               n > 0
                 ? `${plural(n, "persona", "persone")}, ${n === 1 ? "rientra" : "rientrano"} se lo ripristini`
@@ -150,6 +164,7 @@ export function RecentlyDeleted({
             id: t.id,
             version: t.version,
             name: t.name,
+            members: n,
             note:
               n > 0
                 ? `${plural(n, "persona", "persone")}, ${n === 1 ? "rientra" : "rientrano"} se lo ripristini`
@@ -172,7 +187,7 @@ export function RecentlyDeleted({
   function askPurge(section: SectionDef, item: Item) {
     setConfirm({
       title: `Elimini definitivamente «${item.name}»?`,
-      description: `${NO_RETURN} ${section.after}`,
+      description: `${NO_RETURN} ${purgeConsequence(section, item)}`,
       confirmLabel: "Elimina definitivamente",
       onConfirm: () => onPurge({ kind: item.kind, id: item.id }),
     });

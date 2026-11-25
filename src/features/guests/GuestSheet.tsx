@@ -16,17 +16,19 @@ import {
   CATEGORY_LABELS,
   findDuplicates,
   GUEST_CATEGORIES,
+  liveTableOf,
   LIMITS,
   validateGuest,
   type GuestCategory,
   type GuestErrors,
   type GuestSide,
+  type GuestTable,
 } from "@/domain/guests";
 import { Field, NativeSelect, Textarea } from "@/features/decisions/form-bits";
 import { useConflict } from "@/features/budget/use-conflict";
 import { PanelContent } from "@/features/timeline/PanelContent";
 import { addGuestAction, updateGuestAction } from "./actions";
-import type { GroupView, GuestValues, GuestView } from "./data";
+import type { GroupView, GuestValues, GuestView, TableView } from "./data";
 import { formatConflictValue, GUEST_FIELD_LABELS } from "./field-labels";
 import {
   groupChoiceError,
@@ -46,6 +48,8 @@ interface Form {
   email: string;
   notes: string;
   group: GroupChoice;
+  /** Id of the chosen live table, "" = Senza tavolo. */
+  tableId: string;
 }
 
 const orNull = (text: string): string | null => (text.trim() === "" ? null : text.trim());
@@ -66,6 +70,7 @@ function initialForm(
   guest: GuestView | null,
   groups: readonly GroupView[],
   groupId: string | null,
+  tables: readonly GuestTable[],
 ): Form {
   const group = guest ? liveGroupId(guest, groups) : groupId;
   return {
@@ -77,6 +82,7 @@ function initialForm(
     email: guest?.email ?? "",
     notes: guest?.notes ?? "",
     group: group ? { kind: "existing", id: group } : NO_GROUP,
+    tableId: guest ? (liveTableOf(guest, tables)?.id ?? "") : "",
   };
 }
 
@@ -91,6 +97,7 @@ export function GuestSheet({
   guest,
   groupId = null,
   groups,
+  tables = [],
   guests,
   partners,
   onDelete,
@@ -103,13 +110,15 @@ export function GuestSheet({
   /** Pre-selected group when adding ("Aggiungi persona" from a group). */
   groupId?: string | null;
   groups: readonly GroupView[];
+  /** LIVE tables: the table field exists only when there is at least one (AC16). */
+  tables?: readonly TableView[];
   /** All the guests, for the duplicate warning. */
   guests: readonly GuestView[];
   partners: PartnerNames;
   onDelete: (guest: GuestView) => void;
   onStale: () => void;
 }) {
-  const [form, setForm] = useState<Form>(() => initialForm(guest, groups, groupId));
+  const [form, setForm] = useState<Form>(() => initialForm(guest, groups, groupId, tables));
   const [errors, setErrors] = useState<GuestErrors & { group?: string }>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [announcement, setAnnouncement] = useState("");
@@ -118,6 +127,7 @@ export function GuestSheet({
     Boolean(guest && (guest.phone || guest.email || guest.notes)),
   );
   const groupTouched = useRef(false);
+  const tableTouched = useRef(false);
   const firstRef = useRef<HTMLInputElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -147,7 +157,7 @@ export function GuestSheet({
         partnerA: partners.a,
         partnerB: partners.b,
         groups: groupNames,
-        tables: new Map(),
+        tables: new Map(tables.map((t) => [t.id, t.name])),
       }),
     partnerName: "Il tuo partner",
     onResolved: finish,
@@ -188,7 +198,11 @@ export function GuestSheet({
       set("group", { kind: "existing", id: resolved.groupId });
 
     if (!guest) {
-      const added = await addGuestAction({ guest: values, groupId: resolved.groupId });
+      const added = await addGuestAction({
+        guest: values,
+        groupId: resolved.groupId,
+        ...(tables.length > 0 ? { tableId: form.tableId || null } : {}),
+      });
       setPending(false);
       if (!added.ok) return setFormError(added.message);
       if (!another) {
@@ -216,11 +230,12 @@ export function GuestSheet({
         version,
         guest: values,
         ...(groupTouched.current ? { groupId: resolved.groupId } : {}),
+        ...(tableTouched.current ? { tableId: form.tableId || null } : {}),
       });
     const mine = {
       ...values,
       groupId: groupTouched.current ? resolved.groupId : guest.groupId,
-      tableId: guest.tableId,
+      tableId: tableTouched.current ? form.tableId || null : guest.tableId,
     };
     const result = await send(guest.version);
     setPending(false);
@@ -329,6 +344,31 @@ export function GuestSheet({
                 set("group", group);
               }}
             />
+
+            {tables.length > 0 ? (
+              <Field
+                label="Tavolo"
+                hint={form.category === "infant" ? "I neonati non occupano posto." : undefined}
+              >
+                {(control) => (
+                  <NativeSelect
+                    {...control}
+                    value={form.tableId}
+                    onChange={(event) => {
+                      tableTouched.current = true;
+                      set("tableId", event.target.value);
+                    }}
+                  >
+                    <option value="">Senza tavolo</option>
+                    {tables.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                      </option>
+                    ))}
+                  </NativeSelect>
+                )}
+              </Field>
+            ) : null}
 
             <div>
               <Button

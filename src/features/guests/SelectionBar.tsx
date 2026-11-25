@@ -11,7 +11,8 @@ import {
 } from "@/components/ui/sheet";
 import { plural } from "@/components/format";
 import { PanelContent } from "@/features/timeline/PanelContent";
-import type { GroupView } from "./data";
+import { Field, NativeSelect } from "@/features/decisions/form-bits";
+import type { GroupView, TableView } from "./data";
 import { MAX_SELECTION, SELECTION_TOO_LARGE } from "./schemas";
 import {
   groupChoiceError,
@@ -24,7 +25,7 @@ import {
 /**
  * Multiple selection (AC7): "{n} selezionati", "Seleziona tutti i {m} filtrati", then Assegna a
  * gruppo, Elimina and Fine. Both actions end in a toast with "Annulla" (done by the screen).
- * `extraActions` is where T9 adds "Assegna a tavolo" (only when tables exist).
+ * "Assegna a tavolo" appears only when a live table exists; `extraActions` is a further slot.
  */
 export function SelectionBar({
   selectedCount,
@@ -35,7 +36,9 @@ export function SelectionBar({
   onSelectAll,
   onClear,
   onDone,
+  tables = [],
   onAssignGroup,
+  onAssignTable,
   onDelete,
   extraActions,
 }: {
@@ -50,10 +53,16 @@ export function SelectionBar({
   onDone: () => void;
   /** Resolves true when the assignment worked (the sheet closes). */
   onAssignGroup: (groupId: string) => Promise<boolean>;
+  /** LIVE tables: "Assegna a tavolo" exists only with at least one (AC16). */
+  tables?: readonly TableView[];
+  onAssignTable?: (tableId: string) => Promise<boolean>;
   onDelete: () => void;
   extraActions?: React.ReactNode;
 }) {
   const [assigning, setAssigning] = useState(false);
+  const [seating, setSeating] = useState(false);
+  const [tableId, setTableId] = useState("");
+  const [tableError, setTableError] = useState<string | undefined>();
   const [choice, setChoice] = useState<GroupChoice>(NO_GROUP);
   const [error, setError] = useState<string | undefined>();
   const [failure, setFailure] = useState<string | null>(null);
@@ -112,6 +121,16 @@ export function SelectionBar({
         >
           Assegna a gruppo
         </Button>
+        {tables.length > 0 && onAssignTable ? (
+          <Button
+            type="button"
+            variant="outline"
+            disabled={none || busy}
+            onClick={() => setSeating(true)}
+          >
+            Assegna a tavolo
+          </Button>
+        ) : null}
         {extraActions}
         <Button
           type="button"
@@ -152,6 +171,57 @@ export function SelectionBar({
               {busy ? "Un attimo…" : "Assegna"}
             </Button>
             <Button type="button" variant="outline" onClick={() => setAssigning(false)}>
+              Annulla
+            </Button>
+          </SheetFooter>
+        </PanelContent>
+      </Sheet>
+
+      <Sheet open={seating} onOpenChange={setSeating}>
+        <PanelContent aria-describedby="seat-bar-hint">
+          <SheetHeader>
+            <SheetTitle>Assegna a tavolo</SheetTitle>
+            <SheetDescription id="seat-bar-hint">
+              {plural(selectedCount, "persona", "persone")} andranno al tavolo scelto. Se è pieno
+              puoi andare oltre la capienza: lo vedrai scritto.
+            </SheetDescription>
+          </SheetHeader>
+          <Field label="Tavolo" error={tableError}>
+            {(control) => (
+              <NativeSelect
+                {...control}
+                value={tableId}
+                onChange={(event) => setTableId(event.target.value)}
+              >
+                <option value="" disabled>
+                  Scegli un tavolo
+                </option>
+                {tables.map((table) => (
+                  <option key={table.id} value={table.id}>
+                    {table.name}
+                  </option>
+                ))}
+              </NativeSelect>
+            )}
+          </Field>
+          <SheetFooter>
+            <Button
+              type="button"
+              disabled={busy}
+              onClick={() => {
+                if (tableId === "") return setTableError("Scegli un tavolo.");
+                setTableError(undefined);
+                void onAssignTable?.(tableId).then((ok) => {
+                  if (ok) {
+                    setSeating(false);
+                    setTableId("");
+                  }
+                });
+              }}
+            >
+              {busy ? "Un attimo…" : "Assegna"}
+            </Button>
+            <Button type="button" variant="outline" onClick={() => setSeating(false)}>
               Annulla
             </Button>
           </SheetFooter>

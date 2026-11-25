@@ -30,6 +30,8 @@ const actions = vi.hoisted(() => ({
   undoBulkAction: vi.fn(),
 }));
 vi.mock("./actions", () => actions);
+const tableActions = vi.hoisted(() => ({ addTableAction: vi.fn(), updateTableAction: vi.fn() }));
+vi.mock("./tables-actions", () => tableActions);
 
 vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
 vi.stubGlobal(
@@ -585,5 +587,226 @@ describe("load error", () => {
     expect(screen.getByText(/non sono ancora pronti/)).toBeTruthy();
     await userEvent.click(screen.getByRole("button", { name: "Riprova" }));
     expect(nav.refresh).toHaveBeenCalled();
+  });
+});
+
+const tbl = (
+  id: string,
+  name: string,
+  capacity: number | null,
+  deletedAt: string | null = null,
+): TableView => ({
+  id,
+  name,
+  capacity,
+  deletedAt,
+  version: 1,
+});
+
+describe("tables (AC14-AC16)", () => {
+  it("shows the Tavoli tab with 'Crea tavolo' and no trace of tables elsewhere when there are none", async () => {
+    renderScreen({ guests: [guest(), guest()] });
+    expect(screen.getByRole("tab", { name: "Tavoli" })).toBeTruthy();
+    // no table filter, no table field, no 'Assegna a tavolo', no summary line
+    await userEvent.click(screen.getByRole("button", { name: /Filtri/ }));
+    expect(screen.queryByLabelText("Tavolo")).toBeNull();
+    await userEvent.keyboard("{Escape}");
+    await userEvent.click(screen.getByRole("button", { name: "Aggiungi" }));
+    await userEvent.click(screen.getByRole("button", { name: "Una persona" }));
+    expect(screen.queryByLabelText("Tavolo")).toBeNull();
+    await userEvent.keyboard("{Escape}");
+    await userEvent.click(screen.getByRole("tab", { name: "Tavoli" }));
+    expect(screen.getByText("Ti servono i tavoli? Creali quando vuoi.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Crea tavolo" })).toBeTruthy();
+  });
+
+  it("creates a table; a capacity outside 1-50 is refused in Italian", async () => {
+    tableActions.addTableAction.mockResolvedValue(ok({ tableId: "t" }));
+    renderScreen();
+    await userEvent.click(screen.getByRole("tab", { name: "Tavoli" }));
+    await userEvent.click(screen.getByRole("button", { name: "Crea tavolo" }));
+    await userEvent.type(screen.getByRole("textbox", { name: "Nome del tavolo" }), "Rossi");
+    await userEvent.type(screen.getByRole("textbox", { name: "Capienza" }), "51");
+    await userEvent.click(screen.getByRole("button", { name: "Crea tavolo" }));
+    expect(screen.getByText(/numero intero da 1 a 50/)).toBeTruthy();
+    expect(tableActions.addTableAction).not.toHaveBeenCalled();
+    await userEvent.clear(screen.getByRole("textbox", { name: "Capienza" }));
+    await userEvent.type(screen.getByRole("textbox", { name: "Capienza" }), "8");
+    await userEvent.click(screen.getByRole("button", { name: "Crea tavolo" }));
+    await waitFor(() =>
+      expect(tableActions.addTableAction).toHaveBeenCalledWith({ name: "Rossi", capacity: 8 }),
+    );
+  });
+
+  it("shows seats in text, 'Oltre la capienza' without colour alone, infants apart, and the summary line", async () => {
+    const t = tbl("t1", "Rossi", 2);
+    const seated = [
+      guest({ tableId: "t1" }),
+      guest({ tableId: "t1" }),
+      guest({ tableId: "t1", category: "child" }),
+      guest({ tableId: "t1", category: "infant" }),
+    ];
+    renderScreen({ guests: seated, tables: [t] });
+    expect(screen.getByText("1 tavolo oltre la capienza")).toBeTruthy();
+    await userEvent.click(screen.getByRole("tab", { name: "Tavoli" }));
+    const card = screen.getByTestId("table-card");
+    expect(card.textContent).toContain("3 / 2 posti");
+    expect(card.textContent).toContain("Oltre la capienza di 2");
+    expect(card.textContent).toContain("Neonati: 1 (non occupano posto)");
+  });
+
+  it("with a table: the person sheet has the table field, the filter works, the row shows it", async () => {
+    const t = tbl("t1", "Rossi", 8);
+    renderScreen({
+      guests: [guest({ firstName: "Mario", tableId: "t1" }), guest({ firstName: "Luca" })],
+      tables: [t],
+    });
+    expect(screen.getByText("Tavolo Rossi")).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: /Filtri/ }));
+    await userEvent.selectOptions(screen.getByLabelText("Tavolo"), "none");
+    expect(screen.getByTestId("guests-count").textContent).toBe("1 di 2 persone");
+    await userEvent.keyboard("{Escape}");
+    await userEvent.click(
+      screen.getByRole("button", { name: "Rimuovi filtro Tavolo: Senza tavolo" }),
+    );
+    await userEvent.click(screen.getByRole("button", { name: /^Mario Rossi/ }));
+    expect((screen.getByLabelText("Tavolo") as HTMLSelectElement).value).toBe("t1");
+  });
+
+  it("assigns the selected people to a table from the bar", async () => {
+    actions.bulkGuestsAction.mockResolvedValue(ok({ previous: [], changed: 2 }));
+    const guests = [guest(), guest()];
+    renderScreen({ guests, tables: [tbl("t1", "Rossi", 8)] });
+    await userEvent.click(screen.getByRole("button", { name: "Altro" }));
+    await userEvent.click(screen.getByRole("button", { name: "Seleziona" }));
+    await userEvent.click(screen.getByRole("button", { name: "Seleziona tutti i 2" }));
+    await userEvent.click(screen.getByRole("button", { name: "Assegna a tavolo" }));
+    await userEvent.selectOptions(screen.getByLabelText("Tavolo"), "t1");
+    await userEvent.click(screen.getByRole("button", { name: "Assegna" }));
+    await waitFor(() =>
+      expect(actions.bulkGuestsAction).toHaveBeenCalledWith({
+        ids: guests.map((g) => g.id),
+        op: "assign_table",
+        target: "t1",
+      }),
+    );
+  });
+
+  describe("a whole group (AC15)", () => {
+    const setup = async () => {
+      actions.bulkGuestsAction.mockResolvedValue(ok({ previous: [], changed: 1 }));
+      const free = guest({ groupId: "g1" });
+      const elsewhere = guest({ groupId: "g1", tableId: "t2" });
+      renderScreen({
+        guests: [free, elsewhere],
+        groups: [group("g1", "Famiglia Rossi")],
+        tables: [tbl("t1", "Uno", 8), tbl("t2", "Due", 8)],
+      });
+      await userEvent.click(screen.getByRole("tab", { name: "Tavoli" }));
+      await userEvent.click(screen.getByRole("button", { name: /^Uno/ }));
+      await userEvent.click(screen.getByRole("button", { name: "Aggiungi un gruppo intero" }));
+      await userEvent.selectOptions(screen.getByLabelText("Gruppo"), "g1");
+      await userEvent.click(screen.getByRole("button", { name: "Aggiungi il gruppo" }));
+      return { free, elsewhere };
+    };
+
+    it("asks first when someone sits elsewhere, and 'Sposta' moves everybody", async () => {
+      const { free, elsewhere } = await setup();
+      expect(screen.getByText("1 di loro sono già al tavolo Due: li sposto qui?")).toBeTruthy();
+      expect(actions.bulkGuestsAction).not.toHaveBeenCalled();
+      await userEvent.click(screen.getByRole("button", { name: "Sposta" }));
+      await waitFor(() =>
+        expect(actions.bulkGuestsAction).toHaveBeenCalledWith({
+          ids: [free.id, elsewhere.id],
+          op: "assign_table",
+          target: "t1",
+        }),
+      );
+    });
+
+    it("'Lascia dove sono' seats only the people without a table", async () => {
+      const { free } = await setup();
+      await userEvent.click(screen.getByRole("button", { name: "Lascia dove sono" }));
+      await waitFor(() =>
+        expect(actions.bulkGuestsAction).toHaveBeenCalledWith({
+          ids: [free.id],
+          op: "assign_table",
+          target: "t1",
+        }),
+      );
+    });
+  });
+
+  it("shows a stale edit of a table as the conflict dialog", async () => {
+    tableActions.updateTableAction.mockResolvedValue({
+      ok: false,
+      code: "conflict",
+      message: "x",
+      conflict: {
+        current: { name: "Altro", capacity: 4, version: 3 },
+        changedByName: "Jessica",
+        changedAt: new Date().toISOString(),
+      },
+    });
+    renderScreen({ tables: [tbl("t1", "Rossi", 8)] });
+    await userEvent.click(screen.getByRole("tab", { name: "Tavoli" }));
+    await userEvent.click(screen.getByRole("button", { name: /^Rossi/ }));
+    await userEvent.type(screen.getByRole("textbox", { name: "Nome del tavolo" }), "x");
+    await userEvent.click(screen.getByRole("button", { name: "Salva" }));
+    expect(await screen.findByText(/Jessica ha modificato questo elemento/)).toBeTruthy();
+  });
+
+  it("removes a person from the table with a direct assignment", async () => {
+    actions.assignGuestAction.mockResolvedValue({ ok: true, data: undefined });
+    const mario = guest({ firstName: "Mario", tableId: "t1" });
+    renderScreen({ guests: [mario], tables: [tbl("t1", "Rossi", 8)] });
+    await userEvent.click(screen.getByRole("tab", { name: "Tavoli" }));
+    await userEvent.click(screen.getByRole("button", { name: /^Rossi/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Rimuovi dal tavolo Mario Rossi" }));
+    expect(actions.assignGuestAction).toHaveBeenCalledWith({ guestId: mario.id, tableId: null });
+  });
+
+  it("deleting a table asks first and says what happens to the people", async () => {
+    actions.removeEntityAction.mockResolvedValue(ok({ version: 2 }));
+    renderScreen({
+      guests: [guest({ tableId: "t1" }), guest({ tableId: "t1" })],
+      tables: [tbl("t1", "Rossi", 8)],
+    });
+    await userEvent.click(screen.getByRole("tab", { name: "Tavoli" }));
+    await userEvent.click(screen.getByRole("button", { name: /^Rossi/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Elimina il tavolo" }));
+    expect(screen.getByText(/Le 2 persone restano, senza tavolo/)).toBeTruthy();
+    await userEvent.click(
+      within(screen.getByRole("alertdialog")).getByRole("button", { name: "Elimina il tavolo" }),
+    );
+    await waitFor(() =>
+      expect(actions.removeEntityAction).toHaveBeenCalledWith({
+        kind: "table",
+        id: "t1",
+        version: 1,
+      }),
+    );
+  });
+
+  it("a deleted table sends its people to 'Senza tavolo', and permanent deletion names how many", async () => {
+    const deleted = "2026-11-01T10:00:00Z";
+    actions.purgeEntityAction.mockResolvedValue({ ok: true, data: undefined });
+    renderScreen({
+      guests: [guest({ tableId: "t1" }), guest({ tableId: "t1" })],
+      tables: [tbl("t1", "Rossi", 8, deleted)],
+    });
+    // no live table: no table text on the rows, no filter
+    expect(screen.queryByText("Tavolo Rossi")).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Altro" }));
+    await userEvent.click(screen.getByRole("button", { name: /Eliminati di recente/ }));
+    expect(screen.getByText("2 persone, rientrano se lo ripristini")).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: "Elimina definitivamente Rossi" }));
+    expect(screen.getByText(/Le 2 persone che ne fanno parte restano, senza tavolo/)).toBeTruthy();
+    await userEvent.click(
+      within(screen.getByRole("alertdialog")).getByRole("button", {
+        name: "Elimina definitivamente",
+      }),
+    );
+    expect(actions.purgeEntityAction).toHaveBeenCalledWith({ kind: "table", id: "t1" });
   });
 });

@@ -32,6 +32,10 @@ export function sideText(side: GuestSide | null, partners: PartnerNames): string
   return side === "both" ? "Entrambi" : "Non indicato";
 }
 
+/** "Tavolo 3" for a row; a name that already starts with "Tavolo" is not repeated. */
+export const tableLabel = (name: string): string =>
+  /^tavolo\b/i.test(name.trim()) ? name.trim() : `Tavolo ${name.trim()}`;
+
 /** Short type text for a row: nothing for an adult. */
 export const typeText = (category: GuestCategory): string =>
   category === "child" ? "Bambino" : category === "infant" ? "Neonato" : "";

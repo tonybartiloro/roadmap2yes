@@ -19,6 +19,8 @@ export interface ListState {
 export interface ListHandlers {
   selecting: boolean;
   selected: ReadonlySet<string>;
+  /** Live table id to its row label; `null` when there are no live tables (no table text at all). */
+  tableLabels: ReadonlyMap<string, string> | null;
   onSelect: (id: string, selected: boolean) => void;
   onOpen: (guest: GuestView) => void;
   onShowMore: (key: string) => void;
@@ -56,6 +58,7 @@ function Rows({
             guest={guest}
             partners={partners}
             groupLabel={groupNames?.get(guest.id) ?? null}
+            tableLabel={guest.tableId ? (handlers.tableLabels?.get(guest.tableId) ?? null) : null}
             selecting={handlers.selecting}
             selected={handlers.selected.has(guest.id)}
             onSelect={handlers.onSelect}

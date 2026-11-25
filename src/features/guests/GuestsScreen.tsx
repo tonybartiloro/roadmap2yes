@@ -2,7 +2,7 @@
 
 import { useCallback, useDeferredValue, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CheckSquare, History, Plus, UserPlus, UsersRound } from "lucide-react";
+import { CheckSquare, History, Plus, TriangleAlert, UserPlus, UsersRound } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import { plural } from "@/components/format";
 import { HelpLink } from "@/components/HelpLink";
@@ -10,16 +10,19 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Sheet, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   countBySide,
   countGuests,
   filterGuests,
   hasActiveFilters,
   NO_FILTERS,
+  occupancyByTable,
+  overSummary,
   type GuestFilters,
 } from "@/domain/guests";
 import { PanelContent } from "@/features/timeline/PanelContent";
-import type { GroupView, GuestView, GuestsSnapshot } from "./data";
+import type { GroupView, GuestView, GuestsSnapshot, TableView } from "./data";
 import { FamilySheet } from "./FamilySheet";
 import { FilterChips, FiltersSheet } from "./FiltersSheet";
 import { ActionMenu, type MenuAction } from "./GroupHeader";
@@ -29,8 +32,17 @@ import { RecentlyDeleted, ConfirmDialog, type ConfirmRequest } from "./RecentlyD
 import { RenameGroupSheet } from "./RenameGroupSheet";
 import { SelectionBar } from "./SelectionBar";
 import { Summary } from "./Summary";
+import { TablesTab } from "./TablesTab";
+import { TableSheet } from "./TableSheet";
 import { useGuestActions } from "./use-guest-actions";
-import { buildSections, COLLAPSE_ABOVE, fullName, PAGE_SIZE, type PartnerNames } from "./view";
+import {
+  buildSections,
+  COLLAPSE_ABOVE,
+  fullName,
+  PAGE_SIZE,
+  tableLabel,
+  type PartnerNames,
+} from "./view";
 
 const MENU_ID = "guests-menu";
 
@@ -40,6 +52,7 @@ type Sheet_ =
   | { kind: "rename"; group: GroupView }
   | { kind: "add" }
   | { kind: "deleted" }
+  | { kind: "table"; table: TableView | null }
   | null;
 
 /**
@@ -73,7 +86,21 @@ export function GuestsScreen({
   const live = useMemo(() => guests.filter((g) => !g.deletedAt), [guests]);
   // The box stays responsive while the (large) list catches up; the count is announced once.
   const deferredQuery = useDeferredValue(filters.query);
-  const effective = useMemo(() => ({ ...filters, query: deferredQuery }), [filters, deferredQuery]);
+  const liveTables = useMemo(() => tables.filter((t) => !t.deletedAt), [tables]);
+  const hasTables = liveTables.length > 0;
+  // Without a live table there is no table filter at all, even if one was set before (AC16).
+  const visible = useMemo(
+    () => (!hasTables && filters.tableId !== null ? { ...filters, tableId: null } : filters),
+    [filters, hasTables],
+  );
+  const effective = useMemo(() => ({ ...visible, query: deferredQuery }), [visible, deferredQuery]);
+  const occupancies = useMemo(() => occupancyByTable(tables, live), [tables, live]);
+  const overLine = overSummary(occupancies.values());
+  const tableLabels = useMemo(
+    () => (hasTables ? new Map(liveTables.map((t) => [t.id, tableLabel(t.name)])) : null),
+    [hasTables, liveTables],
+  );
+  const [tab, setTab] = useState<"people" | "tables">("people");
   const filtered = useMemo(
     () => filterGuests(live, effective, { groups, tables }),
     [live, effective, groups, tables],
@@ -134,6 +161,7 @@ export function GuestsScreen({
   const handlers: ListHandlers = {
     selecting,
     selected,
+    tableLabels,
     onSelect,
     onOpen,
     onShowMore: (key) =>
@@ -188,6 +216,32 @@ export function GuestsScreen({
   };
   const stale = () => router.refresh();
 
+  function changeTab(next: string) {
+    if (next === "people" || next === "tables") {
+      if (next === "tables" && selecting) stopSelecting();
+      setTab(next);
+    }
+  }
+
+  function askDeleteTable(table: TableView) {
+    const n = live.filter((g) => g.tableId === table.id).length;
+    setConfirm({
+      title: `Elimini il tavolo «${table.name}»?`,
+      description:
+        n === 0
+          ? "Il tavolo è vuoto. Lo ritrovi in Eliminati di recente."
+          : `${n === 1 ? "La persona resta" : `Le ${n} persone restano`}, senza tavolo. Se ripristini il tavolo, rientrano.`,
+      confirmLabel: "Elimina il tavolo",
+      onConfirm: () => {
+        setSheet(null);
+        void actions.remove(
+          { kind: "table", id: table.id, version: table.version },
+          `Tavolo «${table.name}»`,
+        );
+      },
+    });
+  }
+
   return (
     // Room under the list for the fixed FAB, or for the (up to three rows tall) selection bar.
     <div
@@ -199,84 +253,119 @@ export function GuestsScreen({
         <HelpLink route="/invitati" />
       </div>
 
-      {live.length === 0 ? (
-        <EmptyState
-          icon={<UsersRound className="size-8" />}
-          title="Ancora nessun invitato"
-          description="Aggiungili uno a uno o incolla la tua lista."
-          action={
-            <div className="flex flex-wrap justify-center gap-2">
-              <Button
-                type="button"
-                onClick={() => setSheet({ kind: "guest", guest: null, groupId: null })}
-              >
-                Aggiungi invitato
-              </Button>
-              {emptyExtra}
-            </div>
-          }
-        />
-      ) : (
-        <>
-          <Summary total={total} shown={shownCounts} bySide={bySide} partners={partners} />
-          <div className="flex items-center gap-2">
-            <div role="search" className="min-w-0 flex-1">
-              <Label htmlFor="guest-search" className="sr-only">
-                Cerca per nome
-              </Label>
-              <Input
-                id="guest-search"
-                type="search"
-                placeholder="Cerca per nome"
-                autoComplete="off"
-                value={filters.query}
-                onChange={(event) => setFilters({ ...filters, query: event.target.value })}
-              />
-            </div>
-            <FiltersSheet
-              filters={filters}
-              onChange={setFilters}
-              groups={groups}
-              partners={partners}
-              matchCount={filtered.length}
-            />
-            <ActionMenu id={MENU_ID} title="Altro" triggerLabel="Altro" actions={menu} />
-          </div>
-          <FilterChips
-            filters={filters}
-            groups={groups}
-            partners={partners}
-            onChange={setFilters}
-          />
-
-          {filtered.length === 0 ? (
+      <Tabs value={tab} onValueChange={changeTab}>
+        <TabsList aria-label="Sezioni" className="h-14 w-full md:w-fit">
+          <TabsTrigger value="people" className="h-11 flex-1 md:flex-none">
+            Persone
+          </TabsTrigger>
+          <TabsTrigger value="tables" className="h-11 flex-1 md:flex-none">
+            Tavoli
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent value="people" className="flex flex-col gap-4">
+          {live.length === 0 ? (
             <EmptyState
-              title="Nessun invitato con questi filtri"
+              icon={<UsersRound className="size-8" />}
+              title="Ancora nessun invitato"
+              description="Aggiungili uno a uno o incolla la tua lista."
               action={
-                <Button type="button" variant="outline" onClick={() => setFilters(NO_FILTERS)}>
-                  Azzera filtri
-                </Button>
+                <div className="flex flex-wrap justify-center gap-2">
+                  <Button
+                    type="button"
+                    onClick={() => setSheet({ kind: "guest", guest: null, groupId: null })}
+                  >
+                    Aggiungi invitato
+                  </Button>
+                  {emptyExtra}
+                </div>
               }
             />
-          ) : filtering ? (
-            <FlatList
-              guests={filtered}
-              groupNames={groupNames}
-              state={list}
-              partners={partners}
-              handlers={handlers}
-            />
           ) : (
-            <GroupedList
-              sections={sections}
-              collapsed={live.length > COLLAPSE_ABOVE}
-              state={list}
-              partners={partners}
-              handlers={handlers}
-            />
+            <>
+              <Summary
+                total={total}
+                shown={shownCounts}
+                bySide={bySide}
+                partners={partners}
+                extra={
+                  overLine ? (
+                    <p className="text-destructive flex items-center gap-1.5 text-base font-semibold">
+                      <TriangleAlert aria-hidden className="size-4 shrink-0" />
+                      {overLine}
+                    </p>
+                  ) : null
+                }
+              />
+              <div className="flex items-center gap-2">
+                <div role="search" className="min-w-0 flex-1">
+                  <Label htmlFor="guest-search" className="sr-only">
+                    Cerca per nome
+                  </Label>
+                  <Input
+                    id="guest-search"
+                    type="search"
+                    placeholder="Cerca per nome"
+                    autoComplete="off"
+                    value={filters.query}
+                    onChange={(event) => setFilters({ ...filters, query: event.target.value })}
+                  />
+                </div>
+                <FiltersSheet
+                  filters={visible}
+                  onChange={setFilters}
+                  groups={groups}
+                  tables={liveTables}
+                  partners={partners}
+                  matchCount={filtered.length}
+                />
+                <ActionMenu id={MENU_ID} title="Altro" triggerLabel="Altro" actions={menu} />
+              </div>
+              <FilterChips
+                filters={visible}
+                groups={groups}
+                tables={liveTables}
+                partners={partners}
+                onChange={setFilters}
+              />
+
+              {filtered.length === 0 ? (
+                <EmptyState
+                  title="Nessun invitato con questi filtri"
+                  action={
+                    <Button type="button" variant="outline" onClick={() => setFilters(NO_FILTERS)}>
+                      Azzera filtri
+                    </Button>
+                  }
+                />
+              ) : filtering ? (
+                <FlatList
+                  guests={filtered}
+                  groupNames={groupNames}
+                  state={list}
+                  partners={partners}
+                  handlers={handlers}
+                />
+              ) : (
+                <GroupedList
+                  sections={sections}
+                  collapsed={live.length > COLLAPSE_ABOVE}
+                  state={list}
+                  partners={partners}
+                  handlers={handlers}
+                />
+              )}
+            </>
           )}
-        </>
-      )}
+        </TabsContent>
+        <TabsContent value="tables">
+          <TablesTab
+            tables={tables}
+            occupancies={occupancies}
+            onCreate={() => setSheet({ kind: "table", table: null })}
+            onOpen={(table) => setSheet({ kind: "table", table })}
+          />
+        </TabsContent>
+      </Tabs>
 
       {live.length === 0 && deletedCount > 0 ? (
         <Button type="button" variant="outline" onClick={() => setSheet({ kind: "deleted" })}>
@@ -284,8 +373,22 @@ export function GuestsScreen({
         </Button>
       ) : null}
 
-      {selecting ? (
+      {tab === "tables" ? null : selecting ? (
         <SelectionBar
+          tables={liveTables}
+          onAssignTable={(tableId) =>
+            run(async () => {
+              const name = tables.find((t) => t.id === tableId)?.name ?? "il tavolo";
+              const ok = await actions.bulk(
+                "assign_table",
+                selectedIds,
+                (n) => `${plural(n, "persona", "persone")} al tavolo «${name}».`,
+                tableId,
+              );
+              if (ok) stopSelecting();
+              return ok;
+            })
+          }
           selectedCount={selectedIds.length}
           filteredCount={filtered.length}
           filtering={filtering}
@@ -368,6 +471,7 @@ export function GuestsScreen({
           guest={sheet.guest}
           groupId={sheet.groupId}
           groups={groups}
+          tables={liveTables}
           guests={live}
           partners={partners}
           onStale={stale}
@@ -388,6 +492,21 @@ export function GuestsScreen({
           key={sheet.group.id}
           group={sheet.group}
           onOpenChange={closeSheet}
+          onStale={stale}
+        />
+      ) : null}
+      {sheet?.kind === "table" ? (
+        <TableSheet
+          key={sheet.table?.id ?? "new-table"}
+          table={sheet.table}
+          occupancy={sheet.table ? (occupancies.get(sheet.table.id) ?? null) : null}
+          tables={tables}
+          members={sheet.table ? live.filter((g) => g.tableId === sheet.table?.id) : []}
+          guests={live}
+          groups={groups}
+          actions={actions}
+          onClose={() => setSheet(null)}
+          onDelete={askDeleteTable}
           onStale={stale}
         />
       ) : null}
