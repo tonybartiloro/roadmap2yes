@@ -390,7 +390,9 @@ test("delete a group: the members stay 'Senza gruppo', come back when it is rest
   await page.getByRole("alertdialog").getByRole("button", { name: "Elimina gruppo" }).click();
   await openMenu(page, /^Eliminati di recente \(1\)/);
   await sheet(page).getByRole("button", { name: "Elimina definitivamente Famiglia Rossi" }).click();
-  await expect(page.getByRole("alertdialog")).toContainText("Le persone del gruppo restano, senza gruppo.");
+  await expect(page.getByRole("alertdialog")).toContainText(
+    "Non si può annullare. Le 2 persone che ne fanno parte restano, senza gruppo.",
+  );
   await page.getByRole("alertdialog").getByRole("button", { name: "Elimina definitivamente" }).click();
   await expect(page.getByText("Eliminato per sempre.")).toBeVisible();
   await expect.poll(memberGroups).toEqual([null, null]);

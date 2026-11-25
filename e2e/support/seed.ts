@@ -200,6 +200,7 @@ export async function addGuest(
     category?: "adult" | "child" | "infant";
     side?: "A" | "B" | "both" | null;
     groupId?: string | null;
+    tableId?: string | null;
     deleted?: boolean;
   },
 ): Promise<string> {
@@ -212,6 +213,7 @@ export async function addGuest(
       category: guest.category ?? "adult",
       side: guest.side ?? null,
       group_id: guest.groupId ?? null,
+      table_id: guest.tableId ?? null,
     })
     .select("id")
     .single();
@@ -224,6 +226,41 @@ export async function addGuest(
     if (gone.error) throw new Error(`seed: guest deleted: ${gone.error.message}`);
   }
   return inserted.data.id;
+}
+
+/** A guest table (name, optional capacity 1-50, `deleted` = already in "Eliminati di recente"). */
+export async function addGuestTable(
+  w: SeededWedding,
+  name: string,
+  options: { capacity?: number | null; deleted?: boolean } = {},
+): Promise<string> {
+  const inserted = await w.wedding.founderClient
+    .from("guest_tables")
+    .insert({ wedding_id: w.weddingId, name, capacity: options.capacity ?? null })
+    .select("id")
+    .single();
+  if (inserted.error) throw new Error(`seed: guest table: ${inserted.error.message}`);
+  if (options.deleted) {
+    const gone = await w.wedding.founderClient
+      .from("guest_tables")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("id", inserted.data.id);
+    if (gone.error) throw new Error(`seed: guest table deleted: ${gone.error.message}`);
+  }
+  return inserted.data.id;
+}
+
+/** Seats guests at a table (or removes them with `null`), straight in the database. */
+export async function seatGuests(
+  w: SeededWedding,
+  guestIds: string[],
+  tableId: string | null,
+): Promise<void> {
+  const updated = await w.wedding.founderClient
+    .from("guests")
+    .update({ table_id: tableId })
+    .in("id", guestIds);
+  if (updated.error) throw new Error(`seed: seat guests: ${updated.error.message}`);
 }
 
 export type TestFamilyMember = { user: TestUser; client: TestClient };
