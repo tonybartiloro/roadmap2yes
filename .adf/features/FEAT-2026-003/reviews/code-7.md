@@ -31,3 +31,16 @@ Questions: none blocking.
 - **REV-34**: fatto. Nessuno da sedere ("Lascia dove sono" con tutti già seduti): toast "Nessuno da aggiungere: sono già tutti seduti." e lo sheet si chiude. Gruppo senza persone vive: nota "Questo gruppo non ha ancora persone: aggiungine prima dal gruppo." e nessuna scrittura; la nota sparisce cambiando gruppo.
 - **REV-35**: fatto, `localeCompare(..., "it")`.
 - **REV-36**: fatto, due test (nessuno libero; gruppo vuoto) più quello sul conteggio dei gruppi.
+
+## Closure (reviewer; b245703, a0d626d, 42adaff, 841a683)
+- REV-32 CLOSED: `tables-data.ts:75-87` calls the shared `versioned`; the duplicate is gone.
+- REV-33 CLOSED: `RecentlyDeleted.tsx:74-82` gives the count for groups and tables; test added.
+- REV-34 CLOSED: `TableAddPeople.tsx` toast and close when nothing to seat, note for an empty group, no write.
+- REV-35 CLOSED: `TablesTab.tsx:27` uses `localeCompare("it")`. REV-36 CLOSED: both no-op paths tested.
+- a0d626d (QA-3): no regression found. `onDone` is the table sheet's `onClose`, which sets the sheet to null, so both
+  sheets unmount together and no stale local state is left. Annulla undoes through `actions.bulk` previous values, so
+  moved people return to their old table. Focus: sheets are state-opened (no trigger); Radix returns focus to the
+  previously focused table card, which stays mounted. Not verified in a browser (no e2e run).
+- `components.test.tsx`: 42/42 pass. New findings: none.
+
+Verdict: **approved**.
