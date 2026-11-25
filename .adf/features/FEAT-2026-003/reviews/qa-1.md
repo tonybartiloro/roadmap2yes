@@ -57,6 +57,9 @@ NFR: axe on every guests screen (list, sheets, tables, import steps) and 12 them
 ## Flaky tests
 None seen in the new specs (each run at least twice). `percorso.spec.ts:334` passed in the full run (known flaky, not triggered).
 
+## Rerun after design-1 (a844366, 8f84e5a)
+Fresh build, `E2E_PORT=3300`, only the affected specs: all `invitati*.spec.ts` (mobile and desktop), `export.spec.ts`, `guida.nav.spec.ts` and `themes.spec.ts` (including the guests themes test) pass. One assertion was updated, same intent: the "group already at this table" case now says "Nessuno aggiunto: sono rimasti dove erano." (was "Nessuno da aggiungere: sono già tutti seduti."). No product failure. The new row text, the alphabetical flat list and the new table-sheet order needed no change in the tests. Scale numbers unchanged (500 guests: list ready about 240-280 ms; search over 1200: 34 ms).
+
 ## Questions for the developer
 1. WebKit smoke: run `npm run e2e:install` once, or leave it to CI?
 2. `partner.spec.ts:415`: is the local Supabase CLI expected to apply `[auth.email.template.recovery]`? If CI passes it, only this machine's stack differs.

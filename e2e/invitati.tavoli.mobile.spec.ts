@@ -347,7 +347,7 @@ test("whole group: everybody already at this table, and a group with no people, 
   ).toBeVisible();
   await sheet(page).last().getByLabel("Gruppo").selectOption({ label: "Famiglia Rossi" });
   await sheet(page).last().getByRole("button", { name: "Aggiungi il gruppo" }).click();
-  await expect(page.getByText("Nessuno da aggiungere: sono già tutti seduti.")).toBeVisible();
+  await expect(page.getByText("Nessuno aggiunto: sono rimasti dove erano.")).toBeVisible();
   await expect(sheet(page)).toHaveCount(0);
   expect(await tableOf(w, "Mario")).toBe(uno);
   await expect(card(page, "Uno")).toContainText("2 / 10 posti");
