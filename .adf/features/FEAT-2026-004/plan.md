@@ -305,5 +305,6 @@ Nessun'altra domanda per lo sviluppatore: QA-Q1, QA-Q2 sono le modifiche sopra; 
 | Date | Change | Why | Approved by |
 |---|---|---|---|
 | 2026-11-26 | Round 1 di F2: contratto di `rsvp_submit` (`seen_at`, `invalid_answers`), `undo_guest_import` più stretta, orologio, matrice, file aggiunti a T4/T6/T9/T10/T11 | Obiezioni QA, designer, PO | — (Gate B) |
+| 2026-11-26 | T1: `qa_cross_wedding.test.sql` e (se serve) `tests/acceptance/support/matrix.ts` aggiunti ai file di T1; `rsvp_lifecycle.test.sql` nuovo per la matrice; `rsvp_status` e RPC coppia DEFINER con controllo `guests/read`; `unique (id, wedding_id)` su `guests`; colonne `created_*/updated_*` sulle tabelle RSVP; `mark_shared` unisce la fotografia | Oracoli per-tabella esistenti; nessun USAGE su `private` per `authenticated`; FK composite; trigger di audit/versione | coordinatore (stesso perimetro del Gate B) |
 
 ## Outcome
