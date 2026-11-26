@@ -228,7 +228,10 @@ export function ImportSheet({
         else close();
       }}
     >
-      <PanelContent className="max-h-[92dvh] overflow-y-auto" aria-describedby="import-step">
+      <PanelContent
+        className="max-h-[92dvh] overflow-y-auto md:w-[44rem]"
+        aria-describedby="import-step"
+      >
         <SheetHeader>
           <SheetTitle ref={titleRef} tabIndex={-1}>
             {STEP_TITLES[step]}

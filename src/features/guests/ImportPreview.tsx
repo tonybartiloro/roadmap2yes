@@ -87,7 +87,7 @@ export function ImportPreview({ preview }: { preview: ParsedPreview }) {
           {preview.newGroups.join(", ")}.
         </p>
       ) : null}
-      <ul className="flex flex-col gap-2">
+      <ul className="flex flex-col gap-2 md:grid md:grid-cols-2">
         {rows.slice(0, shown).map((row) => (
           <Card key={row.line} row={row} />
         ))}

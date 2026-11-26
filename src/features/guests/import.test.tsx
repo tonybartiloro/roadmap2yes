@@ -131,6 +131,15 @@ describe("import (AC17-AC20)", () => {
     expect(screen.getByText(/1 riga da correggere viene saltata/)).toBeTruthy();
   });
 
+  it("lays the preview cards out in two columns from 768 px (design 7)", async () => {
+    renderScreen();
+    await openImport();
+    await paste("Mario Rossi\nLuca Rossi");
+    await preview();
+    const list = screen.getByTestId("import-preview").querySelector("ul");
+    expect(list?.className).toContain("md:grid-cols-2");
+  });
+
   it("'Torna indietro' keeps the text; closing the sheet saves nothing", async () => {
     renderScreen();
     await openImport();

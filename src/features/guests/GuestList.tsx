@@ -5,7 +5,7 @@ import { Pencil, Plus, Trash2 } from "lucide-react";
 import { countGuests } from "@/domain/guests";
 import type { GroupView, GuestView } from "./data";
 import { GroupHeader } from "./GroupHeader";
-import { GuestRow } from "./GuestRow";
+import { GuestRow, rowColumns } from "./GuestRow";
 import { ShowMore } from "./ShowMore";
 import { categorySummary, PAGE_SIZE, type PartnerNames, type Section } from "./view";
 
@@ -49,8 +49,20 @@ function Rows({
   handlers: ListHandlers;
 }) {
   const count = state.shown[id] ?? PAGE_SIZE;
+  const withGroup = groupNames !== null;
+  const withTable = handlers.tableLabels !== null;
   return (
     <>
+      <div
+        aria-hidden
+        className={`text-muted-foreground border-border hidden border-b py-1.5 pr-3 text-sm font-semibold md:grid md:gap-x-4 ${handlers.selecting ? "md:pl-12" : "md:pl-3"} ${rowColumns(withGroup, withTable)}`}
+      >
+        <span>Nome</span>
+        <span>Tipo</span>
+        <span>Lato</span>
+        {withGroup ? <span>Gruppo</span> : null}
+        {withTable ? <span>Tavolo</span> : null}
+      </div>
       <ul id={`list-${id}`} className="flex flex-col">
         {guests.slice(0, count).map((guest) => (
           <GuestRow
@@ -58,6 +70,8 @@ function Rows({
             guest={guest}
             partners={partners}
             groupLabel={groupNames?.get(guest.id) ?? null}
+            withGroup={withGroup}
+            withTable={withTable}
             tableLabel={guest.tableId ? (handlers.tableLabels?.get(guest.tableId) ?? null) : null}
             selecting={handlers.selecting}
             selected={handlers.selected.has(guest.id)}

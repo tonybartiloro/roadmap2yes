@@ -147,7 +147,56 @@ describe("row accessible name (WCAG 2.5.3)", () => {
     });
     const row = screen.getByRole("button", { name: /^Luca Rossi/ });
     expect(row.hasAttribute("aria-label")).toBe(false);
-    expect(row.textContent).toBe("Luca Rossi Bambino · Tony");
+    expect(row.textContent).toBe("Luca Rossi Bambino Tony");
+  });
+});
+
+describe("desktop columns (design 7, DES-03)", () => {
+  const headers = (container: HTMLElement) =>
+    [...container.querySelectorAll("[aria-hidden=true].md\\:grid > span")].map(
+      (s) => s.textContent,
+    );
+
+  it("grouped list: Nome, Tipo, Lato columns (no group column: the heading is the group)", () => {
+    const { container } = renderScreen({
+      guests: [guest({ firstName: "Luca", category: "child", side: "A", groupId: "g1" })],
+      groups: [group("g1", "Famiglia Rossi")],
+    });
+    expect(headers(container)).toEqual(["Nome", "Tipo", "Lato"]);
+    const row = screen.getByTestId("guest-row");
+    expect(row.innerHTML).toContain("md:grid-cols-[minmax(0,1fr)_7rem_8rem]");
+    // an adult reads "Adulto" (visible from 768 px, screen reader below)
+    expect(row.textContent).toContain("Bambino");
+  });
+
+  it("flat list adds the Gruppo column and shows the group in it", async () => {
+    const { container } = renderScreen({
+      guests: [guest({ firstName: "Luca", category: "child", side: "A", groupId: "g1" })],
+      groups: [group("g1", "Famiglia Rossi")],
+    });
+    await userEvent.type(screen.getByRole("searchbox"), "Luca");
+    expect(headers(container)).toEqual(["Nome", "Tipo", "Lato", "Gruppo"]);
+    expect(screen.getByTestId("guest-row").textContent).toBe(
+      "Luca Rossi Bambino Tony Famiglia Rossi",
+    );
+    expect(
+      screen.getByRole("button", { name: /^Luca Rossi Bambino Tony Famiglia Rossi$/ }),
+    ).toBeTruthy();
+  });
+
+  it("adds the Tavolo column only when a table exists, and keeps selection working", async () => {
+    const { container } = renderScreen({
+      guests: [guest({ firstName: "Luca", tableId: "t1" })],
+      tables: [{ id: "t1", name: "Rossi", capacity: 8, deletedAt: null, version: 1 }],
+    });
+    expect(headers(container)).toEqual(["Nome", "Tipo", "Lato", "Tavolo"]);
+    expect(screen.getByTestId("guest-row").textContent).toContain("Adulto");
+    await userEvent.click(screen.getByRole("button", { name: "Altro" }));
+    await userEvent.click(screen.getByRole("button", { name: "Seleziona" }));
+    await userEvent.click(screen.getByRole("checkbox", { name: "Seleziona Luca Rossi" }));
+    expect(screen.getByText("1 selezionato")).toBeTruthy();
+    const header = container.querySelector("[aria-hidden=true].md\\:grid");
+    expect(header?.className).toContain("md:pl-12");
   });
 });
 
