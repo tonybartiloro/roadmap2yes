@@ -31,7 +31,7 @@ function Sep({ visible }: { visible: boolean }) {
   return (
     <>
       {" "}
-      <span className={visible ? "md:sr-only" : "sr-only"}>·</span>{" "}
+      <span className={visible ? "mx-1.5 md:sr-only md:mx-0" : "sr-only"}>·</span>{" "}
     </>
   );
 }
