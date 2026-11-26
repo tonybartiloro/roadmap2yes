@@ -14,7 +14,7 @@ const BUTTONS: ReadonlyArray<{ which: Which; label: string; hint: string; mime: 
   {
     which: "json",
     label: "Tutto in un file (JSON)",
-    hint: "Impostazioni, scelte e storico, compiti, budget e pagamenti.",
+    hint: "Impostazioni, scelte e storico, compiti, budget e pagamenti, invitati, gruppi e tavoli.",
     mime: "application/json;charset=utf-8",
   },
   {
@@ -29,6 +29,12 @@ const BUTTONS: ReadonlyArray<{ which: Which; label: string; hint: string; mime: 
     hint: "Voci, importi concordati e pagato.",
     mime: "text/csv;charset=utf-8",
   },
+  {
+    which: "guestsCsv",
+    label: "Invitati (CSV)",
+    hint: "Esporta tutti gli invitati, anche se hai dei filtri attivi. Gli eliminati non sono inclusi.",
+    mime: "text/csv;charset=utf-8",
+  },
 ];
 
 type Phase =
@@ -38,7 +44,7 @@ type Phase =
   | { kind: "failed"; message: string };
 
 /**
- * The three downloads with a progress bar and its text equivalent. The files are made on the
+ * The four downloads with a progress bar and its text equivalent. The files are made on the
  * server with the person's own session and saved by the browser; the name carries the date.
  */
 export function ExportPanel({ fileNames }: { fileNames: ExportFileNames }) {

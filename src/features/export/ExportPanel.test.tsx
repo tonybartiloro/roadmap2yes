@@ -13,7 +13,7 @@ vi.mock("./download", () => ({ downloadText: mocks.downloadText }));
 import { ExportPanel } from "./ExportPanel";
 
 const fileNames = exportFileNames("2026-11-24");
-const bundle = { fileNames, json: "{}", tasksCsv: "t", budgetCsv: "b" };
+const bundle = { fileNames, json: "{}", tasksCsv: "t", budgetCsv: "b", guestsCsv: "g" };
 
 afterEach(() => {
   cleanup();
@@ -21,11 +21,26 @@ afterEach(() => {
 });
 
 describe("ExportPanel", () => {
-  it("lists the three files with the date in their names", () => {
+  it("lists the four files with the date in their names", () => {
     render(<ExportPanel fileNames={fileNames} />);
     expect(screen.getByText("roadmap2yes-2026-11-24.json")).toBeTruthy();
     expect(screen.getByText("roadmap2yes-compiti-2026-11-24.csv")).toBeTruthy();
     expect(screen.getByText("roadmap2yes-budget-2026-11-24.csv")).toBeTruthy();
+    expect(screen.getByText("roadmap2yes-invitati-2026-11-24.csv")).toBeTruthy();
+  });
+
+  it("the guests button says plainly that it exports everyone, filters or not (AC21)", async () => {
+    mocks.prepareExportAction.mockResolvedValue({ ok: true, bundle });
+    const user = userEvent.setup();
+    render(<ExportPanel fileNames={fileNames} />);
+    expect(screen.getByText(/tutti gli invitati, anche se hai dei filtri attivi/)).toBeTruthy();
+    await user.click(screen.getByTestId("export-guestsCsv"));
+    await waitFor(() => expect(mocks.downloadText).toHaveBeenCalledTimes(1));
+    expect(mocks.downloadText).toHaveBeenCalledWith(
+      "roadmap2yes-invitati-2026-11-24.csv",
+      "g",
+      expect.stringContaining("text/csv"),
+    );
   });
 
   it("downloads only the file asked for, then says it is ready", async () => {

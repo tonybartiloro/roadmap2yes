@@ -10,16 +10,18 @@
 -- To add a table: add a row to qa_tables (and to tests/acceptance/support/matrix.ts, which does the
 -- same for the PostgREST layer). Nobody gets to skip the matrix by forgetting it.
 begin;
-select plan(31);
+select plan(32);
 
 -- ---------------------------------------------------------------------------------------------
 -- Oracle: tables. tenancy: 'wedding' (policy via has_permission), 'own' (also user_id = auth.uid()),
 -- 'service' (RLS on, no policy, no grant to API roles). sel_hidden = columns authenticated cannot read.
--- ins/upd = the ONLY columns authenticated may INSERT/UPDATE. del = DELETE allowed (own rows only).
+-- ins/upd = the ONLY columns authenticated may INSERT/UPDATE. del = DELETE allowed (own rows only);
+-- del_soft = ... and the DELETE policy only lets SOFT-DELETED rows through (guests, ADR-0002).
 -- ---------------------------------------------------------------------------------------------
 create temp table qa_tables (
   name text primary key, tenancy text not null, sel_hidden text[] not null default '{}',
-  ins text[] not null default '{}', upd text[] not null default '{}', del boolean not null default false
+  ins text[] not null default '{}', upd text[] not null default '{}', del boolean not null default false,
+  del_soft boolean not null default false
 );
 insert into qa_tables (name, tenancy, sel_hidden, ins, upd, del) values
   ('weddings', 'wedding', '{}', '{}',
@@ -57,6 +59,13 @@ insert into qa_tables (name, tenancy, sel_hidden, ins, upd, del) values
     '{amount_cents,deleted_at,due_date,kind,paid,paid_on}', false),
   ('notification_preferences', 'own', '{}',
     '{digest_enabled,reminders_enabled,user_id,wedding_id}', '{digest_enabled,reminders_enabled}', false);
+-- FEAT-2026-003: the only tables with a hard DELETE on domain data, and only on soft-deleted rows.
+insert into qa_tables (name, tenancy, sel_hidden, ins, upd, del, del_soft) values
+  ('guest_groups', 'wedding', '{}', '{name,wedding_id}', '{deleted_at,name}', true, true),
+  ('guest_tables', 'wedding', '{}', '{capacity,name,pos_x,pos_y,shape,wedding_id}',
+    '{capacity,deleted_at,name,pos_x,pos_y,shape}', true, true),
+  ('guests', 'wedding', '{}', '{category,email,first_name,group_id,last_name,notes,phone,side,table_id,wedding_id}',
+    '{category,deleted_at,email,first_name,group_id,last_name,notes,phone,side,table_id}', true, true);
 
 -- Oracle: functions in `public`. 'user' = EXECUTE for authenticated (plan 3.1 allowlist; the two
 -- marked * are not in the plan text but were added and accepted in the T2/T9 reviews:
@@ -73,6 +82,8 @@ insert into qa_functions (name, klass) values
   ('dismiss_welcome', 'user'), ('last_heartbeat', 'user'),
   ('has_permission', 'user'),        -- *
   ('move_budget_items', 'user'),     -- *
+  ('create_guest_family', 'user'), ('guests_bulk', 'user'), ('guests_bulk_undo', 'user'),  -- FEAT-2026-003
+  ('import_guests', 'user'), ('undo_guest_import', 'user'),
   ('record_heartbeat', 'service'), ('login_gate', 'service'), ('login_record', 'service'),
   ('auth_user_id_by_email', 'service'), ('invitation_by_token', 'service'), ('sync_timeline', 'service'),
   ('job_claim_notification', 'service'), ('job_fail_notification', 'service'),
@@ -146,7 +157,7 @@ select is(
       or has_table_privilege('authenticated', ('public.' || quote_ident(t.name))::regclass, 'truncate')
       or has_table_privilege('authenticated', ('public.' || quote_ident(t.name))::regclass, 'trigger')
       or has_table_privilege('authenticated', ('public.' || quote_ident(t.name))::regclass, 'references')),
-  '{}'::text[], 'authenticated DELETE only on option_reactions; never TRUNCATE/TRIGGER/REFERENCES');
+  '{}'::text[], 'authenticated DELETE only where the oracle says (option_reactions, guests tables); never TRUNCATE/TRIGGER/REFERENCES');
 select is(
   (select coalesce(array_agg(t.name || ':' || p order by t.name collate "C", p), '{}')
    from qa_tables t cross join unnest(array['select', 'insert', 'update', 'references']) p
@@ -299,6 +310,16 @@ select is(
   (select count(*)::int from pg_attribute a where a.attrelid = 'public.invitations'::regclass and a.attname = 'token_hash'
      and has_column_privilege('authenticated', a.attrelid, a.attnum, 'select')),
   0, 'authenticated cannot SELECT invitations.token_hash');
+
+-- 32. A hard DELETE is only ever allowed on soft-deleted rows, with its own permission (ADR-0002).
+select is(
+  (select coalesce(array_agg(t.name order by t.name collate "C"), '{}') from qa_tables t
+   where t.del_soft is distinct from exists (
+       select 1 from pg_policy p where p.polrelid = ('public.' || quote_ident(t.name))::regclass and p.polcmd = 'd'
+         and pg_get_expr(p.polqual, p.polrelid) like '%deleted_at IS NOT NULL%'
+         and pg_get_expr(p.polqual, p.polrelid) like '%has_permission(%''delete''%')
+     and t.del),
+  '{}'::text[], 'DELETE policy of the soft-delete tables requires deleted_at is not null AND the guests/delete permission');
 
 select * from finish();
 rollback;

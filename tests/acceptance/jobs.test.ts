@@ -220,12 +220,37 @@ describe("reminders reach the mailbox once (AC50, AC52, AC53, AC61)", () => {
   });
 
   it("over the daily cap a mail is skipped, recorded and flagged, never silently dropped (AC53)", async () => {
-    vi.stubEnv("EMAIL_DAILY_CAP", "0");
     const w = await createWedding();
+    // The cap must be REACHED, whatever earlier tests sent today (the quota is global). "0" is not
+    // a valid cap (the config falls back to 50), so: put one `sent` row for today in the log, read
+    // today's count through the quota RPC and make that number the cap. The founder's own claim
+    // then finds the day full.
+    const admin = serviceClient();
+    const filler = await admin.from("notification_log").insert({
+      wedding_id: w.weddingId,
+      user_id: w.founder.id,
+      kind: "digest",
+      batch_key: `qa-cap-filler-${w.weddingId}`,
+      status: "sent",
+      attempts: 1,
+      claimed_at: new Date().toISOString(),
+      sent_at: new Date().toISOString(),
+    });
+    expect(filler.error).toBeNull();
+    const quota = await admin.rpc("job_quota_status", { p_now: new Date().toISOString() });
+    expect(quota.error).toBeNull();
+    const sentToday = (quota.data as { sent_today: number }).sent_today;
+    expect(sentToday).toBeGreaterThanOrEqual(1);
+    vi.stubEnv("EMAIL_DAILY_CAP", String(sentToday));
+
     await task(w, "Oltre il limite", plus(0));
     const response = await run();
-    const body = (await response.json()) as Record<string, unknown>;
-    expect(JSON.stringify(body)).toMatch(/quota/i);
+    const body = (await response.json()) as {
+      overQuota?: boolean;
+      quota?: { skippedToday?: number } | null;
+    };
+    expect(body.overQuota).toBe(true);
+    expect(body.quota?.skippedToday).toBeGreaterThanOrEqual(1);
     expect(await listMessagesTo(w.founder.email)).toHaveLength(0);
     const log = await serviceClient()
       .from("notification_log")

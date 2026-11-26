@@ -54,6 +54,12 @@ Potete filtrare per "Miei", "Di {partner}" o "Tutti". Il filtro "Filtri" mostra 
 
 Il badge **Da rivedere** compare sui compiti collegati a una data che è stata riaperta. "Va bene così" lo toglie.
 
+## Invitati
+
+Due tappe riguardano gli invitati: **Fare la lista preliminare degli invitati** e **Raccogliere le conferme degli invitati**. Nel dettaglio di ciascuna trovi il link **Vai a Invitati**, che apre la pagina [Invitati](invitati.md).
+
+Il link non completa nulla: la tappa si segna fatta solo da te, anche se avete già aggiunto tutti gli invitati.
+
 ## Suggerimenti da rivedere
 
 Quando cambiate data o rito, l'app può proporre tappe nuove o togliere quelle che non servono più. Compaiono in "Suggerimenti da rivedere": potete accettare, scartare o ignorare. Non cancella mai nulla da sola.
@@ -63,3 +69,4 @@ Quando cambiate data o rito, l'app può proporre tappe nuove o togliere quelle c
 | Data | Feature | Modifica |
 |---|---|---|
 | 2026-11-24 | FEAT-2026-001 | Prima stesura (F4, T18) |
+| 2026-11-25 | FEAT-2026-003 | Link "Vai a Invitati" nelle tappe sugli invitati; nessun completamento automatico |

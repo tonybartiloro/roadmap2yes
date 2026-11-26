@@ -11,7 +11,7 @@ import { BUREAUCRATIC_DISCLAIMER, getMilestone } from "@/content/milestones";
 import type { MilestoneCategory } from "@/content/milestones/types";
 import type { PlainDate } from "@/lib/dates/plain-date";
 import { COPY, dueExactText } from "./copy";
-import { DATE_DECISION_HREF } from "./links";
+import { DATE_DECISION_HREF, GUESTS_HREF, GUESTS_TASK_KEYS } from "./links";
 import type { TaskFields } from "./field-labels";
 import { taskToFields } from "./field-labels";
 import { assigneeName, type PartnerView, type TaskView } from "./model";
@@ -153,6 +153,11 @@ export function TaskSheet({
                     <Info aria-hidden className="mt-0.5 size-4 shrink-0" />
                     <span>{BUREAUCRATIC_DISCLAIMER}</span>
                   </p>
+                ) : null}
+                {task.templateKey && GUESTS_TASK_KEYS.has(task.templateKey) ? (
+                  <Button asChild variant="outline" className="self-start">
+                    <Link href={GUESTS_HREF}>Vai a Invitati</Link>
+                  </Button>
                 ) : null}
                 {task.notes ? (
                   <div>

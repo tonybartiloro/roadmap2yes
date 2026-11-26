@@ -28,6 +28,8 @@ Lo stile scelto al passo 7 non cambia le tappe: mostra solo una frase di consigl
 
 ## Cosa succede dopo
 
+La fascia di invitati scelta al passo 5 è una stima. Quando aggiungete invitati in [Invitati](invitati.md), l'app la calcola dal numero reale e non la chiede più: la trovate in [Opzioni](opzioni.md), in sola lettura, con il link alla lista.
+
 Appena completate il rito e la data, l'app prepara il Percorso con le tappe della vostra cerimonia. Le tappe di solito si fanno con qualche mese di anticipo: se la data è vicina, alcune risultano già "da recuperare". È previsto, non è un errore.
 
 Quando cambiate la data o il rito più avanti, l'app non cancella nulla: propone i cambiamenti in "Suggerimenti da rivedere" nel Percorso.
@@ -38,3 +40,4 @@ Quando cambiate la data o il rito più avanti, l'app non cancella nulla: propone
 |---|---|---|
 | 2026-11-24 | FEAT-2026-001 | Prima stesura (F4, T18) |
 | 2026-11-25 | FEAT-2026-002 | "Altro" diventa "Opzioni" |
+| 2026-11-25 | FEAT-2026-003 | La fascia di invitati è calcolata dalla lista, quando esistono invitati |

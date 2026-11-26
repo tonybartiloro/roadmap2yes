@@ -125,6 +125,17 @@ In CI ogni test ha un tentativo in più (`retries: 1`). Un test che passa solo a
 - **Orologio.** `E2E_CLOCK=1` abilita il cookie `r2y-test-now`. Con `VERCEL` definita il cookie è ignorato. Il flag non deve mai essere impostato su Vercel.
 - **Email reali.** Nessun test invia email vere: l'unico trasporto usato è Mailpit (o nessun trasporto).
 
+## Invitati (FEAT-2026-003)
+
+Dove stanno i test del modulo, per livello:
+
+- **Seed**: `supabase/seeds/04_guests.sql` (applicato da `npm run db:reset`) con nomi inventati, telefoni finti ed email `@example.test`. Una guardia Vitest (`tests/unit/guests-seed.test.ts`) controlla che resti così.
+- **pgTAP**: `guests_rls.test.sql` (dinieghi, `DELETE` solo su righe eliminate), `guests_model.test.sql` (vincoli, audit senza dati personali, trigger, operazioni di massa e relativo undo) e `guests_import.test.sql` (500 sì, 501 no, lotti, undo di un altro matrimonio). Richiedono `npm run db:reset`.
+- **Unit** (`npm test`): `src/domain/guests/*.test.ts` per parser CSV, export, occupazione dei tavoli, conteggi e filtri; `src/features/guests/*.test.tsx` per i componenti, incluso Annulla visibile a 7,9 secondi con timer finti. `src/components/HelpLink.test.tsx` controlla la mappa del pulsante Aiuto.
+- **Integration** (`npm run test:integration`): `tests/integration/guests.data.test.ts`, `guests.actions.test.ts`, `guests.tables.test.ts`, e `export.data.test.ts` per l'export completo. Richiedono lo stack locale e girano uno alla volta.
+- **E2E**: `e2e/invitati.mobile.spec.ts` (persone e azioni di massa), `invitati.desktop.spec.ts` (conflitto e scala), `invitati.tavoli.mobile.spec.ts` (tavoli) e `invitati.nav.spec.ts` (barra e Aiuto). I dati si preparano con gli helper `seedGuests`, `addFamilyMember` e quelli dei tavoli in `e2e/support/seed.ts`, mai dalla UI.
+- Gli e2e girano sulla build: dopo ogni modifica lanciate `npm run build`, poi `E2E_PORT=3300 npm run e2e` come nel resto del documento.
+
 ## Stato al termine di F3
 
 Riferimento dal log della feature, non un contratto: unit circa 850, integration circa 740, pgTAP circa 950, e2e 209 su 210 con un test di avvio a freddo poi reso deterministico. I numeri cambiano con il codice.
@@ -141,3 +152,4 @@ Riferimento dal log della feature, non un contratto: unit circa 850, integration
 |---|---|---|
 | 2026-11-24 | FEAT-2026-001 | Prima stesura: suite, progetti e2e, matrice dei temi, limiti noti (F4, T18) |
 | 2026-11-25 | FEAT-2026-002 | Test dei documenti della Guida; porta e2e locale (`E2E_PORT=3300`) |
+| 2026-11-25 | FEAT-2026-003 | Test del modulo invitati per livello, seed finto e helper e2e |

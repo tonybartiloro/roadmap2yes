@@ -54,6 +54,8 @@ export interface SettingsView {
   readonly completed: boolean;
   readonly rite: Rite | null;
   readonly guestBand: string | null;
+  /** People on the list; 0 = empty (or no table yet): the band is then editable. */
+  readonly guestCount: number;
   readonly styleLabel: string | null;
   readonly styleNote: string | null;
   readonly region: string | null;
@@ -92,8 +94,27 @@ function partnerNameOf(rows: readonly PartnerRow[], userId: string): string {
   return displayName(other ? { firstName: other.first_name, label: other.label } : null);
 }
 
+/** SQLSTATE / PostgREST codes meaning "the table is not there yet" (migration not applied). */
+const MISSING_TABLE_CODES: ReadonlySet<string> = new Set(["42P01", "PGRST205"]);
+
+/**
+ * People on the guest list (not deleted, RLS decides what is visible). A missing `guests` table
+ * counts as an empty list: the settings keep working before the migration (BR6).
+ */
+export async function countGuests(db: Db): Promise<number> {
+  const result = await db
+    .from("guests")
+    .select("id", { count: "exact", head: true })
+    .is("deleted_at", null);
+  if (result.error) {
+    if (result.error.code && MISSING_TABLE_CODES.has(result.error.code)) return 0;
+    throw new SettingsLoadError("Impostazioni: invitati", result.error);
+  }
+  return result.count ?? 0;
+}
+
 export async function loadSettings(db: Db, userId: string): Promise<SettingsView> {
-  const [wedding, scenarios, versions, partners] = await Promise.all([
+  const [wedding, scenarios, versions, partners, guestCount] = await Promise.all([
     db.from("weddings").select("*").limit(1).maybeSingle(),
     db.from("date_scenarios").select("id,option_id,kind,date_from,date_to,location_option_id"),
     db
@@ -103,6 +124,7 @@ export async function loadSettings(db: Db, userId: string): Promise<SettingsView
       .order("id", { ascending: false })
       .limit(1),
     loadPartnerRows(db),
+    countGuests(db),
   ]);
   const row = must(wedding, "nozze");
   const scenarioRows = must(scenarios, "date");
@@ -150,6 +172,7 @@ export async function loadSettings(db: Db, userId: string): Promise<SettingsView
     completed: row.onboarding_completed_at !== null,
     rite: isRite(row.rite) ? row.rite : null,
     guestBand: isGuestBand(row.guest_band) ? row.guest_band : null,
+    guestCount,
     styleLabel: row.style_label,
     styleNote: row.style_note,
     region: row.region,

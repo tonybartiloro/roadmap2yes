@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { Popover } from "radix-ui";
-import { CircleHelp } from "lucide-react";
+import { Info } from "lucide-react";
 import { formatShortDate } from "@/components/format";
+import { HelpLink } from "@/components/HelpLink";
 import { ReferenceBadge } from "@/components/ReferenceBadge";
 import { Button } from "@/components/ui/button";
 import { COPY } from "./copy";
@@ -19,7 +20,7 @@ function ReferenceHelp({ nearest }: { nearest: boolean }) {
     <Popover.Root>
       <Popover.Trigger asChild>
         <Button type="button" variant="ghost" size="sm" data-testid="reference-help">
-          <CircleHelp aria-hidden />
+          <Info aria-hidden />
           Cos&apos;è?
         </Button>
       </Popover.Trigger>
@@ -92,9 +93,12 @@ export function PercorsoHeader({
   const line = referenceLine(view);
   return (
     <header className="flex flex-col gap-3" data-testid="percorso-header">
-      <h1 id="percorso-title" tabIndex={-1} className="text-[28px] leading-[34px]">
-        Percorso
-      </h1>
+      <div className="flex items-center justify-between gap-2">
+        <h1 id="percorso-title" tabIndex={-1} className="min-w-0 text-[28px] leading-[34px]">
+          Percorso
+        </h1>
+        <HelpLink route="/percorso" />
+      </div>
 
       {reference ? (
         <div className="flex flex-col gap-2" data-testid="reference-status">

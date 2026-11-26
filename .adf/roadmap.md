@@ -17,10 +17,11 @@ Vision: `.adf/project.md → What this project is` · Stack decision: [ADR-0001]
 | ID | Title | Size | Depends on | Status | Feature |
 |---|---|---|---|---|---|
 | R-01 | Fondamenta, onboarding guidato, Percorso e budget | L | — | done | FEAT-2026-001 |
-| R-02 | Guida d'uso nell'app | S | R-01 | in-progress | FEAT-2026-002 |
-| R-03 | Invitati: anagrafica, gruppi/famiglie, tavoli facoltativi | L | R-01 | todo | |
+| R-02 | Guida d'uso nell'app | S | R-01 | done | FEAT-2026-002 |
+| R-03 | Invitati: anagrafica, gruppi/famiglie, tavoli facoltativi | L | R-01 | in-progress | FEAT-2026-003 |
 | R-04 | Conferme di presenza (RSVP) con link personale | L | R-03 | todo | |
 | R-05 | Lista nozze | M | R-01 | todo | |
+| R-06 | Sala: disposizione visuale dei tavoli | M | R-03 | todo | |
 
 Le voci R-02…R-05 formano insieme la release "R2", approvata dallo sviluppatore il 2026-11-25. Fornitori, scheda location e confronto data×location (indicati come "R2" nel brief di FEAT-2026-001) sono rimandati a dopo questa release. R-03 e R-04 sono L per il rischio (dati personali di terzi, pagina pubblica senza login), non per la quantità di lavoro.
 
@@ -40,7 +41,7 @@ Le voci R-02…R-05 formano insieme la release "R2", approvata dallo sviluppator
 - **Goal:** la coppia costruisce e mantiene la lista degli invitati e sa quante persone aspettarsi.
 - **Scope:** anagrafica degli invitati (nome, contatti facoltativi, lato sposo/sposa o entrambi, adulto/bambino, note come allergie); gruppi/famiglie (nuclei) che raggruppano più persone; conteggi e riepiloghi; tavoli facoltativi (si possono creare e assegnare, ma l'app funziona anche senza); importazione/esportazione semplice. Accesso solo alla coppia (RLS).
 - **Main acceptance criteria (high level):** aggiungere, modificare, eliminare invitati e gruppi; filtri e conteggi per lato, gruppo, categoria; assegnazione facoltativa ai tavoli con capienza; i dati sono inclusi nell'esportazione; nessun dato reale nel repository.
-- **Out:** RSVP (R-04), sito pubblico, disposizione grafica della sala.
+- **Out:** RSVP (R-04), sito pubblico, disposizione grafica della sala (R-06).
 
 ### R-04 — Conferme di presenza (RSVP) con link personale
 - **Goal:** ogni invitato (o gruppo) conferma la presenza da un link personale, e la coppia vede le risposte in tempo reale.
@@ -53,3 +54,10 @@ Le voci R-02…R-05 formano insieme la release "R2", approvata dallo sviluppator
 - **Scope:** voci della lista (regalo, link, prezzo indicativo, quote), stato dei regali, ringraziamenti; visibilità agli invitati da decidere in F1 (se pubblica, passa dalla pagina di R-04 e dipende da R-04).
 - **Main acceptance criteria (high level):** aggiungere, modificare, eliminare voci; segnare un regalo come ricevuto e da chi; riepilogo; nessun pagamento gestito dall'app.
 - **Out:** pagamenti online, integrazione con negozi.
+
+### R-06 — Sala: disposizione visuale dei tavoli
+Aggiunta dallo sviluppatore il 2026-11-25 durante la F1 di FEAT-2026-003 (risposta alla domanda 7): i tavoli devono essere anche visuali e riorganizzabili in una stanza virtuale. Separata da R-03 perché R-03 arrivi prima in produzione.
+- **Goal:** la coppia vede la sala come una mappa e sposta i tavoli finché la disposizione la convince.
+- **Scope:** mappa della sala con i tavoli di R-03 (forma, posizione, capienza, invitati seduti); spostamento e riorganizzazione dei tavoli; alternativa senza trascinamento per l'accessibilità; pensata per tablet e computer, con la lista di R-03 come alternativa sul telefono. R-03 prevede già posizione e forma nel modello dei tavoli, così R-06 non richiede migrazioni distruttive.
+- **Main acceptance criteria (high level):** creare e spostare i tavoli sulla mappa; la disposizione resta salvata per entrambi i partner; ogni azione è possibile anche da tastiera; la lista dei tavoli resta coerente con la mappa.
+- **Out:** planimetria reale importata dalla location, misure in scala, posti numerati del singolo invitato (da decidere in F1).

@@ -1,4 +1,5 @@
 import type { Rite } from "@/content/milestones/types";
+import { BAND_RANGE_LABELS, bandOf } from "@/domain/guests";
 import { RITE_LABELS } from "@/features/onboarding/model";
 
 /** Pure helpers of Impostazioni and Profili (no Next.js, no React). */
@@ -17,6 +18,15 @@ export interface SettingsValues {
   comune: string;
   /** Text of the budget total as typed (euros); "" = none. */
   budgetText: string;
+}
+
+/** Route of the guest list ("Vedi la lista"). */
+export const GUESTS_HREF = "/invitati";
+
+/** "Sei a 62 persone: fascia 50-80." Shown instead of the choice once the list has people (BR6). */
+export function guestBandText(count: number): string {
+  const people = count === 1 ? "1 persona" : `${count} persone`;
+  return `Sei a ${people}: fascia ${BAND_RANGE_LABELS[bandOf(count)]}.`;
 }
 
 export const SESSION_EXPIRED = "La sessione è scaduta. Entra di nuovo: non hai perso nulla.";

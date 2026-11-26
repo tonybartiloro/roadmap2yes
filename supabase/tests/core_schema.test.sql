@@ -8,19 +8,20 @@ select is(
   0, 'RLS enabled on every table of public and private');
 
 select is(
-  (select array_agg(p.oid::regprocedure::text order by p.oid::regprocedure::text)
+  (select array_agg(p.oid::regprocedure::text order by p.oid::regprocedure::text collate "C")
    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public' and p.prokind = 'f'
      and has_function_privilege('authenticated', p.oid, 'execute')),
   array[
     'accept_pending_invitation()', 'acknowledge_task_review(uuid)', 'add_decision_note(uuid,text,uuid)',
     'authorize_account_op(text,text,text)', 'choose_option(uuid,uuid,integer,date)', 'complete_onboarding(jsonb,jsonb)',
-    'create_invitation(text,text,uuid,bytea)',
-    'create_wedding()', 'dismiss_welcome()', 'has_permission(uuid,text,text)', 'insert_template_tasks(jsonb)',
+    'create_guest_family(text,text,jsonb)', 'create_invitation(text,text,uuid,bytea)',
+    'create_wedding()', 'dismiss_welcome()', 'guests_bulk(uuid[],text,uuid)', 'guests_bulk_undo(jsonb)',
+    'has_permission(uuid,text,text)', 'import_guests(jsonb)', 'insert_template_tasks(jsonb)',
     'last_heartbeat(text)',
     'move_budget_items(uuid,uuid)', 'record_export()', 'record_seen()',
     'reopen_decision(uuid,text,integer)', 'revoke_invitation(uuid)',
-    'rotate_invitation(uuid,bytea)', 'set_reference_scenario(uuid)', 'sync_my_email()', 'update_partner_email(text,text)',
+    'rotate_invitation(uuid,bytea)', 'set_reference_scenario(uuid)', 'sync_my_email()', 'undo_guest_import(uuid)', 'update_partner_email(text,text)',
     'upsert_partner_b(text,text,text,text)'
   ]::text[], 'authenticated can execute exactly the allowlist (T8/T9 extend it)');
 
@@ -65,9 +66,10 @@ select is(
   0, 'authenticated has no table-level INSERT/TRUNCATE on any table');
 
 select is(
-  (select array_agg(table_name::text order by table_name) from information_schema.role_table_grants
+  (select array_agg(table_name::text order by table_name::text collate "C") from information_schema.role_table_grants
    where table_schema = 'public' and grantee = 'authenticated' and privilege_type = 'DELETE'),
-  array['option_reactions']::text[], 'DELETE only on option_reactions (own rows, RLS)');
+  array['guest_groups', 'guest_tables', 'guests', 'option_reactions']::text[],
+  'DELETE only on option_reactions (own rows) and the three guest tables (soft-deleted rows only: RLS)');
 
 select is(
   (select array_agg(table_name::text order by table_name) from information_schema.role_table_grants
@@ -87,6 +89,11 @@ select is(
     'decision_options.comune', 'decision_options.cons', 'decision_options.cost_cents', 'decision_options.deleted_at',
     'decision_options.link', 'decision_options.notes', 'decision_options.pros', 'decision_options.title',
     'decisions.question',
+    'guest_groups.deleted_at', 'guest_groups.name',
+    'guest_tables.capacity', 'guest_tables.deleted_at', 'guest_tables.name', 'guest_tables.pos_x',
+    'guest_tables.pos_y', 'guest_tables.shape',
+    'guests.category', 'guests.deleted_at', 'guests.email', 'guests.first_name', 'guests.group_id',
+    'guests.last_name', 'guests.notes', 'guests.phone', 'guests.side', 'guests.table_id',
     'notification_preferences.digest_enabled', 'notification_preferences.reminders_enabled',
     'option_reactions.reaction',
     'payments.amount_cents', 'payments.deleted_at', 'payments.due_date', 'payments.kind',
@@ -113,6 +120,11 @@ select is(
     'decision_options.comune', 'decision_options.cons', 'decision_options.cost_cents',
     'decision_options.decision_id', 'decision_options.link', 'decision_options.notes', 'decision_options.pros',
     'decision_options.title', 'decision_options.wedding_id',
+    'guest_groups.name', 'guest_groups.wedding_id',
+    'guest_tables.capacity', 'guest_tables.name', 'guest_tables.pos_x', 'guest_tables.pos_y',
+    'guest_tables.shape', 'guest_tables.wedding_id',
+    'guests.category', 'guests.email', 'guests.first_name', 'guests.group_id', 'guests.last_name',
+    'guests.notes', 'guests.phone', 'guests.side', 'guests.table_id', 'guests.wedding_id',
     'notification_preferences.digest_enabled', 'notification_preferences.reminders_enabled',
     'notification_preferences.user_id', 'notification_preferences.wedding_id',
     'option_reactions.option_id', 'option_reactions.reaction', 'option_reactions.user_id',

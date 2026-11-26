@@ -226,6 +226,22 @@ La Guida legge i file di `docs/functional` e li mostra nell'app. Le regole di si
 - `Referrer-Policy: no-referrer` su `/invito/*`, `/auth/*` ed `/email/*`, perché il token sta nel percorso o nella query.
 - Le pagine autenticate sono dinamiche e non vengono messe in cache (una regola di lint vieta `use cache` nelle aree autenticate). Le risposte di uscita e quelle delle pagine con token sono `no-store`, così il pulsante Indietro non mostra dati dopo l'uscita.
 
+## Dati personali degli invitati (ADR-0002)
+
+Sono i primi dati di persone che non usano l'app: nomi, telefoni, email, note (anche allergie). Le regole, con la motivazione, sono nell'[ADR-0002](../adr/0002-dati-personali-invitati.md).
+
+- **Solo RLS.** L'area `guests` è solo per `partner`, con `read`, `write` e `delete`. Nessun grant né policy per `anon`, ora e in R-04. Famiglia e planner non hanno righe. I pgTAP negano l'accesso ad `anon`, a un altro matrimonio e a `family`/`planner`.
+- **Cancellazione vera.** Il `DELETE` è permesso dalla RLS solo su righe già eliminate logicamente e con `guests/delete`. Le chiavi esterne dei membri si azzerano (`on delete set null`).
+- **Audit senza dati personali.** `audit_row` esclude `first_name`, `last_name`, `phone`, `email` e `notes` di `guests`, e `name` di gruppi e tavoli. Il test pgTAP controlla `audit_log.old_data` e `new_data` dopo insert, update, delete e svuota. Le tabelle non entrano in "Novità".
+- **Nessun valore nei log né negli errori.** Le server action restituiscono codici e messaggi fissi, mai `message` o `details` di Postgres. Le RPC sollevano codici stabili (`invalid_row`, `too_many_rows`, `payload_too_large`, `group_deleted`, `table_deleted`) e `42501` per i dinieghi. Un test di integrazione spia `console` e non trova valori.
+- **Il file non lascia il browser prima della conferma.** L'importazione legge il CSV nel client. La server action rivalida le righe e le scrive con `import_guests`; il file intero non viene mai inviato.
+- **Nessun dato reale nel repository.** Il seed `supabase/seeds/04_guests.sql` usa nomi inventati, telefoni finti ed email `@example.test`. Una guardia Vitest (`tests/unit/guests-seed.test.ts`) e `check:test-emails` lo verificano.
+- **Residui accettati.**
+  - REV-8: se una scrittura diretta viola un vincolo, Postgres scrive nei propri log la riga ("Failing row contains (...)"). L'app non lo restituisce né lo registra, ma i log del fornitore lo conservano fino alla rotazione.
+  - I backup gestiti da Supabase ruotano da soli.
+  - I file CSV o JSON già scaricati dalla coppia restano sul loro dispositivo.
+- **Revisione.** Il round di sicurezza del reviewer ha riguardato la migrazione e le server action (code-2, REV-5..10). È un requisito del piano prima del merge.
+
 ## Segreti
 
 | Dove | Cosa | Regola |
@@ -243,3 +259,4 @@ Il file `.env.example` contiene solo valori finti. Le chiavi locali le genera `n
 |---|---|---|
 | 2026-11-24 | FEAT-2026-001 | Prima stesura con ordine DB-prima, codici, limitatore, R26 e R27, cookie, token di invito (F4, T18) |
 | 2026-11-25 | FEAT-2026-002 | Guida: slug solo da elenco reale, nessun HTML grezzo, regole dei link esterni; "Altro" diventa "Opzioni" |
+| 2026-11-25 | FEAT-2026-003 | Dati personali degli invitati (ADR-0002): permesso `delete`, `DELETE` solo su righe eliminate, audit senza dati personali, nessun valore nei log, residuo REV-8 |

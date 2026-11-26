@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import {
   Bell,
+  BookOpen,
   ChevronRight,
   Download,
   Info,
@@ -9,9 +10,10 @@ import {
   MailPlus,
   Palette,
   SlidersHorizontal,
-  Users,
+  UserCog,
   type LucideIcon,
 } from "lucide-react";
+import { HelpLink } from "@/components/HelpLink";
 import { OPTIONS_SECTION_LABEL } from "@/components/section-label";
 import { SignOutButton } from "@/features/auth/SignOutButton";
 
@@ -33,7 +35,7 @@ const LINKS: ReadonlyArray<{
     href: "/altro/profili",
     label: "Profili",
     description: "I dati tuoi e del tuo partner.",
-    icon: Users,
+    icon: UserCog,
   },
   {
     href: "/altro/impostazioni",
@@ -77,7 +79,21 @@ const LINKS: ReadonlyArray<{
 export default function AltroPage() {
   return (
     <div className="flex max-w-xl flex-col gap-6">
-      <h1 className="font-heading text-[28px] leading-9">{OPTIONS_SECTION_LABEL}</h1>
+      <div className="flex items-center justify-between gap-2">
+        <h1 className="font-heading text-[28px] leading-9">{OPTIONS_SECTION_LABEL}</h1>
+        <HelpLink route="/altro" />
+      </div>
+      <Link
+        href="/guida"
+        className="border-primary bg-card hover:bg-muted focus-visible:ring-ring flex min-h-14 items-center gap-3 rounded-lg border-2 px-4 py-3 focus-visible:ring-2 focus-visible:outline-none"
+      >
+        <BookOpen aria-hidden className="text-primary size-6 shrink-0" />
+        <span className="flex flex-1 flex-col">
+          <span className="font-semibold">Guida</span>
+          <span className="text-muted-foreground text-sm">Come si usa roadmap2yes, passo passo</span>
+        </span>
+        <ChevronRight aria-hidden className="text-muted-foreground size-5 shrink-0" />
+      </Link>
       <ul className="border-border bg-card divide-border divide-y rounded-lg border">
         {LINKS.map(({ href, label, description, icon: Icon }) => (
           <li key={href}>

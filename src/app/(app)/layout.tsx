@@ -1,15 +1,22 @@
 import type { ReactNode } from "react";
 import { AppNav } from "@/components/AppNav";
 import { EmailStatusProvider } from "@/components/EmailOffBanner";
+import { shouldShowGuestsNav } from "@/components/guests-nav";
 import { readEmailConfig } from "@/lib/app-config";
+import { createClient } from "@/lib/supabase/server";
 
 /**
  * Shell of the signed-in area: skip link, navigation (bottom bar / rail) and the content column.
  * Access control is NOT here: the proxy guards and RLS own it. The "are emails on?" flag is
  * computed on the server at request time and handed to `EmailOffBanner` through a provider.
+ *
+ * "Invitati" in the bar depends on the `guests` read permission (`shouldShowGuestsNav`: both reads
+ * share one 1.5 s abort signal, fail-open). It runs on full loads and refreshes, not on client
+ * navigation (a shared layout stays mounted), so a permission change shows only after a reload.
  */
-export default function AppLayout({ children }: { children: ReactNode }) {
+export default async function AppLayout({ children }: { children: ReactNode }) {
   const emailEnabled = readEmailConfig().enabled;
+  const showGuests = await shouldShowGuestsNav(await createClient());
   return (
     <EmailStatusProvider emailEnabled={emailEnabled}>
       <a
@@ -18,7 +25,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
       >
         Vai al contenuto
       </a>
-      <AppNav />
+      <AppNav showGuests={showGuests} />
       <div className="md:pl-20 lg:pl-56">
         <main
           id="contenuto"

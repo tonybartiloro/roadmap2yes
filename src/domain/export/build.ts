@@ -1,5 +1,7 @@
 import { CATEGORY_LABELS } from "@/content/milestones/categories";
 import { budgetTotals, itemAgreedCents, itemPaidCents } from "@/domain/budget/totals";
+import { guestsToCsv } from "@/domain/guests/csv-export";
+import { displayName } from "@/lib/display-name";
 import { todayInRome, type PlainDate } from "@/lib/dates/plain-date";
 import { formatCentsPlain } from "@/lib/money";
 import { toCsv } from "./csv";
@@ -43,14 +45,16 @@ export interface ExportFileNames {
   readonly json: string;
   readonly tasksCsv: string;
   readonly budgetCsv: string;
+  readonly guestsCsv: string;
 }
 
-/** Three separate downloads, each with the date in its name (AC42). */
+/** Four separate downloads, each with the date in its name (AC42, AC21). */
 export function exportFileNames(today: PlainDate): ExportFileNames {
   return {
     json: `roadmap2yes-${today}.json`,
     tasksCsv: `roadmap2yes-compiti-${today}.csv`,
     budgetCsv: `roadmap2yes-budget-${today}.csv`,
+    guestsCsv: `roadmap2yes-invitati-${today}.csv`,
   };
 }
 
@@ -59,6 +63,7 @@ export interface ExportBundle {
   readonly json: string;
   readonly tasksCsv: string;
   readonly budgetCsv: string;
+  readonly guestsCsv: string;
 }
 
 const ITEM_STATUS_LABEL = { planned: "Previsto", agreed: "Concordato", cancelled: "Annullata" };
@@ -130,6 +135,30 @@ function budgetCsv(input: ExportInput): string {
   );
 }
 
+/**
+ * CSV of the live guests, whatever filters any screen has (AC21): the same function and columns
+ * as "Esporta CSV" in Invitati. The `lato` column uses a REAL partner name only (first name, else
+ * label); with none the letter is written, never a fallback text such as "Partner A", which the
+ * import cannot read (REV-45: same rule as `partnerNames().real` of the Invitati page).
+ */
+function guestsCsvOf(input: ExportInput): string {
+  const nameOf = (slot: "A" | "B"): string | null => {
+    const row = input.partners.find((p) => p["slot"] === slot);
+    return (
+      displayName(
+        row
+          ? {
+              firstName: typeof row["first_name"] === "string" ? row["first_name"] : null,
+              label: typeof row["label"] === "string" ? row["label"] : null,
+            }
+          : null,
+        "",
+      ) || null
+    );
+  };
+  return guestsToCsv(input.guests, input.guestGroups, { a: nameOf("A"), b: nameOf("B") });
+}
+
 /** JSON document with every wedding datum (plan §10). `now` only stamps `exportedAt`. */
 export function buildExportJson(input: ExportInput, now: Date): string {
   const optionById = new Map(input.decisionOptions.map((o) => [o.id, o]));
@@ -163,16 +192,21 @@ export function buildExportJson(input: ExportInput, now: Date): string {
       items: input.budgetItems,
       payments: input.payments,
     },
+    // Deleted ones ("Eliminati di recente") are in, marked `deleted: true` (AC22).
+    guests: input.guests,
+    guestGroups: input.guestGroups,
+    guestTables: input.guestTables,
   };
   return JSON.stringify(sanitize(doc), null, 2);
 }
 
-/** The three files of the export, from plain inputs. Pure: `now` comes from the caller. */
+/** The four files of the export, from plain inputs. Pure: `now` comes from the caller. */
 export function buildExport(input: ExportInput, now: Date): ExportBundle {
   return {
     fileNames: exportFileNames(todayInRome(now)),
     json: buildExportJson(input, now),
     tasksCsv: tasksCsv(input),
     budgetCsv: budgetCsv(input),
+    guestsCsv: guestsCsvOf(input),
   };
 }

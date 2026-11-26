@@ -28,6 +28,15 @@ type Ids = {
   category: string;
   item: string;
   task: string;
+  /** guests module (FEAT-2026-003): live and soft-deleted rows of each table */
+  group: string;
+  gtable: string;
+  guest: string;
+  deletedGroup: string;
+  deletedTable: string;
+  deletedGuest: string;
+  /** a live guest whose group and table are soft-deleted (the pointer is kept) */
+  memberOfDeleted: string;
 };
 
 const HASH_HEX = createHash("sha256").update(randomBytes(32)).digest("hex");
@@ -55,6 +64,9 @@ const INSERT_ROWS: Record<string, (w: string, p: Ids, user: string) => Record<st
   budget_items: (w, p) => ({ wedding_id: w, category_id: p.category, description: "Extra" }),
   payments: (w, p) => ({ wedding_id: w, item_id: p.item, amount_cents: 1 }),
   notification_preferences: (w, _p, u) => ({ user_id: u, wedding_id: w }),
+  guest_groups: (w) => ({ wedding_id: w, name: "Extra" }),
+  guest_tables: (w) => ({ wedding_id: w, name: "Extra" }),
+  guests: (w) => ({ wedding_id: w, first_name: "Extra" }),
 };
 /** Parent column and parent id of each insertable child, to hang a W1 row from a W2 parent. */
 const PARENT: Record<string, { column: string; pick: (ids: Ids) => string }> = {
@@ -63,6 +75,7 @@ const PARENT: Record<string, { column: string; pick: (ids: Ids) => string }> = {
   option_reactions: { column: "option_id", pick: (i) => i.optionFree },
   budget_items: { column: "category_id", pick: (i) => i.category },
   payments: { column: "item_id", pick: (i) => i.item },
+  guests: { column: "group_id", pick: (i) => i.group },
 };
 
 /**
@@ -162,10 +175,70 @@ async function seed(w: TestWedding, label: string, invite: boolean): Promise<Ids
     claimed_at: new Date().toISOString(),
   });
   await service.from("heartbeats").insert({ source: `qa-rls-${label}` });
+  // Guests: a live and a soft-deleted row per table (all invented). The member of the deleted group
+  // and table is inserted while both are live, then they are deleted: the pointer stays.
+  const group = await insertOne("guest_groups", {
+    wedding_id: w.weddingId,
+    name: "Famiglia Prova",
+  });
+  const deletedGroup = await insertOne("guest_groups", {
+    wedding_id: w.weddingId,
+    name: "Gruppo eliminato",
+  });
+  const gtable = await insertOne("guest_tables", {
+    wedding_id: w.weddingId,
+    name: "Tavolo 1",
+    capacity: 8,
+  });
+  const deletedTable = await insertOne("guest_tables", {
+    wedding_id: w.weddingId,
+    name: "Tavolo eliminato",
+  });
+  const guest = await insertOne("guests", {
+    wedding_id: w.weddingId,
+    first_name: "Mario",
+    group_id: group,
+    table_id: gtable,
+  });
+  const memberOfDeleted = await insertOne("guests", {
+    wedding_id: w.weddingId,
+    first_name: "Membro",
+    group_id: deletedGroup,
+    table_id: deletedTable,
+  });
+  const deletedGuest = await insertOne("guests", {
+    wedding_id: w.weddingId,
+    first_name: "Eliminato",
+  });
+  for (const [table, id] of [
+    ["guest_groups", deletedGroup],
+    ["guest_tables", deletedTable],
+    ["guests", deletedGuest],
+  ] as const) {
+    const removed = await service
+      .from(table)
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("id", id);
+    if (removed.error) throw new Error(`seed soft delete ${table}: ${removed.error.message}`);
+  }
   const task = rows(
     await service.from("tasks").select("id").eq("wedding_id", w.weddingId).limit(1),
   )[0]!["id"] as string;
-  return { decision: date, optionFree, optionLoc, category, item, task };
+  return {
+    decision: date,
+    optionFree,
+    optionLoc,
+    category,
+    item,
+    task,
+    group,
+    gtable,
+    guest,
+    deletedGroup,
+    deletedTable,
+    deletedGuest,
+    memberOfDeleted,
+  };
 }
 
 async function snapshot(wedding: string, label: string): Promise<Record<string, unknown>> {
@@ -688,11 +761,101 @@ describe("catalog matrix through the API (AC1, AC10, AC11, AC21)", () => {
         budgetCategories: [],
         budgetItems: [],
         payments: [],
+        guests: [],
+        guestGroups: [],
+        guestTables: [],
       };
       const json = buildExportJson(input, new Date("2026-11-25T10:00:00Z"));
       expect(json).not.toMatch(/token_hash/i);
       expect(json).not.toContain(HASH_HEX);
       expect(json).toContain('"note": "ok"'); // the rest of the payload survives
+    });
+  });
+
+  describe("guests: hard DELETE only on soft-deleted rows, with guests/delete (ADR-0002, AC11, AC13)", () => {
+    const soft = Object.entries(TABLES).filter(([, s]) => s.delete === "soft_deleted");
+    const liveOf = (t: string) =>
+      ({ guests: ids1.guest, guest_groups: ids1.group, guest_tables: ids1.gtable })[t]!;
+    const deletedOf = (t: string) =>
+      ({
+        guests: ids1.deletedGuest,
+        guest_groups: ids1.deletedGroup,
+        guest_tables: ids1.deletedTable,
+      })[t]!;
+    const survives = async (table: string, id: string) =>
+      rows(await loose(serviceClient()).from(table).select("id").eq("id", id)).length === 1;
+
+    it("the oracle lists the three guests tables as soft_deleted", () => {
+      expect(soft.map(([t]) => t).sort()).toEqual(["guest_groups", "guest_tables", "guests"]);
+    });
+
+    it.each(soft)(
+      "%s: DELETE on a live row removes nothing (even for the partner)",
+      async (table) => {
+        const result = await loose(w1.founderClient)
+          .from(table)
+          .delete()
+          .eq("id", liveOf(table))
+          .select();
+        expect(result.error, table).toBeNull();
+        expect(rows(result), table).toEqual([]);
+        expect(await survives(table, liveOf(table)), table).toBe(true);
+      },
+    );
+
+    it.each(soft)(
+      "%s: a family member and another wedding cannot delete a soft-deleted row",
+      async (table) => {
+        for (const client of [family.client, w2.founderClient, stranger.client]) {
+          const result = await loose(client)
+            .from(table)
+            .delete()
+            .eq("id", deletedOf(table))
+            .select();
+          expect(rows(result), table).toEqual([]);
+        }
+        expect(await survives(table, deletedOf(table)), table).toBe(true);
+      },
+    );
+
+    it("restoring a deleted guest makes it undeletable again", async () => {
+      const mine = loose(w1.founderClient);
+      const created = rows(
+        await mine
+          .from("guests")
+          .insert({ wedding_id: w1.weddingId, first_name: "Ripensato" })
+          .select("id"),
+      )[0]!["id"] as string;
+      const stamp = new Date().toISOString();
+      await mine.from("guests").update({ deleted_at: stamp }).eq("id", created);
+      await mine.from("guests").update({ deleted_at: null }).eq("id", created);
+      const result = await mine.from("guests").delete().eq("id", created).select();
+      expect(rows(result)).toEqual([]);
+      expect(await survives("guests", created)).toBe(true);
+    });
+
+    it.each(soft)("%s: the partner deletes a soft-deleted row for good", async (table) => {
+      const result = await loose(w1.founderClient)
+        .from(table)
+        .delete()
+        .eq("id", deletedOf(table))
+        .select("id");
+      expect(result.error, table).toBeNull();
+      expect(rows(result), table).toHaveLength(1);
+      expect(await survives(table, deletedOf(table)), table).toBe(false);
+    });
+
+    it("deleting a group or a table for good frees its members and nothing else", async () => {
+      const member = rows(
+        await loose(serviceClient())
+          .from("guests")
+          .select("id,wedding_id,group_id,table_id,deleted_at")
+          .eq("id", ids1.memberOfDeleted),
+      )[0]!;
+      expect(member["group_id"]).toBeNull();
+      expect(member["table_id"]).toBeNull();
+      expect(member["wedding_id"]).toBe(w1.weddingId);
+      expect(member["deleted_at"]).toBeNull();
     });
   });
 });

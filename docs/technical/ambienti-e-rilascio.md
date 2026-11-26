@@ -270,6 +270,16 @@ Il percorso è:
 11. Avviso "email spente" visibile.
 12. Guida: `/guida` mostra l'indice e `/guida/budget` mostra la pagina con la tabella, senza pagina d'errore. Se compare la pagina d'errore, controllate che `docs/functional` sia incluso nella build: il tracciamento è in `next.config.ts` (`outputFileTracingIncludes`).
 
+Controlli specifici di FEAT-2026-003 (Invitati), dopo il job `migrate` verde:
+
+13. Il job `migrate` ha applicato `20261202100000_guests.sql` e `20261202200000_guests_import.sql`, senza errori.
+14. Nella Guida e in Opzioni: barra con sei voci (Home, Percorso, Scelte, Budget, Invitati, Opzioni) a 320 px, nessun troncamento; "Guida" è in cima a Opzioni; "Aiuto" nelle intestazioni.
+15. `/invitati` mostra lo stato vuoto ("Ancora nessun invitato"), senza errore di tabella.
+16. Con un invitato finto (nome e email `@example.test`): aggiunta, eliminazione, "Elimina definitivamente". Il dato non compare più.
+17. Opzioni > Esporta: il JSON completo contiene `guests`, `guestGroups` e `guestTables`; il CSV "Invitati" è scaricabile.
+18. Nel pannello Supabase, l'ultima riga di `audit_log` per `guests` non contiene nome, telefono, email o note.
+19. Se `/invitati` mostra "Non riesco a caricare gli invitati" per qualche minuto dopo il merge, è la finestra in cui il codice nuovo gira sullo schema vecchio: "Riprova" dopo il job `migrate`. Se persiste, il rollback è l'Instant Rollback di Vercel, non lo schema.
+
 ## Rollback
 
 - **Codice**: Instant Rollback di Vercel alla deploy precedente. Le migrazioni sono additive, quindi il codice precedente gira sullo schema nuovo.
@@ -289,6 +299,7 @@ Il percorso è:
 
 ## Punti da confermare
 
+- **Invitati in preview (decisione D-A, opzione c)**: lo staging non riceve le migrazioni `guests` prima del merge. La preview quindi non prova le funzioni del modulo. La verifica è in locale (Gate C) e poi sui controlli post-deploy in produzione, con dati finti.
 - **Migrazioni delle PR su staging**: oggi `migrate.yml` le applica allo staging solo da `main` e a mano. Va deciso se servono una procedura per le PR o un avvio manuale da branch (con la regola dei branch già rispettata).
 - **Stato remoto del database**: non risulta che la migrazione `core` sia stata applicata a un progetto remoto. Da verificare prima del primo rilascio.
 - **Percorso del menu** per impostare una password e `app_metadata` dal pannello Supabase: da verificare nella versione in uso.
@@ -302,3 +313,4 @@ Il percorso è:
 |---|---|---|
 | 2026-11-24 | FEAT-2026-001 | Prima stesura del runbook: setup locale, primo utente, variabili, segreti GitHub con regola dei branch, checklist Auth, migrazioni, keep-alive, pausa, reset dal pannello, Resend, rilascio, rollback (F4, T18) |
 | 2026-11-25 | FEAT-2026-002 | "Altro" diventa "Opzioni" nei percorsi del runbook; controllo della Guida in Preview e post-deploy |
+| 2026-11-25 | FEAT-2026-003 | Controlli post-deploy di Invitati (13-19); decisione D-A sulla preview |
