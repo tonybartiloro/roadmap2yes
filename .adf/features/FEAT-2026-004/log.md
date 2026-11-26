@@ -35,3 +35,9 @@
 ## Gate B — 2026-11-26
 - Developer: "Approvo" → plan, AC3/AC6/AC10/AC12 amendments, ADR-0003 (accepted), `public-rpc.ts` as fifth secret-key scope, P5/P6, D4 correction, routine git work (commits, push of the branch — public repo, PR, fix commits). Merge to main = production → Gate C. No new dependency.
 - Developer must create `RSVP_LINK_SECRET` in Vercel (Production + Preview, different values, Sensitive) before the merge.
+
+## F3 S1 progress — 2026-11-26
+- T1 (6e6aa08, af95a06): migration + couple RPCs, pgTAP model/RLS/lifecycle matrix; ownership extended to `qa_cross_wedding.test.sql` and `tests/acceptance/support/matrix.ts` (plan Change log). db:test 1623 green.
+- T3 (3cd7bc1): `supabase/seeds/05_rsvp.sql` reuses the 04 demo wedding; fake local secret `local-fake-rsvp-secret-0123456789abcdef`, link id `00000000-0000-4000-8000-0000000a3001` → token `D-nIsgqL5dGbgoSIb9_oamFr3fXgA_dVLTkmc1J0vno` (T4 test vector; T11 must not use it).
+- T2 (a147c0f): `rsvp_attempts` + `rsvp_gate/page/submit` (service_role only), 140 pgTAP; db:test 1763 green. Deviations: `answered_at` in each person (for `seen_at`), malformed IP key = `invalid_key`, empty answers = `invalid_answers`. Signatures/codes for T5 in the T2 commit and `rsvp_public.test.sql`.
+- S1 review: code-1 (general) and code-2 (security round, L) on `c96b987..HEAD`.
