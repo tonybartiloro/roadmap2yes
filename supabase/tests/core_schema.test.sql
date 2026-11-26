@@ -21,7 +21,10 @@ select is(
     'last_heartbeat(text)',
     'move_budget_items(uuid,uuid)', 'record_export()', 'record_seen()',
     'reopen_decision(uuid,text,integer)', 'revoke_invitation(uuid)',
-    'rotate_invitation(uuid,bytea)', 'set_reference_scenario(uuid)', 'sync_my_email()', 'undo_guest_import(uuid)', 'update_partner_email(text,text)',
+    'rotate_invitation(uuid,bytea)',
+    'rsvp_create_links(jsonb)', 'rsvp_mark_shared(uuid)', 'rsvp_revoke_link(uuid)', 'rsvp_rotate_link(uuid,uuid,bytea)',
+    'rsvp_status(timestamp with time zone)', 'rsvp_unmark_shared(uuid,jsonb)',
+    'set_reference_scenario(uuid)', 'sync_my_email()', 'undo_guest_import(uuid)', 'update_partner_email(text,text)',
     'upsert_partner_b(text,text,text,text)'
   ]::text[], 'authenticated can execute exactly the allowlist (T8/T9 extend it)');
 
@@ -89,7 +92,7 @@ select is(
     'decision_options.comune', 'decision_options.cons', 'decision_options.cost_cents', 'decision_options.deleted_at',
     'decision_options.link', 'decision_options.notes', 'decision_options.pros', 'decision_options.title',
     'decisions.question',
-    'guest_groups.deleted_at', 'guest_groups.name',
+    'guest_groups.deleted_at', 'guest_groups.name', 'guest_groups.rsvp_mode',
     'guest_tables.capacity', 'guest_tables.deleted_at', 'guest_tables.name', 'guest_tables.pos_x',
     'guest_tables.pos_y', 'guest_tables.shape',
     'guests.category', 'guests.deleted_at', 'guests.email', 'guests.first_name', 'guests.group_id',
