@@ -64,6 +64,9 @@ select 'c6000000-0000-4000-8000-000000000001'::uuid as mario, 'c6000000-0000-400
   'c6000000-0000-4000-8000-000000000003'::uuid as neo, 'c6000000-0000-4000-8000-000000000006'::uuid as lia,
   'c6000000-0000-4000-8000-000000000009'::uuid as mario2 \gset
 
+-- other suites (acceptance) may leave limiter rows in the local database: count against a baseline
+select count(*) as n from private.rsvp_attempts \gset base_
+
 -- ===== Grants: service_role only =========================================================================
 select tests.login_anon();
 select throws_ok(format($$select public.%I(%s)$$, f.n, f.a), '42501', null, 'anon: no EXECUTE on ' || f.n)
@@ -153,7 +156,7 @@ select is(public.rsvp_gate(pg_temp.h('revoked'), null) ->> 'theme_id', null, 'ga
 select throws_ok($$select public.rsvp_page(extensions.digest('x', 'sha256'), '\x00'::bytea)$$, 'P0001', 'invalid_key', 'a malformed IP key is a server bug: invalid_key');
 select throws_ok($$select public.rsvp_gate(extensions.digest('x', 'sha256'), '\x00'::bytea)$$, 'P0001', 'invalid_key', 'gate: same');
 select throws_ok($$select public.rsvp_submit(extensions.digest('x', 'sha256'), '\x00'::bytea, '[]')$$, 'P0001', 'invalid_key', 'submit: same');
-select is((select count(*)::int from private.rsvp_attempts), 0, 'no limiter row so far: null IP key means no IP limit, and gate never writes');
+select is((select count(*)::int from private.rsvp_attempts), :base_n::int, 'no limiter row added so far: null IP key means no IP limit, and gate never writes');
 
 -- ===== Limits (BR9, QA-2, QA-11) =========================================================================
 select count(*) filter (where r = '{"ok": false}'::jsonb) as neutral from (select public.rsvp_page(pg_temp.h('bad-' || i), pg_temp.ik('k1')) r from generate_series(1, 9) i) x \gset l1_

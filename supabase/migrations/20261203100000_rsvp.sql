@@ -603,6 +603,10 @@ revoke all on function
   public.rsvp_unmark_shared(uuid, jsonb)
 from public, anon, authenticated;
 
+-- The CHECK of rsvp_responses.diet runs with the privileges of the writer: a direct write by the secret
+-- key (fixtures, support) needs it. API roles never insert (no grant), so nothing is opened to them.
+grant execute on function private.rsvp_diet_ok(text[]) to service_role;
+
 grant execute on function
   public.rsvp_status(timestamptz),
   public.rsvp_create_links(jsonb, timestamptz),
