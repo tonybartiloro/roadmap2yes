@@ -22,3 +22,10 @@ Note for QA: the tests are markup-only; 768 and 1100 px visuals, 500 guests timi
 - **REV-60**: fatto. I separatori " · " restano nel DOM (spazi come nodi di testo fuori dallo span, così il nome accessibile resta "Luca Rossi Bambino · Tony · Famiglia Rossi"): visibili sotto 768 px, solo per screen reader (`md:sr-only`) da 768 px; dopo il marcatore "Adulto" sono sempre nascosti. Test sul nome accessibile e sul separatore.
 - **REV-61**: fatto. Celle con `min-w-0 break-words`; tolto `md:truncate`.
 - **REV-62**: fatto. L'intestazione colonne è un solo `ColumnHeader` per lista (una volta in cima ai gruppi, una nella lista piatta). Test: un solo elemento nei gruppi.
+
+## Closure (reviewer, e770add)
+- REV-60 CLOSED: `Sep` keeps `·` in the DOM with the spaces as text nodes outside the span, `md:sr-only` from 768 px (still in the accessible name, no layout), always `sr-only` after the hidden "Adulto" marker. `sr-only` is absolutely positioned, so it does not take a grid cell inside `md:contents`.
+- REV-61 CLOSED (`CELL` = `min-w-0 break-words`, no truncate). REV-62 CLOSED: one `ColumnHeader` per list; the grouped wrapper `px-px` offsets the sections' 1 px border, and `gap-x-3` now matches the row.
+- DES-08 widths: Nome `minmax(8rem,1fr)`, Tipo 5rem (fits "Neonato"/"Bambino"), Lato/Gruppo/Tavolo `minmax(0, 6-7rem)`; "Non indicato" wraps at its space inside 6rem. Acceptable; the spare width goes to Nome.
+- New nit REV-63: below 768 px the visible `·` now sits between flex items in a `flex-wrap gap-x-0` container, where whitespace text nodes are not rendered, so it probably shows as "Bambino·Tony·Famiglia Rossi" with no spaces (before: `ml-2` plus gap). This contradicts "nothing changes below 768". Give the visible separator `mx-1.5 md:mx-0` (or `gap-x-1.5` on the wrapper only below md) and confirm in a 390 px screenshot; QA to check, not measured here.
+- Verdict for DES-03: **approved** (REV-63 nit open). Not run: build, e2e, tests.
