@@ -17,3 +17,8 @@ Verdict: **approved with one should-fix** (0 blocking, 1 should, 2 nit). Checked
 **REV-62 (nit)** `GuestList.tsx:55`: `Rows` renders the column header once per group section, so with 10 groups it repeats 10 times. Render it once above the first section in grouped mode (or sticky under the filters), and keep it per list in flat mode.
 
 Note for QA: the tests are markup-only; 768 and 1100 px visuals, 500 guests timing and axe in selection mode are still to be done in the browser (the developer said so).
+
+## Risposte (developer B)
+- **REV-60**: fatto. I separatori " · " restano nel DOM (spazi come nodi di testo fuori dallo span, così il nome accessibile resta "Luca Rossi Bambino · Tony · Famiglia Rossi"): visibili sotto 768 px, solo per screen reader (`md:sr-only`) da 768 px; dopo il marcatore "Adulto" sono sempre nascosti. Test sul nome accessibile e sul separatore.
+- **REV-61**: fatto. Celle con `min-w-0 break-words`; tolto `md:truncate`.
+- **REV-62**: fatto. L'intestazione colonne è un solo `ColumnHeader` per lista (una volta in cima ai gruppi, una nella lista piatta). Test: un solo elemento nei gruppi.

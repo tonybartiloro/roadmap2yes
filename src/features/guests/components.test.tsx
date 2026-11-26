@@ -147,7 +147,7 @@ describe("row accessible name (WCAG 2.5.3)", () => {
     });
     const row = screen.getByRole("button", { name: /^Luca Rossi/ });
     expect(row.hasAttribute("aria-label")).toBe(false);
-    expect(row.textContent).toBe("Luca Rossi Bambino Tony");
+    expect(row.textContent).toBe("Luca Rossi Bambino · Tony");
   });
 });
 
@@ -156,6 +156,18 @@ describe("desktop columns (design 7, DES-03)", () => {
     [...container.querySelectorAll("[aria-hidden=true].md\\:grid > span")].map(
       (s) => s.textContent,
     );
+  it("shows the column header once for the whole grouped list, and keeps the separators in the DOM (REV-60, REV-62)", () => {
+    const { container } = renderScreen({
+      guests: [
+        guest({ firstName: "Luca", category: "child", side: "A", groupId: "g1" }),
+        guest({ firstName: "Anna", side: "B", groupId: "g2" }),
+      ],
+      groups: [group("g1", "Famiglia Rossi"), group("g2", "Famiglia Verdi")],
+    });
+    expect(container.querySelectorAll("[aria-hidden=true].md\\:grid")).toHaveLength(1);
+    const sep = screen.getByRole("button", { name: /^Luca Rossi/ }).querySelector(".md\\:sr-only");
+    expect(sep?.textContent).toBe("·");
+  });
 
   it("grouped list: Nome, Tipo, Lato columns (no group column: the heading is the group)", () => {
     const { container } = renderScreen({
@@ -164,7 +176,7 @@ describe("desktop columns (design 7, DES-03)", () => {
     });
     expect(headers(container)).toEqual(["Nome", "Tipo", "Lato"]);
     const row = screen.getByTestId("guest-row");
-    expect(row.innerHTML).toContain("md:grid-cols-[minmax(0,1fr)_7rem_8rem]");
+    expect(row.innerHTML).toContain("md:grid-cols-[minmax(8rem,1fr)_5rem_minmax(0,6rem)]");
     // an adult reads "Adulto" (visible from 768 px, screen reader below)
     expect(row.textContent).toContain("Bambino");
   });
@@ -177,10 +189,10 @@ describe("desktop columns (design 7, DES-03)", () => {
     await userEvent.type(screen.getByRole("searchbox"), "Luca");
     expect(headers(container)).toEqual(["Nome", "Tipo", "Lato", "Gruppo"]);
     expect(screen.getByTestId("guest-row").textContent).toBe(
-      "Luca Rossi Bambino Tony Famiglia Rossi",
+      "Luca Rossi Bambino · Tony · Famiglia Rossi",
     );
     expect(
-      screen.getByRole("button", { name: /^Luca Rossi Bambino Tony Famiglia Rossi$/ }),
+      screen.getByRole("button", { name: /^Luca Rossi Bambino · Tony · Famiglia Rossi$/ }),
     ).toBeTruthy();
   });
 

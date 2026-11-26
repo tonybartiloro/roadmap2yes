@@ -11,15 +11,30 @@ import { fullName, sideText, typeText, type PartnerNames } from "./view";
  */
 export function rowColumns(withGroup: boolean, withTable: boolean): string {
   if (withGroup && withTable) {
-    return "md:grid-cols-[minmax(0,1fr)_7rem_8rem_minmax(0,10rem)_8rem]";
+    return "md:grid-cols-[minmax(8rem,1fr)_5rem_minmax(0,6rem)_minmax(0,7rem)_minmax(0,6rem)]";
   }
-  if (withGroup) return "md:grid-cols-[minmax(0,1fr)_7rem_8rem_minmax(0,10rem)]";
-  if (withTable) return "md:grid-cols-[minmax(0,1fr)_7rem_8rem_8rem]";
-  return "md:grid-cols-[minmax(0,1fr)_7rem_8rem]";
+  if (withGroup) return "md:grid-cols-[minmax(8rem,1fr)_5rem_minmax(0,6rem)_minmax(0,7rem)]";
+  if (withTable) return "md:grid-cols-[minmax(8rem,1fr)_5rem_minmax(0,6rem)_minmax(0,6rem)]";
+  return "md:grid-cols-[minmax(8rem,1fr)_5rem_minmax(0,6rem)]";
 }
 
-const CELL =
-  "md:row-start-1 after:ml-2 after:content-['·'] last:after:content-none md:after:content-none";
+// Cells: wrap long text inside their column instead of cutting it (REV-61).
+const CELL = "md:row-start-1 min-w-0 break-words";
+
+/**
+ * The " · " between details stays in the DOM so the accessible name reads "Luca Rossi Bambino ·
+ * Tony · Famiglia Rossi" (REV-60): visible below 768 px, visually hidden (not removed) from 768 px,
+ * where the columns separate the cells. After a non-visible adult marker it is always hidden.
+ */
+function Sep({ visible }: { visible: boolean }) {
+  // The spaces are text nodes OUTSIDE the span, so the accessible name keeps "Bambino · Tony".
+  return (
+    <>
+      {" "}
+      <span className={visible ? "md:sr-only" : "sr-only"}>·</span>{" "}
+    </>
+  );
+}
 
 /**
  * One person. Normally a button that opens the edit sheet; in selection mode a checkbox row. It has
@@ -63,25 +78,26 @@ export const GuestRow = memo(function GuestRow({
   const side = sideText(guest.side, partners);
   const details = (
     <span
-      className={`flex min-w-0 flex-1 flex-col md:grid md:items-center md:gap-x-4 ${rowColumns(withGroup, withTable)}`}
+      className={`flex min-w-0 flex-1 flex-col md:grid md:items-center md:gap-x-3 ${rowColumns(withGroup, withTable)}`}
     >
       <span className="break-words md:col-start-1 md:row-start-1">{name}</span>{" "}
-      <span className="text-muted-foreground flex flex-wrap gap-x-2 text-sm md:contents md:text-base">
+      <span className="text-muted-foreground flex flex-wrap gap-x-0 text-sm md:contents md:text-base">
         {type ? (
           <span className={`${CELL} md:col-start-2`}>{type}</span>
         ) : (
           <span className="sr-only md:not-sr-only md:col-start-2 md:row-start-1">Adulto</span>
-        )}{" "}
+        )}
+        <Sep visible={Boolean(type)} />
         <span className={`${CELL} md:col-start-3`}>{side}</span>
         {withGroup && groupLabel ? (
           <>
-            {" "}
-            <span className={`${CELL} md:col-start-4 md:truncate`}>{groupLabel}</span>
+            <Sep visible />
+            <span className={`${CELL} md:col-start-4`}>{groupLabel}</span>
           </>
         ) : null}
         {withTable && tableLabel ? (
           <>
-            {" "}
+            <Sep visible />
             <span className={`${CELL} ${withGroup ? "md:col-start-5" : "md:col-start-4"}`}>
               {tableLabel}
             </span>

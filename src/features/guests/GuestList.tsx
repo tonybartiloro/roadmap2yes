@@ -32,6 +32,23 @@ export interface ListHandlers {
 
 const keyOf = (id: string | null) => id ?? "none";
 
+/** Column titles from 768 px: decoration (`aria-hidden`), shown ONCE per list, not per group. */
+function ColumnHeader({ handlers, withGroup }: { handlers: ListHandlers; withGroup: boolean }) {
+  const withTable = handlers.tableLabels !== null;
+  return (
+    <div
+      aria-hidden
+      className={`text-muted-foreground border-border hidden border-b py-1.5 pr-3 text-sm font-semibold md:grid md:gap-x-3 ${handlers.selecting ? "md:pl-12" : "md:pl-3"} ${rowColumns(withGroup, withTable)}`}
+    >
+      <span>Nome</span>
+      <span>Tipo</span>
+      <span>Lato</span>
+      {withGroup ? <span>Gruppo</span> : null}
+      {withTable ? <span>Tavolo</span> : null}
+    </div>
+  );
+}
+
 function Rows({
   id,
   guests,
@@ -53,16 +70,6 @@ function Rows({
   const withTable = handlers.tableLabels !== null;
   return (
     <>
-      <div
-        aria-hidden
-        className={`text-muted-foreground border-border hidden border-b py-1.5 pr-3 text-sm font-semibold md:grid md:gap-x-4 ${handlers.selecting ? "md:pl-12" : "md:pl-3"} ${rowColumns(withGroup, withTable)}`}
-      >
-        <span>Nome</span>
-        <span>Tipo</span>
-        <span>Lato</span>
-        {withGroup ? <span>Gruppo</span> : null}
-        {withTable ? <span>Tavolo</span> : null}
-      </div>
       <ul id={`list-${id}`} className="flex flex-col">
         {guests.slice(0, count).map((guest) => (
           <GuestRow
@@ -103,6 +110,7 @@ export function FlatList({
 }) {
   return (
     <div className="border-border bg-card rounded-lg border" data-testid="guest-list-flat">
+      <ColumnHeader handlers={handlers} withGroup />
       <Rows
         id="flat"
         guests={guests}
@@ -198,6 +206,9 @@ export function GroupedList({
   const listId = useId();
   return (
     <div className="flex flex-col gap-4" data-testid="guest-list" id={listId}>
+      <div className="hidden px-px md:block">
+        <ColumnHeader handlers={handlers} withGroup={false} />
+      </div>
       {sections.map((section) => {
         const key = keyOf(section.id);
         return (
