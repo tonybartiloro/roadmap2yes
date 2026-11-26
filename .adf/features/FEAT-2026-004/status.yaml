@@ -10,7 +10,7 @@ roadmap: R-04
 created: 2026-11-26
 updated: 2026-11-26
 gates:
-  a_requirements: pending    # pending | approved <date> by <name> | approved <date> via roadmap R-NN | skipped
+  a_requirements: "approved 2026-11-26 via roadmap R-04"
   b_plan: pending
   c_production: pending      # pending | approved <date> by <name> | not-needed
 environments:

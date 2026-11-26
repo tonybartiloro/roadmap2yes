@@ -5,7 +5,7 @@
      Approving the roadmap approves the requirements of every item at high level (gate A for its features);
      each feature still needs its plan approved (gate B). Adding or changing items needs the developer's approval again. -->
 
-Approval: approved 2026-11-25 by tonybartiloro
+Approval: approved 2026-11-26 by tonybartiloro
 
 Vision: `.adf/project.md → What this project is` · Stack decision: [ADR-0001](../docs/adr/0001-stack-auth-ambienti.md)
 
@@ -22,6 +22,7 @@ Vision: `.adf/project.md → What this project is` · Stack decision: [ADR-0001]
 | R-04 | Conferme di presenza (RSVP) con link personale | L | R-03 | in-progress | FEAT-2026-004 |
 | R-05 | Lista nozze | M | R-01 | todo | |
 | R-06 | Sala: disposizione visuale dei tavoli | M | R-03 | todo | |
+| R-07 | RSVP: strumenti della coppia (conteggi, filtri, risposta manuale, riepilogo alimentare, scadenza, coda invii) | M | R-04 | todo | |
 
 Le voci R-02…R-05 formano insieme la release "R2", approvata dallo sviluppatore il 2026-11-25. Fornitori, scheda location e confronto data×location (indicati come "R2" nel brief di FEAT-2026-001) sono rimandati a dopo questa release. R-03 e R-04 sono L per il rischio (dati personali di terzi, pagina pubblica senza login), non per la quantità di lavoro.
 
@@ -48,6 +49,7 @@ Le voci R-02…R-05 formano insieme la release "R2", approvata dallo sviluppator
 - **Scope:** link personale non indovinabile per invitato o gruppo, condiviso a mano (copia link / WhatsApp) finché le email sono spente; pagina pubblica senza login con i dati minimi del matrimonio, risposta per ogni persona del gruppo (sì/no, eventuali preferenze alimentari), modifica entro una scadenza; revoca e rigenerazione del link; stato delle risposte nella lista invitati.
 - **Main acceptance criteria (high level):** un link mostra solo i dati del proprio invitato/gruppo; link revocato o scaduto non funziona; la coppia vede chi ha risposto e chi no; protezione contro abusi (limiti, nessuna indicizzazione).
 - **Out:** invio automatico via email/SMS finché Resend non è attivo, sito pubblico completo del matrimonio.
+- **Divisione (2026-11-26, decisione D1 dello sviluppatore in F1 di FEAT-2026-004):** conteggi, filtri, risposta manuale, riepilogo alimentare, scadenza delle risposte, colonne CSV e coda di invio passano a R-07; R-04 resta il nucleo (link, pagina pubblica, risposta, stato in lista, scadenza dei link, abusi e privacy, export JSON).
 
 ### R-05 — Lista nozze
 - **Goal:** la coppia gestisce la propria lista nozze e tiene traccia dei regali ricevuti.
@@ -61,3 +63,10 @@ Aggiunta dallo sviluppatore il 2026-11-25 durante la F1 di FEAT-2026-003 (rispos
 - **Scope:** mappa della sala con i tavoli di R-03 (forma, posizione, capienza, invitati seduti); spostamento e riorganizzazione dei tavoli; alternativa senza trascinamento per l'accessibilità; pensata per tablet e computer, con la lista di R-03 come alternativa sul telefono. R-03 prevede già posizione e forma nel modello dei tavoli, così R-06 non richiede migrazioni distruttive.
 - **Main acceptance criteria (high level):** creare e spostare i tavoli sulla mappa; la disposizione resta salvata per entrambi i partner; ogni azione è possibile anche da tastiera; la lista dei tavoli resta coerente con la mappa.
 - **Out:** planimetria reale importata dalla location, misure in scala, posti numerati del singolo invitato (da decidere in F1).
+
+### R-07 — RSVP: strumenti della coppia (conteggi, filtri, risposta manuale, riepilogo alimentare, scadenza, coda invii)
+Separata da R-04 durante la F1 di FEAT-2026-004 per decisione dello sviluppatore (D1, 2026-11-26): è il passo 2 del brief di FEAT-2026-004 (ex AC15-AC21, `.adf/features/FEAT-2026-004/brief.md → Rimandato a R-07`); le decisioni D6, D7, D11, D12 e D13 di quel brief valgono anche qui.
+- **Goal:** la coppia usa le risposte raccolte con R-04 per organizzarsi: numeri per location e catering, chi sollecitare, risposte avute a voce, una data limite.
+- **Scope:** riepilogo "Presenze" in Invitati (Sì con adulti/bambini/neonati e posti, No, In attesa) cliccabile come filtro; filtri Presenza, Con preferenze alimentari, Link; risposta inserita a mano dalla coppia e "Segna presenza" multipla (conferma e Annulla che ripristina anche le preferenze); riepilogo alimentare sui soli Sì; scadenza delle risposte facoltativa (fine giornata Europe/Rome, poi pagina pubblica in sola lettura); colonne presenza e preferenze nel CSV degli invitati, ignorate dall'importazione; coda "Invia i link" per condividere i link uno dopo l'altro; avviso se la data viene scelta dopo le prime risposte.
+- **Main acceptance criteria (high level):** i numeri delle presenze tornano con la lista e ignorano gli eliminati; ogni filtro è usabile da tastiera e lettore di schermo; una risposta a mano non sovrascrive in silenzio quella dell'invitato (dialogo di conflitto); dopo la scadenza l'invitato non può più cambiare le risposte, la coppia sì; nessuna preferenza persa senza conferma e Annulla; CSV con andata e ritorno dell'anagrafica invariata.
+- **Out:** avvisi di nuove risposte (email o Home), invio automatico dei link, filtro "Risposte degli ultimi 7 giorni" (da valutare).

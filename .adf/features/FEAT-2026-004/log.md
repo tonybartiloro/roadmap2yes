@@ -20,3 +20,9 @@
 - PO brief: 19 AC, 3 steps, 8 questions. Architect ARC-1..10 (`reviews/f1-architect.md`; blocking ARC-3 token in Vercel request logs, ARC-4 link created on first use breaks iOS share; Q8 → derived token HMAC(`RSVP_LINK_SECRET`, id), ADR-0003; ARC-8 split). Designer DES-1..23 (`design.md` draft; blocking DES-1 theme/RsvpShell, DES-2 where share actions live).
 - PO response: 30 accepted, 1 in part (DES-17: per-IP limit only on invalid links, 429 instead of the neutral page when blocked), 2 rejected (ARC-7 simple bulk No without undo → DES-7 undo restores preferences; DES-21 "last 7 days" → follow-up). Brief now 21 AC: step 1 AC1-14 (shippable core), step 2 AC15-21 (couple tools). Open questions D1-D13 in `brief.md → Decisions`.
 - design.md is 26 KB (target 25 KB for L): the designer condenses it when finalising in F2.
+
+## F1 decisions and Gate A — 2026-11-26
+- Developer: "Accetto tutte" → D1-D13 accepted as proposed (`brief.md → Decisions`).
+- D1 split: FEAT-2026-004 = step 1 only (AC1-AC14); old AC15-AC21 → new roadmap item R-07 (M, depends on R-04). Roadmap re-approved 2026-11-26 (`adf roadmap approve`).
+- Answer deadline moved to R-07; here guests can answer until the link expires (BR7). New secret `RSVP_LINK_SECRET` (D4) and ADR-0003 (D3, D5) go into the plan.
+- Gate A recorded via roadmap R-04.
