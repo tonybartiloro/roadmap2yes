@@ -258,7 +258,7 @@ export const TABLES: Record<string, TableSpec> = {
     select: true,
     delete: "soft_deleted",
     insert: ["name", "wedding_id"],
-    update: ["deleted_at", "name"],
+    update: ["deleted_at", "name", "rsvp_mode"],
     patch: { name: "Hacked" },
   },
   guest_tables: {
@@ -301,6 +301,32 @@ export const TABLES: Record<string, TableSpec> = {
     ],
     patch: { first_name: "Hacked" },
   },
+  // FEAT-2026-004: SELECT-only (every write goes through the RPCs); token_hash is never readable.
+  rsvp_links: {
+    tenancy: "wedding",
+    key: "wedding_id",
+    select: true,
+    hidden: ["token_hash"],
+    insert: [],
+    update: [],
+    delete: false,
+  },
+  rsvp_link_people: {
+    tenancy: "wedding",
+    key: "wedding_id",
+    select: true,
+    insert: [],
+    update: [],
+    delete: false,
+  },
+  rsvp_responses: {
+    tenancy: "wedding",
+    key: "wedding_id",
+    select: true,
+    insert: [],
+    update: [],
+    delete: false,
+  },
 };
 
 /**
@@ -336,6 +362,12 @@ export const FUNCTIONS: Record<string, "user" | "service"> = {
   guests_bulk_undo: "user",
   import_guests: "user",
   undo_guest_import: "user",
+  rsvp_status: "user",
+  rsvp_create_links: "user",
+  rsvp_rotate_link: "user",
+  rsvp_revoke_link: "user",
+  rsvp_mark_shared: "user",
+  rsvp_unmark_shared: "user",
   record_heartbeat: "service",
   login_gate: "service",
   login_record: "service",

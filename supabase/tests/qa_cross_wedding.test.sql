@@ -9,7 +9,7 @@
 -- family (member of W1 with role `family`, which has NO rows in private.role_permissions).
 begin;
 \set su 'reset role; do $x$ begin perform set_config(''request.jwt.claims'','''',true); perform set_config(''request.jwt.claim.sub'','''',true); end $x$;'
-select plan(359);  -- generated per table: adding a table to the oracle changes this number (and must)
+select plan(386);  -- generated per table: adding a table to the oracle changes this number (and must)
 
 -- Oracle (see qa_catalog_matrix.test.sql for the full grant matrix).
 create temp table qx_t (
@@ -56,6 +56,11 @@ insert into qx_t (name, keycol, anycol, sel, upd_col, del, ins_sql, parent, del_
     $q$insert into public.guest_tables (wedding_id, name) values (%1$L, 'Extra')$q$, null, true),
   ('guests', 'wedding_id', 'wedding_id', true, 'first_name', true,
     $q$insert into public.guests (wedding_id, first_name, group_id) values (%1$L, 'Extra', %2$L)$q$, 'group', true);
+-- FEAT-2026-004: SELECT-only tables (no direct write at all; the RPCs are tested in rsvp_*.test.sql)
+insert into qx_t (name, keycol, anycol, sel, upd_col, del, ins_sql, parent) values
+  ('rsvp_links', 'wedding_id', 'wedding_id', true, null, false, null, null),
+  ('rsvp_link_people', 'wedding_id', 'wedding_id', true, null, false, null, null),
+  ('rsvp_responses', 'wedding_id', 'wedding_id', true, null, false, null, null);
 -- column "upd_col" is a granted column; the update below assigns it to itself.
 create temp table qx_ids (wedding uuid, kind text, id uuid);
 grant select on qx_t, qx_ids to public;
@@ -111,6 +116,13 @@ begin
   insert into public.guest_tables (wedding_id, name) values (p_wedding, 'Tavolo 1');
   insert into public.guests (wedding_id, first_name, group_id)
     select p_wedding, 'Mario', id from public.guest_groups where wedding_id = p_wedding;
+  insert into public.rsvp_links (id, wedding_id, group_id, shared_at, token_hash)
+    select gen_random_uuid(), p_wedding, id, now(), extensions.digest('qx-' || p_wedding, 'sha256')
+    from public.guest_groups where wedding_id = p_wedding;
+  insert into public.rsvp_link_people (link_id, guest_id, wedding_id)
+    select l.id, g.id, p_wedding from public.rsvp_links l join public.guests g on g.wedding_id = l.wedding_id where l.wedding_id = p_wedding;
+  insert into public.rsvp_responses (id, wedding_id, status)
+    select id, p_wedding, 'yes' from public.guests where wedding_id = p_wedding;
   insert into public.notification_log (wedding_id, user_id, kind, batch_key, status, sent_at, claimed_at)
     values (p_wedding, p_founder, 'reminder', 'qx-' || p_wedding, 'sent', now(), now());
   insert into qx_ids
