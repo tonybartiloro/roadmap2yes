@@ -41,3 +41,10 @@
 - T3 (3cd7bc1): `supabase/seeds/05_rsvp.sql` reuses the 04 demo wedding; fake local secret `local-fake-rsvp-secret-0123456789abcdef`, link id `00000000-0000-4000-8000-0000000a3001` → token `D-nIsgqL5dGbgoSIb9_oamFr3fXgA_dVLTkmc1J0vno` (T4 test vector; T11 must not use it).
 - T2 (a147c0f): `rsvp_attempts` + `rsvp_gate/page/submit` (service_role only), 140 pgTAP; db:test 1763 green. Deviations: `answered_at` in each person (for `seen_at`), malformed IP key = `invalid_key`, empty answers = `invalid_answers`. Signatures/codes for T5 in the T2 commit and `rsvp_public.test.sql`.
 - S1 review: code-1 (general) and code-2 (security round, L) on `c96b987..HEAD`.
+
+## F3 step S1 checkpoint — 2026-11-26
+- Reviews: code-1 REV-1..10 (2 should: limiter race, NUL case) → fixed/closed, approved; code-2 security APPROVED, nits REV-101..106 answered (101-103 fixed, 104/106 residuals for `sicurezza.md`, 105 note for S2). Fix commit 9c4b354.
+- Coordinator decisions: Q1 blank note → null in the T7 server action (DB rejects); Q2 create/rotate refuse after expiry (`link_expired`); Q3 explicit revoke = "Da rimandare" (D8); REV-2 NUL covered in T5/T10 (plan Change log).
+- `test:integration` found missing acceptance fixtures for the 3 tables and a real bug (service role could not insert into `rsvp_responses`: CHECK function without EXECUTE) → fixed in f81708a (grant to service_role only).
+- Carry-overs: T5 maps non-`invalid_answers` errors to a generic state and passes `p_ip_key: null` explicitly; T7 sends blank note as null and `answered_at` untouched as `seen_at`; S2/S3 list columns on `rsvp_links` (never `select('*')`); T10 adds the `\u0000` PostgREST case.
+- Tests: db:test 1778 green (26 files); test:integration 894 pass + 1 skipped; `adf verify` see below.
