@@ -284,3 +284,13 @@ Lo stato "schema non migrato" si prova con test dei componenti e d'integrazione,
 | 2026-11-25 | F3 S3: T11 modifica anche `src/domain/export/csv.ts` (guardia delle formule esatta all'andata e ritorno, REV-39); T14 aggiunge `src/features/export/data.test.ts`; `tests/acceptance/rls-api.test.ts` adattato da A al nuovo `ExportInput`; T13 aggiunge `disabled`/`description` a `MenuAction` e la prop `importNames` alla pagina `/invitati`; `undo_guest_import` cancella fisicamente il lotto (P4), con eccezione nel test "nessuna funzione purga gli invitati" | Proprietà dei file e dettagli emersi in revisione | coordinatore (nessun cambio di soluzione) |
 
 ## Outcome
+Stato al 2026-11-26 (F5, prima del merge; la produzione non è ancora toccata).
+- **Consegnato**: tutti e tre gli step (23 AC). Persone (anagrafica, famiglie/gruppi, filtri, azioni di massa con Annulla, eliminati di recente, 1200+ invitati senza tetto), Tavoli facoltativi (capienza, neonati senza posto), import CSV/testo con Annulla importazione ed export CSV e JSON, navigazione con Invitati e Guida in Opzioni, fascia calcolata, link dal Percorso. Colonne desktop (DES-03) costruite su richiesta dello sviluppatore.
+- **Dati**: 2 migrazioni additive (`20261202100000_guests.sql`, `20261202200000_guests_import.sql`), 5 RPC, ADR-0002 accepted.
+- **Decisioni di F3**: azioni per-richiesta limitate (massa 5.000, famiglia 100), non un tetto agli invitati; REV-47 esito d'importazione ignoto = messaggio, nessun nuovo tentativo; REV-53 `undo_guest_import` toglie solo persone intatte del lotto; DES-02 toast sopra la barra mobile; D-A = (c) nessuna prova su staging.
+- **Verifica**: `adf verify` pass sull'ultimo contenuto; e2e invitati 27/27; revisioni codice e design chiuse.
+- **Aperti**:
+  - smoke WebKit non eseguito in locale (WebKit non installato): resta alla CI;
+  - `partner.spec.ts:415` fallisce in locale perché la Supabase CLI locale invia il modello di recupero predefinito; non viene da questo branch;
+  - follow-up R-06 (Sala: disposizione visuale dei tavoli, usa `shape`/`pos_x`/`pos_y` già presenti);
+  - controlli post-deploy in produzione dopo il Gate C e il merge.
