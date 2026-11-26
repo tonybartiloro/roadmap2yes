@@ -1,0 +1,24 @@
+# p49 ADF feature status — updated through the ADF CLI (adf feature set / adf gate).
+id: FEAT-2026-004
+title: "RSVP: conferme di presenza con link personale"
+type: feature
+size: L
+phase: F1
+branch: feature/FEAT-2026-004-rsvp
+ticket: ""
+roadmap: R-04
+created: 2026-11-26
+updated: 2026-11-26
+gates:
+  a_requirements: pending    # pending | approved <date> by <name> | approved <date> via roadmap R-NN | skipped
+  b_plan: pending
+  c_production: pending      # pending | approved <date> by <name> | not-needed
+environments:
+  staging: pending           # pending | deployed <date> | not-applicable
+  production: pending
+links:
+  pr: ""
+  brief: ""
+  plan: ""
+  docs_functional: ""
+  docs_technical: ""
