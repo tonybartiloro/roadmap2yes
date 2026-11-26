@@ -27,7 +27,20 @@ create index rsvp_attempts_window_idx on private.rsvp_attempts (window_start);
 alter table private.rsvp_attempts enable row level security;
 revoke all on private.rsvp_attempts from public, anon, authenticated;
 
--- One hit on a key, atomically and race-free: the row is locked, then the decision is taken on it.
+-- The limits, in ONE place (BR9): invalid links per IP key, submits per link, window and lock. The
+-- cleanup below derives its age from here, so changing a window can never be shortened by it.
+create function private.rsvp_limits()
+returns table (max_ip integer, max_link integer, win interval, lock_for interval)
+language sql
+immutable
+set search_path = pg_catalog, pg_temp
+as $$
+  select 10, 20, interval '15 minutes', interval '15 minutes';
+$$;
+
+-- One hit on a key, atomically and race-free: the upsert itself takes the row lock (even on an
+-- existing row), so the cleanup can never delete it between "create" and "lock" (REV-1/101); the
+-- decision is then taken on the locked row.
 -- A locked key refuses (and is not extended); a finished window or lock restarts the count; reaching
 -- p_max locks for p_lock. The hit that reaches p_max is still allowed (the next one is refused).
 create function private.rsvp_hit(p_key bytea, p_max integer, p_window interval, p_lock interval)
@@ -39,8 +52,9 @@ as $$
 declare
   r private.rsvp_attempts;
 begin
-  insert into private.rsvp_attempts (key_hash) values (p_key) on conflict do nothing;
-  select * into r from private.rsvp_attempts a where a.key_hash = p_key for update;
+  insert into private.rsvp_attempts as a (key_hash) values (p_key)
+  on conflict (key_hash) do update set key_hash = excluded.key_hash
+  returning a.* into r;
   if r.locked_until is not null and r.locked_until > now() then
     return query select false, ceil(extract(epoch from (r.locked_until - now())))::integer;
     return;
@@ -61,6 +75,25 @@ begin
 end;
 $$;
 
+-- The two hits, with the limits above. IP key: one invalid link; link key: one submit.
+create function private.rsvp_hit_ip(p_ip_key bytea)
+returns void
+language sql
+security definer
+set search_path = pg_catalog, pg_temp
+as $$
+  select h.allowed from private.rsvp_limits() l, private.rsvp_hit(p_ip_key, l.max_ip, l.win, l.lock_for) h;
+$$;
+create function private.rsvp_hit_link(p_link uuid)
+returns table (allowed boolean, retry_after_seconds integer)
+language sql
+security definer
+set search_path = pg_catalog, pg_temp
+as $$
+  select h.allowed, h.retry_after_seconds
+  from private.rsvp_limits() l, private.rsvp_hit(extensions.digest(p_link::text, 'sha256'), l.max_link, l.win, l.lock_for) h;
+$$;
+
 -- Own cleanup (never the login one): finished, unlocked rows older than the window. skip locked: never
 -- wait for a concurrent hit.
 create function private.rsvp_attempts_gc()
@@ -72,7 +105,8 @@ as $$
   delete from private.rsvp_attempts a
   where a.key_hash in (
     select x.key_hash from private.rsvp_attempts x
-    where x.window_start < now() - interval '15 minutes' and (x.locked_until is null or x.locked_until <= now())
+    where x.window_start < now() - (select greatest(l.win, l.lock_for) from private.rsvp_limits() l)
+      and (x.locked_until is null or x.locked_until <= now())
     for update skip locked
   );
 $$;
@@ -202,7 +236,7 @@ begin
   if not found then
     perform private.rsvp_attempts_gc();
     if p_ip_key is not null then
-      perform 1 from private.rsvp_hit(p_ip_key, 10, interval '15 minutes', interval '15 minutes');
+      perform private.rsvp_hit_ip(p_ip_key);
     end if;
     return jsonb_build_object('ok', false);
   end if;
@@ -259,7 +293,7 @@ begin
   if not found then
     perform private.rsvp_attempts_gc();
     if p_ip_key is not null then
-      perform 1 from private.rsvp_hit(p_ip_key, 10, interval '15 minutes', interval '15 minutes');
+      perform private.rsvp_hit_ip(p_ip_key);
     end if;
     return jsonb_build_object('ok', false);
   end if;
@@ -270,7 +304,7 @@ begin
   end if;
 
   perform private.rsvp_attempts_gc();
-  select * into v_hit from private.rsvp_hit(extensions.digest(v_link.link_id::text, 'sha256'), 20, interval '15 minutes', interval '15 minutes');
+  select * into v_hit from private.rsvp_hit_link(v_link.link_id);
   if not v_hit.allowed then
     return jsonb_build_object('ok', false, 'blocked', true, 'retry_after_seconds', v_hit.retry_after_seconds);
   end if;
@@ -315,7 +349,10 @@ $$;
 
 -- EXECUTE: nobody but service_role.
 revoke all on function
+  private.rsvp_limits(),
   private.rsvp_hit(bytea, integer, interval, interval),
+  private.rsvp_hit_ip(bytea),
+  private.rsvp_hit_link(uuid),
   private.rsvp_attempts_gc(),
   private.rsvp_resolve(bytea, timestamptz),
   private.rsvp_people_json(uuid, uuid, timestamptz),

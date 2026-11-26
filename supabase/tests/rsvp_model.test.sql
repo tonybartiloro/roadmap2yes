@@ -4,7 +4,7 @@
 -- All names, notes and emails are FAKE.
 begin;
 \set su 'reset role; do $x$ begin perform set_config(''request.jwt.claims'','''',true); perform set_config(''request.jwt.claim.sub'','''',true); end $x$;'
-select plan(133);
+select plan(136);
 
 -- rows touched by a statement (a data-modifying CTE cannot sit inside a function argument)
 create function pg_temp.rm_rows(p_sql text) returns int language plpgsql as
@@ -301,6 +301,10 @@ select throws_ok($$select public.rsvp_unmark_shared('d4000000-0000-4000-8000-000
 select throws_ok($$select public.rsvp_unmark_shared('d4000000-0000-4000-8000-0000000000b3', '{"people":["nope"]}')$$, 'P0001', 'invalid_previous', 'unmark: a bad id');
 select throws_ok($$select public.rsvp_unmark_shared('d4000000-0000-4000-8000-0000000000b3', '{"shared_at":"never","people":[]}')$$, 'P0001', 'invalid_previous', 'unmark: a bad timestamp');
 select throws_ok($$select public.rsvp_unmark_shared(gen_random_uuid(), '{"people":[]}')$$, 'P0001', 'link_not_found', 'unmark: unknown link');
+-- REV-7/103: the attribution is never taken from the client
+select lives_ok($$select public.rsvp_unmark_shared('d4000000-0000-4000-8000-0000000000b3', '{"shared_at":"2020-01-01T10:00:00Z","shared_by":"00000000-0000-4000-8000-00000000dead","people":[]}')$$, 'unmark with a restored shared_at and a forged shared_by');
+select is((select shared_by from public.rsvp_links where id = 'd4000000-0000-4000-8000-0000000000b3'), :'w1_founder'::uuid, 'shared_by is the caller, not what the client sent');
+select throws_ok($$select public.rsvp_unmark_shared('d4000000-0000-4000-8000-0000000000b3', '{"shared_at":"2999-01-01T00:00:00Z","people":[]}')$$, 'P0001', 'invalid_previous', 'a "Condiviso il" in the future is refused');
 :su
 
 -- ===== undo_guest_import: narrow rule (PO-2) ==========================================================

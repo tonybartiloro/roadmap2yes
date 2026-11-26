@@ -740,13 +740,13 @@ isOneToOne: false
 { Args: { "p_invitation_id": string,"p_token_hash": string }; Returns: Json
                            },
 "rsvp_create_links":
-{ Args: { "p_items": Json }; Returns: Json
+{ Args: { "p_items": Json,"p_now"?: string }; Returns: Json
                            },
 "rsvp_gate":
 { Args: { "p_ip_key"?: string,"p_now"?: string,"p_token_hash": string }; Returns: Json
                            },
 "rsvp_mark_shared":
-{ Args: { "p_link_id": string }; Returns: Json
+{ Args: { "p_link_id": string,"p_now"?: string }; Returns: Json
                            },
 "rsvp_page":
 { Args: { "p_ip_key"?: string,"p_now"?: string,"p_token_hash": string }; Returns: Json
@@ -755,7 +755,7 @@ isOneToOne: false
 { Args: { "p_link_id": string }; Returns: Json
                            },
 "rsvp_rotate_link":
-{ Args: { "p_link_id": string,"p_new_hash": string,"p_new_id": string }; Returns: Json
+{ Args: { "p_link_id": string,"p_new_hash": string,"p_new_id": string,"p_now"?: string }; Returns: Json
                            },
 "rsvp_status":
 { Args: { "p_now"?: string }; Returns: Json

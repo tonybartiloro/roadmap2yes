@@ -4,7 +4,7 @@
 -- tested with the real roles.
 begin;
 \set su 'reset role; do $x$ begin perform set_config(''request.jwt.claims'','''',true); perform set_config(''request.jwt.claim.sub'','''',true); end $x$;'
-select plan(140);
+select plan(146);
 
 create function pg_temp.h(p text) returns bytea language sql as $$ select extensions.digest('pub-' || p, 'sha256') $$;
 create function pg_temp.ik(p text) returns bytea language sql as $$ select extensions.digest('ip-' || p, 'sha256') $$;
@@ -82,7 +82,7 @@ select is((select array_agg(p.proname::text order by p.proname::text) from pg_pr
   array['rsvp_gate', 'rsvp_page', 'rsvp_submit']::text[], 'the three public RPCs are SECURITY DEFINER');
 select is((select p.provolatile::text from pg_proc p where p.proname = 'rsvp_gate' and p.pronamespace = 'public'::regnamespace), 's', 'rsvp_gate is STABLE (QA-11)');
 select is((select count(*)::int from pg_class c where c.relnamespace = 'private'::regnamespace and c.relname = 'rsvp_attempts' and c.relrowsecurity), 1, 'private.rsvp_attempts has RLS');
-select is((select count(*)::int from pg_proc p where p.pronamespace = 'private'::regnamespace and p.proname in ('rsvp_hit', 'rsvp_attempts_gc', 'rsvp_resolve', 'rsvp_people_json', 'rsvp_item_ok')
+select is((select count(*)::int from pg_proc p where p.pronamespace = 'private'::regnamespace and p.proname in ('rsvp_hit', 'rsvp_hit_ip', 'rsvp_hit_link', 'rsvp_limits', 'rsvp_attempts_gc', 'rsvp_resolve', 'rsvp_people_json', 'rsvp_item_ok')
   and (has_function_privilege('anon', p.oid, 'execute') or has_function_privilege('authenticated', p.oid, 'execute'))), 0, 'the private helpers are not executable by API roles');
 select is((select count(*)::int from pg_proc p where p.pronamespace = 'private'::regnamespace and p.prosrc ~* 'login_attempts' and p.proname like 'rsvp%'), 0, 'the limiter does not share the login table or its cleanup');
 
@@ -183,7 +183,13 @@ select is((select failed_count || ':' || (locked_until is null)::text from priva
 insert into private.rsvp_attempts (key_hash, failed_count, window_start, locked_until) values
   (pg_temp.ik('old-free'), 3, now() - interval '2 hours', null),
   (pg_temp.ik('old-locked'), 10, now() - interval '2 hours', now() + interval '5 minutes');
+insert into private.rsvp_attempts (key_hash, failed_count, window_start, locked_until) values
+  (pg_temp.ik('mid'), 3, now() - interval '10 minutes', null),
+  (pg_temp.ik('old20'), 3, now() - interval '20 minutes', null);
+select is((select l.max_ip || ':' || l.max_link || ':' || l.win || ':' || l.lock_for from private.rsvp_limits() l), '10:20:00:15:00:00:15:00', 'the limits live in ONE function (10 per IP, 20 per link, 15 min window, 15 min lock)');
 select public.rsvp_page(pg_temp.h('bad-gc'), pg_temp.ik('k5')) as x \gset gc_
+select is((select count(*)::int from private.rsvp_attempts where key_hash = pg_temp.ik('mid')), 1, 'cleanup follows the limits: a row inside the window (10 min) is kept');
+select is((select count(*)::int from private.rsvp_attempts where key_hash = pg_temp.ik('old20')), 0, 'and one past the window (20 min) is dropped');
 select is((select count(*)::int from private.rsvp_attempts where key_hash = pg_temp.ik('old-free')), 0, 'cleanup: a finished unlocked window is dropped');
 select is((select count(*)::int from private.rsvp_attempts where key_hash = pg_temp.ik('old-locked')), 1, 'cleanup: a locked row is kept');
 select is((select count(*)::int from private.rsvp_attempts where key_hash = pg_temp.ik('k1')), 1, 'cleanup: a fresh row is kept');
@@ -246,6 +252,16 @@ select public.rsvp_submit(pg_temp.h('gt'), null, jsonb_build_array(pg_temp.ans(:
 select is((select array_agg(e ->> 'first_name' order by e ->> 'first_name') from jsonb_array_elements(:'s7_r'::jsonb -> 'people') e), array['Mario', 'Neo']::text[], 'AC11: a person who left is no longer in the answer');
 select is((select status from public.rsvp_responses where id = :'gigi'::uuid), 'yes', 'and their answer was not touched by this submit');
 update public.guests set group_id = 'a6000000-0000-4000-8000-000000000001' where id = :'gigi'::uuid;
+
+-- seen_at is compared at microsecond precision: the untouched string round-trips, a truncated one does not (REV-4)
+update public.rsvp_responses set answered_at = timestamptz '2026-01-01 10:00:00.123456+00' where id = :'mario'::uuid;
+select e ->> 'answered_at' as us_ts from jsonb_array_elements(public.rsvp_page(pg_temp.h('gt'), null) -> 'people') e where e ->> 'id' = :'mario' \gset
+select is(:'us_ts'::text, '2026-01-01T10:00:00.123456+00:00'::text, 'the page carries answered_at with microseconds');
+select is(public.rsvp_submit(pg_temp.h('gt'), null, jsonb_build_array(pg_temp.ans(:'mario'::uuid, 'no', null, null, :'us_ts'))) -> 'changed_meanwhile', '[]'::jsonb,
+  'sending the untouched string back: nothing changed meanwhile');
+update public.rsvp_responses set answered_at = timestamptz '2026-01-01 10:00:00.123456+00' where id = :'mario'::uuid;
+select is((public.rsvp_submit(pg_temp.h('gt'), null, jsonb_build_array(pg_temp.ans(:'mario'::uuid, 'no', null, null, '2026-01-01T10:00:00.123+00:00'))) -> 'changed_meanwhile') ->> 0, :'mario',
+  'a value truncated to milliseconds (a client that parsed and re-serialised it) reports a change: T7 must pass the string through');
 
 -- ===== Validation: invalid_answers, never a 500, nothing written (QA-8) =================================
 select count(*) as n from public.rsvp_responses \gset v0_

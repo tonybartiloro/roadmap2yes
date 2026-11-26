@@ -18,7 +18,7 @@
 -- ---------------------------------------------------------------------------------------------
 
 -- Composite FKs from the RSVP tables to a person need this (guest_groups already has it).
-alter table public.guests add constraint guests_id_wedding_key unique (id, wedding_id);
+alter table public.guests add constraint guests_id_wedding_id_key unique (id, wedding_id);
 
 -- BR1/BR3: "together" (default) = one link answers for the whole group; "separate" = each member is
 -- a recipient on their own. Structural, so it is audited. Written with the version + column grant.
@@ -194,6 +194,17 @@ as $$
   where d.wedding_id = p_wedding and d.key = 'date' and d.status = 'taken';
 $$;
 
+-- The one place that says "expired": the Europe/Rome day of p_now is after date + 30 (BR7, AC12).
+-- Used by the rules below and by the couple RPCs (defence in depth: no creation after the expiry).
+create function private.rsvp_is_expired(p_wedding uuid, p_now timestamptz default null)
+returns boolean
+language sql
+stable
+set search_path = pg_catalog, pg_temp
+as $$
+  select coalesce((coalesce(p_now, now()) at time zone 'Europe/Rome')::date > private.rsvp_expires_on(p_wedding), false);
+$$;
+
 -- BR1-BR4: which (link, person) pairs work NOW. A link works when it is not revoked, not expired
 -- (the Europe/Rome day of p_now is after date + 30) and its target is currently a recipient:
 --   * group link: the group is live and "together"; it covers the group's live members;
@@ -206,10 +217,8 @@ stable
 set search_path = pg_catalog, pg_temp
 as $$
 #variable_conflict use_column
-declare
-  v_exp date := private.rsvp_expires_on(p_wedding);
 begin
-  if v_exp is not null and (coalesce(p_now, now()) at time zone 'Europe/Rome')::date > v_exp then
+  if private.rsvp_is_expired(p_wedding, p_now) then
     return;
   end if;
   return query
@@ -294,7 +303,7 @@ $$;
 -- token_hash is the sha256 of the derived token as a bytea literal (`\x...`, 32 bytes). Creates only
 -- for CURRENT recipients that have no non-revoked link; every other item is skipped silently. A
 -- malformed item refuses the whole call (`invalid_items`); more than 1000 items: `too_many_items`.
-create function public.rsvp_create_links(p_items jsonb)
+create function public.rsvp_create_links(p_items jsonb, p_now timestamptz default null)
 returns jsonb
 language plpgsql
 security definer
@@ -319,6 +328,10 @@ begin
   end if;
   if jsonb_array_length(p_items) > 1000 then
     raise exception 'too_many_items' using errcode = 'P0001';
+  end if;
+  -- AC12 defence in depth: a link created after the expiry would be dead on arrival.
+  if private.rsvp_is_expired(v_wedding, p_now) then
+    raise exception 'link_expired' using errcode = 'P0001';
   end if;
   begin
     for v_item in select e from jsonb_array_elements(p_items) e loop
@@ -367,7 +380,7 @@ $$;
 -- rsvp_rotate_link(old id, new id, new hash) -> { link_id }   (AC7, atomic)
 -- Revokes the non-revoked link and creates the new one on the same target; the old people snapshot
 -- stays with the old link, answers are untouched. The new link starts as "Da condividere".
-create function public.rsvp_rotate_link(p_link_id uuid, p_new_id uuid, p_new_hash bytea)
+create function public.rsvp_rotate_link(p_link_id uuid, p_new_id uuid, p_new_hash bytea, p_now timestamptz default null)
 returns jsonb
 language plpgsql
 security definer
@@ -384,6 +397,9 @@ begin
   where l.id = p_link_id and l.wedding_id = v_wedding for update;
   if not found or v_old.revoked_at is not null then
     raise exception 'link_not_found' using errcode = 'P0001';
+  end if;
+  if private.rsvp_is_expired(v_wedding, p_now) then
+    raise exception 'link_expired' using errcode = 'P0001';
   end if;
   if p_new_id is null or p_new_hash is null or octet_length(p_new_hash) <> 32 then
     raise exception 'invalid_link' using errcode = 'P0001';
@@ -427,7 +443,7 @@ $$;
 -- Stamps "Condiviso il" and ADDS the people the link covers now to its snapshot (union: a person
 -- stays "da rimandare" until a working link covers them again). `previous` is what Annulla takes back.
 -- Only a working link can be marked: `link_not_working` (revoked, expired, dormant or empty).
-create function public.rsvp_mark_shared(p_link_id uuid)
+create function public.rsvp_mark_shared(p_link_id uuid, p_now timestamptz default null)
 returns jsonb
 language plpgsql
 security definer
@@ -448,7 +464,7 @@ begin
     raise exception 'link_not_found' using errcode = 'P0001';
   end if;
   select coalesce(array_agg(c.guest_id), '{}'::uuid[]) into v_people
-  from private.rsvp_cover(v_wedding, p_link_id, now()) c;
+  from private.rsvp_cover(v_wedding, p_link_id, p_now) c;
   if cardinality(v_people) = 0 then
     raise exception 'link_not_working' using errcode = 'P0001';
   end if;
@@ -466,7 +482,8 @@ end;
 $$;
 
 -- rsvp_unmark_shared(id, previous) -> { link_id }   (Annulla of "Condiviso il")
--- Puts back shared_at, shared_by and the exact previous snapshot (people deleted meanwhile are skipped).
+-- Puts back shared_at and the exact previous snapshot (people deleted meanwhile are skipped). The
+-- attribution (shared_by) is NOT taken from `previous`: it becomes the caller, or null if nothing was shared.
 create function public.rsvp_unmark_shared(p_link_id uuid, p_previous jsonb)
 returns jsonb
 language plpgsql
@@ -490,12 +507,17 @@ begin
   end if;
   begin
     v_shared_at := nullif(p_previous ->> 'shared_at', '')::timestamptz;
-    v_shared_by := nullif(p_previous ->> 'shared_by', '')::uuid;
     select coalesce(array_agg(x::uuid), '{}'::uuid[]) into v_people
     from jsonb_array_elements_text(p_previous -> 'people') x;
   exception when data_exception then
     raise exception 'invalid_previous' using errcode = 'P0001';
   end;
+  -- Nothing the client sends is trusted for attribution: shared_by is the caller (REV-7/103), and a
+  -- "Condiviso il" in the future is refused.
+  if v_shared_at > now() then
+    raise exception 'invalid_previous' using errcode = 'P0001';
+  end if;
+  v_shared_by := case when v_shared_at is null then null else auth.uid() end;
   select l.id into v_id from public.rsvp_links l
   where l.id = p_link_id and l.wedding_id = v_wedding for update;
   if v_id is null then
@@ -570,21 +592,22 @@ revoke all on function
   private.rsvp_diet_ok(text[]),
   private.rsvp_responses_stamp(),
   private.rsvp_expires_on(uuid),
+  private.rsvp_is_expired(uuid, timestamptz),
   private.rsvp_cover(uuid, uuid, timestamptz),
   private.rsvp_link_people(uuid, timestamptz),
   public.rsvp_status(timestamptz),
-  public.rsvp_create_links(jsonb),
-  public.rsvp_rotate_link(uuid, uuid, bytea),
+  public.rsvp_create_links(jsonb, timestamptz),
+  public.rsvp_rotate_link(uuid, uuid, bytea, timestamptz),
   public.rsvp_revoke_link(uuid),
-  public.rsvp_mark_shared(uuid),
+  public.rsvp_mark_shared(uuid, timestamptz),
   public.rsvp_unmark_shared(uuid, jsonb)
 from public, anon, authenticated;
 
 grant execute on function
   public.rsvp_status(timestamptz),
-  public.rsvp_create_links(jsonb),
-  public.rsvp_rotate_link(uuid, uuid, bytea),
+  public.rsvp_create_links(jsonb, timestamptz),
+  public.rsvp_rotate_link(uuid, uuid, bytea, timestamptz),
   public.rsvp_revoke_link(uuid),
-  public.rsvp_mark_shared(uuid),
+  public.rsvp_mark_shared(uuid, timestamptz),
   public.rsvp_unmark_shared(uuid, jsonb)
 to authenticated;

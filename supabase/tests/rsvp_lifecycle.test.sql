@@ -6,7 +6,7 @@
 -- "-" means the neutral page. Labels: g/h = group link, a/l = personal link of A/L. All data is FAKE.
 -- Rows cover BR1-BR5, P2, P6, AC5, AC7, AC9, AC12.
 begin;
-select plan(74);
+select plan(80);
 
 create temp sequence lc_seq;
 create temp table lc_w (wedding uuid primary key, founder uuid not null);
@@ -135,6 +135,15 @@ declare
 begin
   if exists (select 1 from private.rsvp_cover(p_w, null, p_now) c group by c.guest_id having count(*) > 1) then
     raise exception 'invariant: a person is covered by two links';
+  end if;
+  -- REV-9 / P2: the public page (rsvp_resolve) and the list (cover) read the same rule, for every link
+  if exists (
+    select 1 from unnest(array['a1', 'a2', 'g1', 'g2', 'h1', 'l1']) as lb (label)
+    join public.rsvp_links l on l.wedding_id = p_w and l.token_hash = pg_temp.lc_th(p_w, lb.label)
+    where exists (select 1 from private.rsvp_resolve(pg_temp.lc_th(p_w, lb.label), p_now))
+      is distinct from exists (select 1 from private.rsvp_cover(p_w, l.id, p_now))
+  ) then
+    raise exception 'invariant: rsvp_resolve (the page) disagrees with the cover (the list)';
   end if;
   select string_agg(x.label || '=' || x.ppl, ' ' order by x.label) into v_links
   from (
@@ -378,6 +387,25 @@ select is(private.rsvp_expires_on(:'wd'::uuid), private.rome_today(), 'date + 30
 select is(pg_temp.lc_obs(:'wd'::uuid, null), 'g1=A,B,C R:-', 'the last day still works with the real clock');
 select pg_temp.lc_reopen(:'wd'::uuid);
 select is(private.rsvp_expires_on(:'wd'::uuid), null, 'date reopened: no expiry');
+-- AC12 defence in depth (REV-8): after the expiry the couple RPCs refuse; mark_shared follows p_now.
+create function pg_temp.lc_items(p_w uuid, p_label text, p_kind text, p_name text) returns jsonb language sql as $$
+  select jsonb_build_array(jsonb_build_object('link_id', gen_random_uuid(), 'token_hash', '\x' || encode(pg_temp.lc_th(p_w, p_label), 'hex'),
+    case p_kind when 'group' then 'group_id' else 'guest_id' end,
+    case p_kind when 'group' then pg_temp.lc_grp(p_w, p_name) else pg_temp.lc_gid(p_w, p_name) end)) $$;
+select pg_temp.lc_new('together') as we \gset
+select pg_temp.lc_mk(:'we'::uuid, 'g1', 'group', 'G', true);
+select pg_temp.lc_set_date(:'we'::uuid, date '2027-03-10');
+select format('select public.rsvp_create_links(%L::jsonb, %L::timestamptz)', pg_temp.lc_items(:'we'::uuid, 'l1', 'guest', 'L')::text, '2027-04-10 00:00:00 Europe/Rome') as sql_ce \gset
+select format('select public.rsvp_create_links(%L::jsonb, %L::timestamptz)', pg_temp.lc_items(:'we'::uuid, 'l1', 'guest', 'L')::text, '2027-04-09 23:59:59 Europe/Rome') as sql_co \gset
+select throws_ok(format($$select pg_temp.lc_fnd(%L, %L)$$, :'we', :'sql_ce'), 'P0001', 'link_expired', 'create_links after the expiry: link_expired');
+select is(jsonb_array_length(pg_temp.lc_fnd(:'we'::uuid, :'sql_co')::jsonb -> 'created'), 1, 'create_links on the last valid day works');
+select format('select public.rsvp_rotate_link(%L, %L, %L::bytea, %L::timestamptz)', pg_temp.lc_lid(:'we'::uuid, 'g1'), gen_random_uuid(),
+  '\x' || encode(pg_temp.lc_th(:'we'::uuid, 'g2'), 'hex'), '2027-04-10 00:00:00 Europe/Rome') as sql_re \gset
+select throws_ok(format($$select pg_temp.lc_fnd(%L, %L)$$, :'we', :'sql_re'), 'P0001', 'link_expired', 'rotate after the expiry: link_expired');
+select is((select revoked_at is null from public.rsvp_links where id = pg_temp.lc_lid(:'we'::uuid, 'g1')), true, 'and the link was not revoked');
+select format('select public.rsvp_mark_shared(%L, %L::timestamptz)', pg_temp.lc_lid(:'we'::uuid, 'l1'), '2027-04-10 00:00:00 Europe/Rome') as sql_me \gset
+select throws_ok(format($$select pg_temp.lc_fnd(%L, %L)$$, :'we', :'sql_me'), 'P0001', 'link_not_working', 'mark_shared evaluates "works" with p_now: an expired link cannot be marked');
+select is(pg_temp.lc_fnd(:'we'::uuid, format('select public.rsvp_mark_shared(%L, %L::timestamptz)', pg_temp.lc_lid(:'we'::uuid, 'l1'), '2027-04-09 23:59:59 Europe/Rome'))::jsonb -> 'previous' ->> 'shared_at', null, 'and the same call before the expiry works');
 select is((select count(*)::int from lc_cases), 54, 'the matrix has 54 rows (adding one changes the plan on purpose)');
 
 select * from finish();
