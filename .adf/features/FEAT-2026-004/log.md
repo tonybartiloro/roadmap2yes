@@ -47,4 +47,4 @@
 - Coordinator decisions: Q1 blank note → null in the T7 server action (DB rejects); Q2 create/rotate refuse after expiry (`link_expired`); Q3 explicit revoke = "Da rimandare" (D8); REV-2 NUL covered in T5/T10 (plan Change log).
 - `test:integration` found missing acceptance fixtures for the 3 tables and a real bug (service role could not insert into `rsvp_responses`: CHECK function without EXECUTE) → fixed in f81708a (grant to service_role only).
 - Carry-overs: T5 maps non-`invalid_answers` errors to a generic state and passes `p_ip_key: null` explicitly; T7 sends blank note as null and `answered_at` untouched as `seen_at`; S2/S3 list columns on `rsvp_links` (never `select('*')`); T10 adds the `\u0000` PostgREST case.
-- Tests: db:test 1778 green (26 files); test:integration 894 pass + 1 skipped; `adf verify` see below.
+- Tests: db:test 1778 green (26 files); test:integration 894 pass + 1 skipped; `adf verify` pass on 828f4a350dc1 (lint, typecheck, unit, build).
