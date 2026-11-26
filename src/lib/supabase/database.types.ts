@@ -742,8 +742,14 @@ isOneToOne: false
 "rsvp_create_links":
 { Args: { "p_items": Json }; Returns: Json
                            },
+"rsvp_gate":
+{ Args: { "p_ip_key"?: string,"p_now"?: string,"p_token_hash": string }; Returns: Json
+                           },
 "rsvp_mark_shared":
 { Args: { "p_link_id": string }; Returns: Json
+                           },
+"rsvp_page":
+{ Args: { "p_ip_key"?: string,"p_now"?: string,"p_token_hash": string }; Returns: Json
                            },
 "rsvp_revoke_link":
 { Args: { "p_link_id": string }; Returns: Json
@@ -753,6 +759,9 @@ isOneToOne: false
                            },
 "rsvp_status":
 { Args: { "p_now"?: string }; Returns: Json
+                           },
+"rsvp_submit":
+{ Args: { "p_answers": Json,"p_ip_key": string,"p_now"?: string,"p_token_hash": string }; Returns: Json
                            },
 "rsvp_unmark_shared":
 { Args: { "p_link_id": string,"p_previous": Json }; Returns: Json

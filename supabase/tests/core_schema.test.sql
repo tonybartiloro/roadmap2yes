@@ -40,7 +40,8 @@ select is(
      and not has_function_privilege('authenticated', p.oid, 'execute')),
   array['auth_user_id_by_email', 'invitation_by_token', 'job_claim_notification', 'job_fail_notification',
     'job_mark_notification_sent', 'job_quota_status', 'job_recipients', 'job_sent_item_keys',
-    'job_unsubscribe', 'login_gate', 'login_record', 'record_heartbeat', 'sync_timeline']::text[],
+    'job_unsubscribe', 'login_gate', 'login_record', 'record_heartbeat', 'rsvp_gate', 'rsvp_page', 'rsvp_submit',
+    'sync_timeline']::text[],
   'secret-key-only functions are not executable by authenticated');
 
 select is(
