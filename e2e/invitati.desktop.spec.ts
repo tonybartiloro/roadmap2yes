@@ -15,7 +15,16 @@
 import type { Page } from "@playwright/test";
 import { loginAs } from "./support/auth";
 import { expect, newSession, serviceClient, test, uniqueIp } from "./support/fixtures";
-import { addGuest, seedGuests, seedWedding, type SeededGuests, type SeededWedding } from "./support/seed";
+import { axeFindings, describeFindings } from "./support/axe";
+import {
+  addGuest,
+  addGuestGroup,
+  addGuestTable,
+  seedGuests,
+  seedWedding,
+  type SeededGuests,
+  type SeededWedding,
+} from "./support/seed";
 
 test.describe.configure({ timeout: 120_000 });
 
@@ -84,6 +93,61 @@ test("conflict: 'Annulla' keeps the partner's version and shows it; the Home of 
   await page.goto("/");
   await expect(page.getByRole("main")).not.toContainText(/Mario|Bianchi|Nota di Tony/);
   await b.context.close();
+});
+
+test("desktop columns: 5 columns at 768 px keep the name readable and the rows short; no sideways scroll and axe clean at 1100 px, also while selecting (DES-03)", async ({
+  page,
+}) => {
+  const w = await seedWedding({ templateTasks: false, names: { a: "Tony", b: "Jessica" } });
+  // realistic group and table names; the person's name is the long one (stress on the Nome column)
+  const group = await addGuestGroup(w, "Famiglia Esempio");
+  const table = await addGuestTable(w, "Tavolo 3", { capacity: 8 });
+  const people: [string, string, "adult" | "child" | "infant", "A" | "B" | "both" | null][] = [
+    ["Bartolomeo", "Esempio-Montefiascone", "adult", "A"],
+    ["Luca", "Esempio", "child", "B"],
+    ["Neo", "Esempio", "infant", "both"],
+    ["Anna", "Esempio", "adult", null],
+  ];
+  for (const [first, last, category, side] of people) {
+    await addGuest(w, { firstName: first, lastName: last, category, side, groupId: group, tableId: table });
+  }
+  await loginAs(page, w.wedding.founder, uniqueIp());
+  await page.setViewportSize({ width: 768, height: 900 });
+  await page.goto("/invitati");
+  // a search makes the list flat: name, type, side, group and table = 5 columns
+  await page.getByRole("searchbox", { name: "Cerca per nome" }).fill("Esempio");
+  await expect(page.getByTestId("guest-row")).toHaveCount(4);
+  await expect(page.locator('[aria-hidden="true"].md\\:grid')).toHaveCount(1); // one header per list
+  const rows = page.getByTestId("guest-row");
+  for (let i = 0; i < 4; i++) {
+    const row = rows.nth(i);
+    const grid = row.locator("button > span").first();
+    const name = grid.locator("> span").first();
+    const tracks = await grid.evaluate((el) => getComputedStyle(el).gridTemplateColumns.split(" ").length);
+    expect(tracks, "5 columns").toBe(5);
+    const nameBox = (await name.boundingBox())!;
+    const rowBox = (await row.boundingBox())!;
+    const rem = await page.evaluate(() => parseFloat(getComputedStyle(document.documentElement).fontSize));
+    expect(nameBox.width, `name cell of row ${i}`).toBeGreaterThanOrEqual(7 * rem);
+    expect(rowBox.height, `height of row ${i}`).toBeLessThanOrEqual(80);
+  }
+
+  await page.setViewportSize({ width: 1100, height: 900 });
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth),
+  ).toBeLessThanOrEqual(0);
+  const list = await axeFindings(page);
+  expect(list, describeFindings(list)).toEqual([]);
+
+  await page.getByRole("button", { name: "Altro", exact: true }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Seleziona" }).click();
+  await page.getByRole("checkbox", { name: "Seleziona Luca Esempio" }).check();
+  await expect(page.getByTestId("selection-bar")).toBeVisible();
+  await expect
+    .poll(() => page.evaluate(() => document.getAnimations().filter((a) => a.effect?.getComputedTiming().iterations !== Infinity).length))
+    .toBe(0);
+  const selecting = await axeFindings(page);
+  expect(selecting, describeFindings(selecting)).toEqual([]);
 });
 
 test.describe.serial("scale: 500, then 1200 guests in one wedding", () => {

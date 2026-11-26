@@ -60,6 +60,11 @@ None seen in the new specs (each run at least twice). `percorso.spec.ts:334` pas
 ## Rerun after design-1 (a844366, 8f84e5a)
 Fresh build, `E2E_PORT=3300`, only the affected specs: all `invitati*.spec.ts` (mobile and desktop), `export.spec.ts`, `guida.nav.spec.ts` and `themes.spec.ts` (including the guests themes test) pass. One assertion was updated, same intent: the "group already at this table" case now says "Nessuno aggiunto: sono rimasti dove erano." (was "Nessuno da aggiungere: sono già tutti seduti."). No product failure. The new row text, the alphabetical flat list and the new table-sheet order needed no change in the tests. Scale numbers unchanged (500 guests: list ready about 240-280 ms; search over 1200: 34 ms).
 
+## Rerun after DES-03 (e770add)
+Fresh build, `E2E_PORT=3300`, mobile and desktop: all `invitati*.spec.ts`, `themes.spec.ts`, `guida.nav.spec.ts`, `export.spec.ts`: 58 passed, 1 failed (REV-63 below). New desktop check in `invitati.desktop.spec.ts`: at 768 px, flat list with a table, 5 grid columns, the Nome cell is at least 7rem wide and rows are at most 80 px tall; at 1100 px no sideways scroll and axe clean, also in selection mode. 500 guests: list ready 349-371 ms; search over 1200: 33 ms. Note: with an extreme group name ("Famiglia Esempio Lunghissima", 28 characters) a row reaches 89 px at 768 px; the test uses realistic names.
+
+**REV-63 (should, product):** at 390 px the visible separator is drawn WITHOUT spaces: "Bambino·Tony". The text is "Bambino · Tony" (innerText and accessible name are right), but the measured gap is 0 px before and 0 px after the dot: the spaces are whitespace text nodes between flex items (`flex flex-wrap` in `GuestRow.tsx`, `Sep`), which the browser does not render. Test: `invitati.mobile.spec.ts` "at 390 px the visible separator has spaces around it" fails on purpose until fixed (suggestion: horizontal padding/gap on the separator span instead of text spaces).
+
 ## Questions for the developer
 1. WebKit smoke: run `npm run e2e:install` once, or leave it to CI?
 2. `partner.spec.ts:415`: is the local Supabase CLI expected to apply `[auth.email.template.recovery]`? If CI passes it, only this machine's stack differs.

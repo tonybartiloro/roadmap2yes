@@ -492,3 +492,34 @@ test("at 320 px neither the add button nor the selection bar covers the last row
     page.getByTestId("selection-bar").getByRole("button", { name: /^Seleziona tutti i \d+ filtrati$/ }),
   ).toBeVisible();
 });
+
+test("at 390 px the visible separator has spaces around it: 'Bambino · Tony' (REV-63)", async ({
+  page,
+}) => {
+  const w = await start();
+  await addGuest(w, { firstName: "Luca", lastName: "Rossi", category: "child", side: "A" });
+  await open(page, w);
+  await page.setViewportSize({ width: 390, height: 800 });
+  const details = row(page, "Luca Rossi").locator("button > span").first();
+  const text = await details.evaluate((el) => (el as HTMLElement).innerText);
+  // what is drawn, with the whitespace the browser really renders
+  expect(text.replace(/\s+/g, " ").trim()).toBe("Luca Rossi Bambino · Tony");
+  // and the pixels: the gap between "Bambino" and the dot, and between the dot and "Tony"
+  const gaps = await details.evaluate((el) => {
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    const boxes: { t: string; l: number; r: number }[] = [];
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+      const t = (n.textContent ?? "").trim();
+      if (!t) continue;
+      const range = document.createRange();
+      range.selectNodeContents(n);
+      const b = range.getBoundingClientRect();
+      boxes.push({ t, l: b.left, r: b.right });
+    }
+    return boxes;
+  });
+  const at = (t: string) => gaps.find((g) => g.t === t)!;
+  expect(at("·").l - at("Bambino").r, "gap before the dot (px)").toBeGreaterThan(1);
+  expect(at("Tony").l - at("·").r, "gap after the dot (px)").toBeGreaterThan(1);
+  await row(page, "Luca Rossi").screenshot({ path: "test-results/rev63-separator.png" });
+});
