@@ -27,8 +27,20 @@ Scope reviewed: production build on port 3300 against the local Supabase stack, 
 - Themes: Giardino light and dark clean. Other themes not visually checked (forcing `data-theme` by script mixed tokens, so not reliable); the 12-theme axe run of T17 is the only evidence there.
 - Keyboard and screen reader: only checked focus on the delete dialog (initial focus "Annulla") and field labels; no full keyboard walk-through.
 
+## Closure, re-check after 81b95bd, a844366 and 8f84e5a (2026-11-26)
+Same setup (fresh build, port 3300, fake seed). Checked: 360 px mobile (light and dark), 768, 900 and 1100 px.
+- DES-01 ✅ flat list sorted (Anna, Gigi, Luca, Mario Rossi) at 900 and 1100 px.
+- DES-02 ✅ import toast description readable in dark and the toast sits above the nav (bottom 636 vs nav top 723 at 360 px).
+- DES-03 ⚠ mostly closed: grouped list with columns Nome/Tipo/Lato(/Tavolo) at 768 and 1100 px; flat list with Gruppo and Tavolo columns at 900 and 1100 px; 550 guests (100 per section, no Tavolo column without tables); import preview in two cards per row at 1100 px; no horizontal scroll at 768, 900, 1100. One problem left: DES-08.
+- DES-04 ✅ table sheet: people and add buttons first, form below. DES-05 ✅ toast "Nessuno aggiunto: sono rimasti dove erano". DES-06 ✅ "Altri dati" has an icon and `aria-expanded`; placeholder "Cerca". DES-07 ✅ rows are two lines at 360 px.
+- 360 px: no regression seen in Persone, Tavoli, Altro menu, import.
+
+| ID | Severity | Evidence | Finding | Why it matters | Proposal | Response (author) | Closed |
+|---|---|---|---|---|---|---|---|
+| DES-08 | should | `/invitati`, 768 px (rail 66 px), search "Rossi" in a wedding with tables, flat list: 5 columns | `rowColumns` in `GuestRow.tsx` sums to about 33 rem of fixed columns (7+8+10+8 rem) plus gaps, so the Nome column collapses to one letter per line ("A / n / n / a / R…"); rows are 190 px tall. At 900 px and above it is fine. Grouped list at 768 is fine. | The flat list with a table column is unreadable on a tablet or a narrow window. | Hide the Gruppo column below `lg` (the group is already a row label), or use smaller fixed widths below `lg`. | | ❌ |
+
 ## Questions for the developer
-1. DES-03: implement columns and two-column preview from 768 px now, or keep the single column and update design.md?
+1. DES-03 (answered: columns implemented; DES-08 is the leftover): implement columns and two-column preview from 768 px now, or keep the single column and update design.md?
 2. Is the toast overlapping the bottom nav accepted app-wide, or fixed in the shared `sonner.tsx` (DES-02)?
 
 ## Risposte (developer B)
