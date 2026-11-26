@@ -2,7 +2,7 @@
 
 | Status | Date | Deciders | Related feature | Supersedes |
 |---|---|---|---|---|
-| proposed | 2026-11-26 | architect (proposta); tonybartiloro (D3-D5 del brief, 2026-11-26; approvazione al Gate B) | FEAT-2026-004 (`.adf/features/FEAT-2026-004/plan.md`) | — (precisa ADR-0002 §3) |
+| accepted | 2026-11-26 | architect (proposta); tonybartiloro (D3-D5 del brief, 2026-11-26; approvata al Gate B il 2026-11-26) | FEAT-2026-004 (`.adf/features/FEAT-2026-004/plan.md`) | — (precisa ADR-0002 §3) |
 
 ## Context
 - **R-04**: ogni destinatario (gruppo "insieme" o persona) riceve un link personale, aperto **senza login** da una pagina pubblica che legge e scrive dati di terzi (nomi, presenza, preferenze alimentari = dati sanitari).

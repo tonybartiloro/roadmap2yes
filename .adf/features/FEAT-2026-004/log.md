@@ -31,3 +31,7 @@
 - Architect plan: 13 tasks in 5 steps (S1 data, S2 server, S3 public page, S4 couple side, S5 tests/docs/release), 2 additive migrations, no new dependency, ADR-0003 drafted (proposed); `public-rpc.ts` = fifth secret-key scope; `undo_guest_import` replaced to keep people who answered.
 - Challenge: QA-1..17 (`reviews/f2-qa.md`; blocking QA-1 clock, QA-2 limiter isolation, QA-3 closed lifecycle matrix, QA-4 normalized neutral comparison), DES-24..36 (`reviews/f2-designer.md`, 0 blocking; design.md finalised, 16 KB), PO-1..7 (`reviews/f2-po.md`, 0 blocking; PO corrected D4 wording in brief).
 - Architect accepted all 37 (QA-15 refined). Technical decisions P1-P7 in `plan.md → Decisions`. AC amendments AC3, AC6, AC10, AC12 to approve at Gate B. plan.md 39 KB (target 40 KB).
+
+## Gate B — 2026-11-26
+- Developer: "Approvo" → plan, AC3/AC6/AC10/AC12 amendments, ADR-0003 (accepted), `public-rpc.ts` as fifth secret-key scope, P5/P6, D4 correction, routine git work (commits, push of the branch — public repo, PR, fix commits). Merge to main = production → Gate C. No new dependency.
+- Developer must create `RSVP_LINK_SECRET` in Vercel (Production + Preview, different values, Sensitive) before the merge.
