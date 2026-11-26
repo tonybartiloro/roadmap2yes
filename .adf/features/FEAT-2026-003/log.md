@@ -46,3 +46,4 @@
 - Coordinator decisions: REV-47 unknown import outcome = wording ("Non so se…", no retry, list reload), no client batch id; REV-53 `undo_guest_import` removes only untouched batch people (live, version 1, unseated), no time window; DES-02 toast above the mobile nav.
 - QA: full suite via verify 288 pass; the 18 failures were environmental (wrong port first run; degraded/email-off need their own servers, 12/12 pass when selected; WebKit not installed, 3 not run; `partner.spec.ts:415` recovery mail uses the local Supabase CLI default template, not from this branch, 2 fail locally). Themes: /invitati and toast with description, 12 themes × light/dark, axe clean.
 - `adf verify` pass on 428b63d6aedc.
+- Developer: "Colonne ora" → DES-03 desktop columns built (81b95bd); code-12 REV-60..63 and DES-08 fixed and closed; design-1 closed. Guests e2e 27/27 on the final build (500 guests ready ~360 ms). `adf verify` pass on 9ab912ad037a.
