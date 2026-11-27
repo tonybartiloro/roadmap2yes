@@ -5,6 +5,8 @@ import {
   readEmailCaps,
   readEmailConfig,
   readLoginLimits,
+  readRsvpLinkSecret,
+  FAKE_RSVP_LINK_SECRET,
   readSiteUrl,
   readSupabasePublicConfig,
   readSupabaseSecretKey,
@@ -199,6 +201,32 @@ describe("Supabase config", () => {
   });
   it("reads the secret key", () => {
     expect(readSupabaseSecretKey({ SUPABASE_SECRET_KEY: "sk" })).toBe("sk");
+  });
+});
+
+describe("readRsvpLinkSecret", () => {
+  const real = "real-looking-secret-0123456789-abcdefghij";
+  it("reads a secret of at least 32 characters", () => {
+    expect(readRsvpLinkSecret({ RSVP_LINK_SECRET: ` ${real} ` })).toBe(real);
+  });
+  it("refuses a missing, empty or too short secret without echoing it", () => {
+    expect(() => readRsvpLinkSecret({})).toThrow("RSVP_LINK_SECRET");
+    expect(() => readRsvpLinkSecret({ RSVP_LINK_SECRET: "  " })).toThrow("RSVP_LINK_SECRET");
+    expect(() => readRsvpLinkSecret({ RSVP_LINK_SECRET: "short-secret-value" })).toThrow(
+      /^(?!.*short-secret-value).*RSVP_LINK_SECRET/,
+    );
+  });
+  it("accepts the fake local secret outside Vercel Production", () => {
+    const env = { RSVP_LINK_SECRET: FAKE_RSVP_LINK_SECRET };
+    expect(readRsvpLinkSecret(env)).toBe(FAKE_RSVP_LINK_SECRET);
+    expect(readRsvpLinkSecret({ ...env, NODE_ENV: "production" })).toBe(FAKE_RSVP_LINK_SECRET);
+    expect(readRsvpLinkSecret({ ...env, VERCEL_ENV: "preview" })).toBe(FAKE_RSVP_LINK_SECRET);
+  });
+  it("refuses the fake local secret on Vercel Production", () => {
+    expect(() =>
+      readRsvpLinkSecret({ RSVP_LINK_SECRET: FAKE_RSVP_LINK_SECRET, VERCEL_ENV: "production" }),
+    ).toThrow("public fake value");
+    expect(readRsvpLinkSecret({ RSVP_LINK_SECRET: real, VERCEL_ENV: "production" })).toBe(real);
   });
 });
 
