@@ -151,6 +151,19 @@ describe("presenceSummary", () => {
     expect(presenceSummary(["a", "c", "d"], responses)).toBe("1 sì · 1 no · 1 in attesa");
     expect(presenceSummary([], responses)).toBe("");
   });
+  it("names the link state of a group in every case, without 'link nessun link'", () => {
+    const name = (state: Parameters<typeof groupAccessibleName>[2]) =>
+      groupAccessibleName("Famiglia Rossi", "2 sì", state);
+    expect(name({ kind: "none" })).toBe("Famiglia Rossi, 2 sì");
+    expect(name(null)).toBe("Famiglia Rossi, 2 sì");
+    expect(name({ kind: "to_share" })).toBe("Famiglia Rossi, 2 sì, link da condividere");
+    expect(name({ kind: "resend", guestIds: ["a"] })).toBe(
+      "Famiglia Rossi, 2 sì, link da rimandare",
+    );
+    expect(name({ kind: "expired", on: "2027-05-31" })).toBe(
+      "Famiglia Rossi, 2 sì, link scaduto il 31 maggio 2027",
+    );
+  });
   it("builds the accessible name of a group", () => {
     expect(
       groupAccessibleName("Famiglia Rossi", "2 sì · 1 in attesa", {

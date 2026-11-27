@@ -216,17 +216,19 @@ describe("readRsvpLinkSecret", () => {
       /^(?!.*short-secret-value).*RSVP_LINK_SECRET/,
     );
   });
-  it("accepts the fake local secret outside Vercel Production", () => {
+  it("accepts the fake local secret outside Vercel (local, CI and e2e with NODE_ENV=production)", () => {
     const env = { RSVP_LINK_SECRET: FAKE_RSVP_LINK_SECRET };
     expect(readRsvpLinkSecret(env)).toBe(FAKE_RSVP_LINK_SECRET);
     expect(readRsvpLinkSecret({ ...env, NODE_ENV: "production" })).toBe(FAKE_RSVP_LINK_SECRET);
-    expect(readRsvpLinkSecret({ ...env, VERCEL_ENV: "preview" })).toBe(FAKE_RSVP_LINK_SECRET);
+    expect(readRsvpLinkSecret({ ...env, VERCEL_ENV: "  " })).toBe(FAKE_RSVP_LINK_SECRET);
   });
-  it("refuses the fake local secret on Vercel Production", () => {
-    expect(() =>
-      readRsvpLinkSecret({ RSVP_LINK_SECRET: FAKE_RSVP_LINK_SECRET, VERCEL_ENV: "production" }),
-    ).toThrow("public fake value");
-    expect(readRsvpLinkSecret({ RSVP_LINK_SECRET: real, VERCEL_ENV: "production" })).toBe(real);
+  it("refuses the fake local secret on every Vercel environment", () => {
+    for (const vercelEnv of ["production", "preview", "development"]) {
+      expect(() =>
+        readRsvpLinkSecret({ RSVP_LINK_SECRET: FAKE_RSVP_LINK_SECRET, VERCEL_ENV: vercelEnv }),
+      ).toThrow("public fake value");
+      expect(readRsvpLinkSecret({ RSVP_LINK_SECRET: real, VERCEL_ENV: vercelEnv })).toBe(real);
+    }
   });
 });
 

@@ -7,6 +7,7 @@ import { GENERIC_ERROR, type Db } from "@/features/guests/data";
 import { readRsvpLinkSecret, readSiteUrl } from "@/lib/app-config";
 import { getNow } from "@/lib/clock";
 import { createClient } from "@/lib/supabase/server";
+import { LINK_ERROR, type SharedPrevious } from "./constants";
 import * as data from "./data";
 
 /**
@@ -30,7 +31,7 @@ async function session(): Promise<{ db: Db; userId: string } | null> {
 
 const expired = { ok: false, code: "session", message: SESSION_EXPIRED } as const;
 const invalid = { ok: false, code: "invalid", message: GENERIC_ERROR } as const;
-const secretFailure = { ok: false, code: "secret", message: data.LINK_ERROR } as const;
+const secretFailure = { ok: false, code: "secret", message: LINK_ERROR } as const;
 
 function readSecret(): string | null {
   try {
@@ -127,7 +128,7 @@ export async function revokeLinkAction(input: unknown): Promise<ActionResult<{ l
 /** After a successful copy or share only (QA-12); the result holds what Annulla needs. */
 export async function markSharedAction(
   input: unknown,
-): Promise<ActionResult<{ previous: data.SharedPrevious }>> {
+): Promise<ActionResult<{ previous: SharedPrevious }>> {
   const parsed = schemas.link.safeParse(input);
   if (!parsed.success) return invalid;
   const ctx = await session();

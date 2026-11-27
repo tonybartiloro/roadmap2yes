@@ -179,7 +179,8 @@ export function groupAccessibleName(
   summary: string,
   state: LinkState | null,
 ): string {
-  const text = state ? linkStateText(state) : "";
+  // "Nessun link" is not repeated as "link nessun link": a group without a link says nothing more.
+  const text = state && state.kind !== "none" ? linkStateText(state) : "";
   return [name, summary.replaceAll(" · ", ", "), text ? `link ${text.toLowerCase()}` : ""]
     .filter(Boolean)
     .join(", ");

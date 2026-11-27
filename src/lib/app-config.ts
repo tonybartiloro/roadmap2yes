@@ -200,7 +200,7 @@ export const FAKE_RSVP_LINK_SECRET = "local-fake-rsvp-secret-0123456789abcdef";
 
 /**
  * Secret of the RSVP link tokens (ADR-0003). Throws a value-free error when missing, shorter than
- * 32 characters, or the public fake value on Vercel Production (the repo is public).
+ * 32 characters, or the public fake value on any Vercel environment (the repo is public).
  */
 export function readRsvpLinkSecret(env: Env = process.env): string {
   const secret = clean(env["RSVP_LINK_SECRET"]);
@@ -209,7 +209,8 @@ export function readRsvpLinkSecret(env: Env = process.env): string {
       `Missing or too short RSVP configuration: RSVP_LINK_SECRET (min ${MIN_RSVP_LINK_SECRET_LENGTH} chars)`,
     );
   }
-  if (secret === FAKE_RSVP_LINK_SECRET && clean(env["VERCEL_ENV"]) === "production") {
+  // Any Vercel environment (production, preview): CI, e2e and local runs do not set VERCEL_ENV.
+  if (secret === FAKE_RSVP_LINK_SECRET && clean(env["VERCEL_ENV"]) !== undefined) {
     throw new Error("Invalid RSVP configuration: RSVP_LINK_SECRET is the public fake value");
   }
   return secret;

@@ -4,6 +4,7 @@ import { mapDbError, versioned, type Db, type RsvpMode } from "@/features/guests
 import { allPages, chunk, PageReadError } from "@/lib/supabase/all-pages";
 import type { Json, Tables } from "@/lib/supabase/database.types";
 import { classifyDbError } from "@/lib/supabase/errors";
+import { LINK_ERROR, SHARE_ERROR, STALE_MESSAGE, type SharedPrevious } from "./constants";
 import { deriveRsvpToken, hashRsvpToken, rsvpUrl } from "./token";
 import type { PresenceStatus, RsvpLink, RsvpResponse, RsvpSnapshot } from "./view";
 
@@ -112,17 +113,6 @@ const MESSAGES: Readonly<Record<string, string>> = {
   link_not_working: "Questo link ora non copre nessuno: ricarica la pagina.",
   invalid_previous: "Non posso annullare questa azione: ricarica la pagina.",
 };
-/** The recomputed token does not match the stored hash (secret rotated): "Nuovo link" fixes it. */
-export const STALE_MESSAGE = "Questo link va rigenerato.";
-export const LINK_ERROR = "Non sono riuscito a creare il link. Riprova.";
-export const SHARE_ERROR = "Non sono riuscito a segnare il link come condiviso. Riprova.";
-
-/** Codes after which the screen is stale and must reload. */
-export const RSVP_STALE_CODES: ReadonlySet<string> = new Set([
-  "link_not_found",
-  "link_not_working",
-  "link_expired",
-]);
 
 function failure(
   error: { code?: string; message?: string } | null,
@@ -184,32 +174,19 @@ export async function getLinkUrl(
   db: Db,
   input: { secret: string; siteUrl: string; linkId: string },
 ): Promise<ActionResult<{ url: string }>> {
-  const wedding = await db.from("weddings").select("id").limit(1).maybeSingle();
-  if (wedding.error) return failure(wedding.error);
-  if (!wedding.data) return failure({ code: "42501" });
-  const allowed = await db.rpc("has_permission", {
-    p_wedding_id: wedding.data.id,
-    p_area: "guests",
-    p_action: "write",
+  const token = deriveRsvpToken(input.secret, input.linkId);
+  // First call = authorisation (`guests/write`, 42501) + wedding scope (`link_not_found`) + hash:
+  // the token is derived, the DB keeps its sha256, so a rotated secret gives another hash.
+  const matches = await db.rpc("rsvp_link_matches", {
+    p_link_id: input.linkId,
+    p_hash: hashRsvpToken(token),
   });
-  if (allowed.error) return failure(allowed.error);
-  if (allowed.data !== true) return failure({ code: "42501" });
-  const row = await db
-    .from("rsvp_links")
-    .select("id, revoked_at")
-    .eq("id", input.linkId)
-    .maybeSingle();
+  if (matches.error) return failure(matches.error);
+  const row = await db.from("rsvp_links").select("revoked_at").eq("id", input.linkId).maybeSingle();
   if (row.error) return failure(row.error);
   if (!row.data || row.data.revoked_at !== null) {
     return failure({ code: "P0001", message: "link_not_found" });
   }
-  const token = deriveRsvpToken(input.secret, row.data.id);
-  // The token is derived, the DB keeps its sha256: a rotated or wrong secret gives another hash.
-  const matches = await db.rpc("rsvp_link_matches", {
-    p_link_id: row.data.id,
-    p_hash: hashRsvpToken(token),
-  });
-  if (matches.error) return failure(matches.error);
   if (matches.data !== true) return { ok: false, code: "stale", message: STALE_MESSAGE };
   return { ok: true, data: { url: rsvpUrl(input.siteUrl, token) } };
 }
@@ -241,13 +218,6 @@ export async function revokeLink(
     return failure(result.error, "Non sono riuscito a revocare il link. Riprova.");
   }
   return { ok: true, data: { linkId: body.link_id } };
-}
-
-/** What `unmarkShared` takes back: handed over exactly as `markShared` returned it. */
-export interface SharedPrevious {
-  shared_at: string | null;
-  shared_by: string | null;
-  people: string[];
 }
 
 /** "Condiviso il": stamps the link and snapshots the people it covers (AC8). */

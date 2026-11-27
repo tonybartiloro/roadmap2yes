@@ -186,6 +186,31 @@ describe("rsvp couple side", () => {
     ).toMatchObject({ ok: false });
   });
 
+  it("Annulla puts back a NON-empty previous stamp and snapshot", async () => {
+    const link = (await snapshot()).links.find((l) => l.guestId === loneId)!;
+    const first = await markShared(db, { linkId: link.id, now: NOW });
+    const second = await markShared(db, { linkId: link.id, now: NOW });
+    if (!first.ok || !second.ok) throw new Error("markShared");
+    // The second mark's `previous` is the state left by the first: a stamp and Mario.
+    expect(second.data.previous.shared_at).not.toBeNull();
+    expect(second.data.previous.people).toEqual([loneId]);
+    await markShared(db, { linkId: link.id, now: NOW }); // a later stamp to take back
+
+    expect(
+      await unmarkShared(db, { linkId: link.id, previous: second.data.previous }),
+    ).toMatchObject({
+      ok: true,
+    });
+    const row = await db.from("rsvp_links").select("shared_at").eq("id", link.id).single();
+    expect(new Date(row.data!.shared_at!).getTime()).toBe(
+      new Date(second.data.previous.shared_at!).getTime(),
+    );
+    const people = await db.from("rsvp_link_people").select("guest_id").eq("link_id", link.id);
+    expect(people.data?.map((p) => p.guest_id)).toEqual([loneId]);
+    // leave the link as the next test found it
+    await unmarkShared(db, { linkId: link.id, previous: first.data.previous });
+  });
+
   it("a new link revokes the old one and gives another URL; revoke ends the last", async () => {
     const old = (await snapshot()).links.find((l) => l.guestId === loneId)!;
     const rotated = await rotateLink(db, { secret: SECRET, now: NOW, linkId: old.id });

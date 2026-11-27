@@ -286,11 +286,11 @@ select is((select count(*)::int from public.rsvp_responses where id = 'c4000000-
 select throws_ok($$select public.rsvp_mark_shared('d4000000-0000-4000-8000-0000000000d1')$$, 'P0001', 'link_not_found', 'mark_shared: a revoked link');
 select throws_ok($$select public.rsvp_mark_shared('d4000000-0000-4000-8000-0000000000b4')$$, 'P0001', 'link_not_found', 'mark_shared: a link that does not exist');
 
--- mark shared / undo with the exact previous snapshot
 -- rsvp_link_matches: does the stored hash equal the recomputed one
 select is(public.rsvp_link_matches('d4000000-0000-4000-8000-0000000000b3', extensions.digest('rm-r3', 'sha256')), true, 'link_matches: the same hash matches');
 select is(public.rsvp_link_matches('d4000000-0000-4000-8000-0000000000b3', extensions.digest('rm-other', 'sha256')), false, 'link_matches: another hash does not');
 select throws_ok($$select public.rsvp_link_matches(gen_random_uuid(), extensions.digest('rm-r3', 'sha256'))$$, 'P0001', 'link_not_found', 'link_matches: unknown link');
+-- mark shared / undo with the exact previous snapshot
 select public.rsvp_mark_shared('d4000000-0000-4000-8000-0000000000b3') as r \gset ms1_
 select is((:'ms1_r'::jsonb -> 'previous' ->> 'shared_at'), null, 'first mark: previous shared_at is null');
 select is(jsonb_array_length(:'ms1_r'::jsonb -> 'previous' -> 'people'), 0, 'and the previous snapshot is empty');
