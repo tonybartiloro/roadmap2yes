@@ -333,6 +333,42 @@ describe("proxy: RSVP gate on /rsvp/{token} (AC10)", () => {
     evaluateGuards.mockResolvedValue({ action: "rewrite", to: "/servizio?motivo=paused" });
     await proxy(request(`/rsvp/${TOKEN}`));
     expect(rsvpGate).not.toHaveBeenCalled();
+    getClaims.mockResolvedValue({ data: null, error: null });
+    for (const decision of [
+      { action: "redirect", to: "/accesso" },
+      { action: "deny", status: 401 },
+      { action: "rewrite", to: "/altro" },
+    ]) {
+      evaluateGuards.mockResolvedValue(decision);
+      await proxy(request(`/rsvp/${TOKEN}`));
+    }
+    expect(rsvpGate).not.toHaveBeenCalled();
+  });
+
+  it("gates only GET and HEAD: a server-action POST reaches the page (REV-112)", async () => {
+    rsvpGate.mockResolvedValue({ blocked: true, retryAfterSeconds: 640, themeId: null });
+    for (const method of ["POST", "PUT", "DELETE", "PATCH"]) {
+      const response = await proxy(
+        new NextRequest(new URL(`/rsvp/${TOKEN}`, "http://localhost:3000"), { method }),
+      );
+      expect(response.status).toBe(200);
+    }
+    expect(rsvpGate).not.toHaveBeenCalled();
+    const head = await proxy(
+      new NextRequest(new URL(`/rsvp/${TOKEN}`, "http://localhost:3000"), { method: "HEAD" }),
+    );
+    expect(head.status).toBe(429);
+  });
+
+  it("decodes the token once, so an escaped spelling cannot skip the gate (REV-111)", async () => {
+    await proxy(request(`/rsvp/%41${"A".repeat(42)}`));
+    expect(rsvpGate).toHaveBeenCalledWith(expect.objectContaining({ token: TOKEN }));
+    rsvpGate.mockClear();
+    // an escape that decodes to something that is not a token, and a malformed escape: no gate, no throw
+    for (const path of [`/rsvp/%2F${"A".repeat(42)}`, `/rsvp/%E0%A4%A${"A".repeat(38)}`, `/rsvp/%ZZ${"A".repeat(41)}`]) {
+      expect((await proxy(request(path))).status).toBe(200);
+    }
+    expect(rsvpGate).not.toHaveBeenCalled();
   });
 
   it("is a bounded call with the request IP (never from the client body or query)", async () => {

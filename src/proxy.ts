@@ -172,8 +172,20 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
 
   // RSVP gate (AC10): only a well-formed token on a healthy backend and an allowed request. Bounded
   // and fail-open: if the gate does not answer, the page decides anyway.
-  if (decision.action === "next" && backend === "ok") {
-    const token = RSVP_PATH.exec(pathname)?.[1];
+  // GET/HEAD only: the submit is a server-action POST to the same path and must reach `rsvp_submit`,
+  // which answers neutral/blocked by itself with a 200 the client can parse (ADR-0003 §6).
+  const isPageLoad = request.method === "GET" || request.method === "HEAD";
+  if (isPageLoad && decision.action === "next" && backend === "ok") {
+    // Decode once, like the page does for `params`: gate and page must see the same token (REV-111).
+    // A malformed escape is not a token: skip the gate, the page answers neutral.
+    let token: string | undefined = RSVP_PATH.exec(pathname)?.[1];
+    if (token !== undefined) {
+      try {
+        token = decodeURIComponent(token);
+      } catch {
+        token = undefined;
+      }
+    }
     if (token !== undefined && isRsvpTokenShape(token)) {
       const gate = await rsvpGate({
         token,
