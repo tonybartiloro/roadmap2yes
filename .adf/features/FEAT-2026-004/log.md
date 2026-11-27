@@ -48,3 +48,10 @@
 - `test:integration` found missing acceptance fixtures for the 3 tables and a real bug (service role could not insert into `rsvp_responses`: CHECK function without EXECUTE) → fixed in f81708a (grant to service_role only).
 - Carry-overs: T5 maps non-`invalid_answers` errors to a generic state and passes `p_ip_key: null` explicitly; T7 sends blank note as null and `answered_at` untouched as `seen_at`; S2/S3 list columns on `rsvp_links` (never `select('*')`); T10 adds the `\u0000` PostgREST case.
 - Tests: db:test 1778 green (26 files); test:integration 894 pass + 1 skipped; `adf verify` pass on 828f4a350dc1 (lint, typecheck, unit, build).
+- Developer: "Procedi con S2".
+
+## F3 step S2 checkpoint — 2026-11-27
+- Done: T4 token/config (5f1fc5b), T5 public edge: `public-rpc.ts` (fifth secret-key scope), limiter keys, proxy gate/429/theme header, `/rsvp` public + no-referrer (93f3976), T6 couple data/actions/view/export (4afbc13) + new RPC `rsvp_link_matches` for the "va rigenerato" check (60156f2). Extra files approved by the coordinator: export domain files, `rsvp_rls.test.sql` (plan Change log).
+- Reviews: code-3 (general) REV-11..18 → fixed/closed, approved; code-4 (security) REV-111..115 → 111 decode-then-shape-check, 112 gate only GET/HEAD, 113 fake secret refused on any `VERCEL_ENV`; 114/115 residuals for `sicurezza.md` (T12). Fixes c42a4d0, 6e4582f.
+- Tests: unit 1434, integration 908 (+1 pre-existing skip), db:test green; `adf verify` pass on b27cdfc01b20; built app curl on `/rsvp/<seed token>` → 404 with noindex, no-store, no-referrer (page = T7).
+- Carry-overs for S3/S4: T7 shape-checks `params.token` with `isRsvpTokenShape`, sends blank note as null and `answered_at` untouched as `seen_at`, uses `rsvpLoadPage`/`rsvpSubmit` from `public-rpc.ts`; T8 imports client constants from `src/features/rsvp/constants.ts`; T9 may make `GroupView.rsvpMode` required.
