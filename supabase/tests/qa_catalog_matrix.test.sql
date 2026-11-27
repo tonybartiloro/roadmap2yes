@@ -90,7 +90,7 @@ insert into qa_functions (name, klass) values
   ('create_guest_family', 'user'), ('guests_bulk', 'user'), ('guests_bulk_undo', 'user'),  -- FEAT-2026-003
   ('import_guests', 'user'), ('undo_guest_import', 'user'),
   ('rsvp_status', 'user'), ('rsvp_create_links', 'user'), ('rsvp_rotate_link', 'user'),  -- FEAT-2026-004
-  ('rsvp_revoke_link', 'user'), ('rsvp_mark_shared', 'user'), ('rsvp_unmark_shared', 'user'),
+  ('rsvp_revoke_link', 'user'), ('rsvp_mark_shared', 'user'), ('rsvp_unmark_shared', 'user'), ('rsvp_link_matches', 'user'),
   ('rsvp_gate', 'service'), ('rsvp_page', 'service'), ('rsvp_submit', 'service'),  -- FEAT-2026-004 (public surface)
   ('record_heartbeat', 'service'), ('login_gate', 'service'), ('login_record', 'service'),
   ('auth_user_id_by_email', 'service'), ('invitation_by_token', 'service'), ('sync_timeline', 'service'),

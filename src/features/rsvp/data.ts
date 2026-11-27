@@ -112,6 +112,8 @@ const MESSAGES: Readonly<Record<string, string>> = {
   link_not_working: "Questo link ora non copre nessuno: ricarica la pagina.",
   invalid_previous: "Non posso annullare questa azione: ricarica la pagina.",
 };
+/** The recomputed token does not match the stored hash (secret rotated): "Nuovo link" fixes it. */
+export const STALE_MESSAGE = "Questo link va rigenerato.";
 export const LINK_ERROR = "Non sono riuscito a creare il link. Riprova.";
 export const SHARE_ERROR = "Non sono riuscito a segnare il link come condiviso. Riprova.";
 
@@ -174,11 +176,9 @@ export async function createLinks(
 
 /**
  * The URL of an existing link, RECOMPUTED from the secret and the link id (read only; the token
- * is never stored). `forbidden` without `guests/write`; a missing or revoked link is `link_not_found`.
- *
- * NOT verified here: that the recomputed token still matches the stored hash (a rotated secret
- * would give a wrong URL). `token_hash` has no column grant, so the user's client cannot compare it;
- * it needs a DB function (see the T6 report).
+ * is never stored). `forbidden` without `guests/write`; a missing or revoked link is `link_not_found`;
+ * a recomputed token whose sha256 differs from the stored one (secret rotated) is `stale`
+ * ("Questo link va rigenerato"), checked by `rsvp_link_matches` because `token_hash` is unreadable.
  */
 export async function getLinkUrl(
   db: Db,
@@ -203,10 +203,15 @@ export async function getLinkUrl(
   if (!row.data || row.data.revoked_at !== null) {
     return failure({ code: "P0001", message: "link_not_found" });
   }
-  return {
-    ok: true,
-    data: { url: rsvpUrl(input.siteUrl, deriveRsvpToken(input.secret, row.data.id)) },
-  };
+  const token = deriveRsvpToken(input.secret, row.data.id);
+  // The token is derived, the DB keeps its sha256: a rotated or wrong secret gives another hash.
+  const matches = await db.rpc("rsvp_link_matches", {
+    p_link_id: row.data.id,
+    p_hash: hashRsvpToken(token),
+  });
+  if (matches.error) return failure(matches.error);
+  if (matches.data !== true) return { ok: false, code: "stale", message: STALE_MESSAGE };
+  return { ok: true, data: { url: rsvpUrl(input.siteUrl, token) } };
 }
 
 /** "Nuovo link": revokes the current one and creates the next, atomically (AC7). */

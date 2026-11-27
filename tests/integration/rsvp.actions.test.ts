@@ -147,6 +147,25 @@ describe("rsvp couple side", () => {
     ).toEqual({ ok: true, data: { created: 0 } });
   });
 
+  it("a secret that no longer matches the stored hash is 'va rigenerato', not a dead URL", async () => {
+    const link = (await snapshot()).links.find((l) => l.groupId === groupId)!;
+    const other = `${SECRET}-rotated`;
+    expect(await getLinkUrl(db, { secret: other, siteUrl: SITE, linkId: link.id })).toEqual({
+      ok: false,
+      code: "stale",
+      message: "Questo link va rigenerato.",
+    });
+    vi.stubEnv("RSVP_LINK_SECRET", other);
+    try {
+      expect(await getLinkUrlAction({ linkId: link.id })).toMatchObject({
+        ok: false,
+        code: "stale",
+      });
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it("marks as shared and Annulla restores the previous stamp and snapshot", async () => {
     const link = (await snapshot()).links.find((l) => l.guestId === loneId)!;
     const marked = await markShared(db, { linkId: link.id, now: NOW });

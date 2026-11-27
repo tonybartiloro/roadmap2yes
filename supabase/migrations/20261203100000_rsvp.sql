@@ -532,6 +532,34 @@ begin
 end;
 $$;
 
+-- rsvp_link_matches(id, hash) -> boolean
+-- Does the stored sha256 of the link equal the one the server recomputed? The couple's client cannot
+-- read token_hash (no column grant), so "Copia link" asks here before showing a recomputed URL: a
+-- rotated or wrong RSVP_LINK_SECRET gives `false` ("va rigenerato"), never a dead link shown as good.
+-- Answers only about a link of the caller's wedding (`link_not_found` otherwise, like the siblings).
+create function public.rsvp_link_matches(p_link_id uuid, p_hash bytea)
+returns boolean
+language plpgsql
+stable
+security definer
+set search_path = pg_catalog, pg_temp
+as $$
+declare
+  v_wedding uuid := private.current_wedding_id();
+  v_stored bytea;
+begin
+  if auth.uid() is null or v_wedding is null or not public.has_permission(v_wedding, 'guests', 'write') then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+  select l.token_hash into v_stored from public.rsvp_links l
+  where l.id = p_link_id and l.wedding_id = v_wedding;
+  if not found then
+    raise exception 'link_not_found' using errcode = 'P0001';
+  end if;
+  return v_stored = p_hash;
+end;
+$$;
+
 -- ---------------------------------------------------------------------------------------------
 -- undo_guest_import: now also leaves the people the RSVP touches (PO-2, narrow rule).
 -- ---------------------------------------------------------------------------------------------
@@ -600,7 +628,8 @@ revoke all on function
   public.rsvp_rotate_link(uuid, uuid, bytea, timestamptz),
   public.rsvp_revoke_link(uuid),
   public.rsvp_mark_shared(uuid, timestamptz),
-  public.rsvp_unmark_shared(uuid, jsonb)
+  public.rsvp_unmark_shared(uuid, jsonb),
+  public.rsvp_link_matches(uuid, bytea)
 from public, anon, authenticated;
 
 -- The CHECK of rsvp_responses.diet runs with the privileges of the writer: a direct write by the secret
@@ -613,5 +642,6 @@ grant execute on function
   public.rsvp_rotate_link(uuid, uuid, bytea, timestamptz),
   public.rsvp_revoke_link(uuid),
   public.rsvp_mark_shared(uuid, timestamptz),
-  public.rsvp_unmark_shared(uuid, jsonb)
+  public.rsvp_unmark_shared(uuid, jsonb),
+  public.rsvp_link_matches(uuid, bytea)
 to authenticated;

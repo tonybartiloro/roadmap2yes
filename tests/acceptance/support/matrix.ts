@@ -368,6 +368,7 @@ export const FUNCTIONS: Record<string, "user" | "service"> = {
   rsvp_revoke_link: "user",
   rsvp_mark_shared: "user",
   rsvp_unmark_shared: "user",
+  rsvp_link_matches: "user",
   rsvp_gate: "service",
   rsvp_page: "service",
   rsvp_submit: "service",

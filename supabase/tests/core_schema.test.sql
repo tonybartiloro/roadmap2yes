@@ -22,7 +22,7 @@ select is(
     'move_budget_items(uuid,uuid)', 'record_export()', 'record_seen()',
     'reopen_decision(uuid,text,integer)', 'revoke_invitation(uuid)',
     'rotate_invitation(uuid,bytea)',
-    'rsvp_create_links(jsonb,timestamp with time zone)', 'rsvp_mark_shared(uuid,timestamp with time zone)', 'rsvp_revoke_link(uuid)',
+    'rsvp_create_links(jsonb,timestamp with time zone)', 'rsvp_link_matches(uuid,bytea)', 'rsvp_mark_shared(uuid,timestamp with time zone)', 'rsvp_revoke_link(uuid)',
     'rsvp_rotate_link(uuid,uuid,bytea,timestamp with time zone)',
     'rsvp_status(timestamp with time zone)', 'rsvp_unmark_shared(uuid,jsonb)',
     'set_reference_scenario(uuid)', 'sync_my_email()', 'undo_guest_import(uuid)', 'update_partner_email(text,text)',

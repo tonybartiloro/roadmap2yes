@@ -3,7 +3,7 @@
 -- only reads; every write goes through the RPCs (AC14, ADR-0002, ADR-0003). All data is FAKE.
 begin;
 \set su 'reset role; do $x$ begin perform set_config(''request.jwt.claims'','''',true); perform set_config(''request.jwt.claim.sub'','''',true); end $x$;'
-select plan(83);
+select plan(87);
 
 select * from tests.make_wedding('rr1') \gset w1_
 select * from tests.make_wedding('rr2') \gset w2_
@@ -43,7 +43,8 @@ select throws_ok(format($$delete from public.%I$$, t), '42501', null, 'anon: no 
   from unnest(array['rsvp_links', 'rsvp_link_people', 'rsvp_responses']) t;
 select throws_ok(format($$select public.%I(%s)$$, f.n, f.args), '42501', null, 'anon: no EXECUTE on ' || f.n)
   from (values ('rsvp_status', ''), ('rsvp_create_links', '''[]''::jsonb'), ('rsvp_rotate_link', 'gen_random_uuid(), gen_random_uuid(), ''\x00''::bytea'),
-    ('rsvp_revoke_link', 'gen_random_uuid()'), ('rsvp_mark_shared', 'gen_random_uuid()'), ('rsvp_unmark_shared', 'gen_random_uuid(), ''{}''::jsonb')) f (n, args);
+    ('rsvp_revoke_link', 'gen_random_uuid()'), ('rsvp_mark_shared', 'gen_random_uuid()'), ('rsvp_unmark_shared', 'gen_random_uuid(), ''{}''::jsonb'),
+    ('rsvp_link_matches', 'gen_random_uuid(), ''\x00''::bytea')) f (n, args);
 :su
 
 -- ===== stranger, family, planner (no guests rows), other wedding: read nothing =======================
@@ -105,6 +106,7 @@ select throws_ok($$select public.rsvp_status()$$, '42501', 'forbidden', 'family:
 select throws_ok($$select public.rsvp_create_links('[]')$$, '42501', 'forbidden', 'family: rsvp_create_links denied');
 select throws_ok($$select public.rsvp_revoke_link('d5000000-0000-4000-8000-000000000001')$$, '42501', 'forbidden', 'family: rsvp_revoke_link denied');
 select throws_ok($$select public.rsvp_mark_shared('d5000000-0000-4000-8000-000000000001')$$, '42501', 'forbidden', 'family: rsvp_mark_shared denied');
+select throws_ok($$select public.rsvp_link_matches('d5000000-0000-4000-8000-000000000001', extensions.digest('x', 'sha256'))$$, '42501', 'forbidden', 'family: rsvp_link_matches denied');
 :su
 select tests.login(:'stranger'::uuid);
 select throws_ok($$select public.rsvp_status()$$, '42501', 'forbidden', 'no membership: rsvp_status denied');
@@ -127,6 +129,7 @@ select throws_ok($$select public.rsvp_revoke_link('d5000000-0000-4000-8000-00000
 select throws_ok($$select public.rsvp_rotate_link('d5000000-0000-4000-8000-000000000001', gen_random_uuid(), extensions.digest('x', 'sha256'))$$, '42501', 'forbidden', 'nor rotate');
 select throws_ok($$select public.rsvp_mark_shared('d5000000-0000-4000-8000-000000000001')$$, '42501', 'forbidden', 'nor mark as shared');
 select throws_ok($$select public.rsvp_unmark_shared('d5000000-0000-4000-8000-000000000001', '{"people":[]}')$$, '42501', 'forbidden', 'nor undo it');
+select throws_ok($$select public.rsvp_link_matches('d5000000-0000-4000-8000-000000000001', extensions.digest('x', 'sha256'))$$, '42501', 'forbidden', 'a reader without guests/write cannot compare a hash');
 :su
 
 -- Another wedding's partner: ids of W1 are invisible, nothing changes.
@@ -135,6 +138,7 @@ select throws_ok($$select public.rsvp_revoke_link('d5000000-0000-4000-8000-00000
 select throws_ok($$select public.rsvp_rotate_link('d5000000-0000-4000-8000-000000000001', gen_random_uuid(), extensions.digest('x', 'sha256'))$$, 'P0001', 'link_not_found', 'other wedding: rotate a W1 link');
 select throws_ok($$select public.rsvp_mark_shared('d5000000-0000-4000-8000-000000000001')$$, 'P0001', 'link_not_found', 'other wedding: mark a W1 link');
 select throws_ok($$select public.rsvp_unmark_shared('d5000000-0000-4000-8000-000000000001', '{"people":[]}')$$, 'P0001', 'link_not_found', 'other wedding: undo on a W1 link');
+select throws_ok($$select public.rsvp_link_matches('d5000000-0000-4000-8000-000000000001', extensions.digest('x', 'sha256'))$$, 'P0001', 'link_not_found', 'other wedding: a W1 link is not found, true or false is never given');
 select is(public.rsvp_create_links(jsonb_build_array(
     jsonb_build_object('link_id', gen_random_uuid(), 'token_hash', '\x' || encode(extensions.digest('rr-intruder', 'sha256'), 'hex'), 'group_id', 'a5000000-0000-4000-8000-000000000001'),
     jsonb_build_object('link_id', gen_random_uuid(), 'token_hash', '\x' || encode(extensions.digest('rr-intruder2', 'sha256'), 'hex'), 'guest_id', 'c5000000-0000-4000-8000-000000000003'))) -> 'created',
@@ -159,8 +163,8 @@ select is(
   (select array_agg(p.proname::text order by p.proname::text) from pg_proc p
    where p.pronamespace = 'public'::regnamespace and p.proname like 'rsvp\_%'
      and has_function_privilege('authenticated', p.oid, 'execute') and not has_function_privilege('anon', p.oid, 'execute')),
-  array['rsvp_create_links', 'rsvp_mark_shared', 'rsvp_revoke_link', 'rsvp_rotate_link', 'rsvp_status', 'rsvp_unmark_shared']::text[],
-  'the six couple RPCs: authenticated yes, anon no (T2 adds the public ones for service_role only)');
+  array['rsvp_create_links', 'rsvp_link_matches', 'rsvp_mark_shared', 'rsvp_revoke_link', 'rsvp_rotate_link', 'rsvp_status', 'rsvp_unmark_shared']::text[],
+  'the seven couple RPCs: authenticated yes, anon no (T2 adds the public ones for service_role only)');
 select is(
   (select array_agg(p.proname::text order by p.proname::text) from pg_proc p
    where p.pronamespace = 'private'::regnamespace and p.proname like 'rsvp\_%'

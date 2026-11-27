@@ -745,6 +745,9 @@ isOneToOne: false
 "rsvp_gate":
 { Args: { "p_ip_key"?: string,"p_now"?: string,"p_token_hash": string }; Returns: Json
                            },
+"rsvp_link_matches":
+{ Args: { "p_hash": string,"p_link_id": string }; Returns: boolean
+                           },
 "rsvp_mark_shared":
 { Args: { "p_link_id": string,"p_now"?: string }; Returns: Json
                            },
