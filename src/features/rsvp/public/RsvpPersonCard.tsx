@@ -43,7 +43,6 @@ export function RsvpPersonCard({
             ...(status === "no" ? { diet: [], note: "" } : {}),
           })
         }
-        aria-controls={enhanced && status === "yes" ? `diet-${id}` : undefined}
         className="sr-only"
       />
       <Icon
@@ -103,6 +102,11 @@ export function RsvpPersonCard({
             name={`note:${id}`}
             value={value.note}
             maxLength={NOTE_MAX}
+            // Health data of a third party: no browser form memory or spell-check service (AC11, BR11).
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck={false}
             onChange={(event) => onChange({ ...value, note: event.target.value })}
             className="h-12 text-base"
           />

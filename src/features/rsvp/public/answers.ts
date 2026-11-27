@@ -11,6 +11,8 @@ import { DIET_VALUES, NOTE_MAX, type FormValues } from "./state";
 const MAX_PEOPLE = 100;
 const ID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const RAW_NOTE_MAX = 1000;
+/** An ISO timestamp with microseconds and offset is 32 characters; anything longer is not one. */
+const SEEN_MAX = 40;
 
 export type ParsedAnswers =
   | { ok: true; answers: RsvpAnswer[]; values: FormValues; chosen: number }
@@ -55,7 +57,8 @@ export function parseAnswers(data: FormData): ParsedAnswers {
       status,
       diet: status === "yes" ? diet : [],
       diet_note: status === "yes" ? note : null,
-      seen_at: seen !== "" && !Number.isNaN(Date.parse(seen)) ? seen : null,
+      seen_at:
+        seen !== "" && seen.length <= SEEN_MAX && !Number.isNaN(Date.parse(seen)) ? seen : null,
     });
   }
   if (tooLong) return { ok: false, values, reason: "note" };

@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
-import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { ServiceDownPage } from "@/components/ServiceDownPage";
 import { clientIp } from "@/features/auth/limiter-keys";
 import { rsvpLoadPage } from "@/features/rsvp/public-rpc";
 import { submitRsvp } from "@/features/rsvp/public-actions";
+import { LinkUnavailable } from "@/features/rsvp/public/LinkUnavailable";
 import { RsvpForm } from "@/features/rsvp/public/RsvpForm";
 import { RsvpShell } from "@/features/rsvp/public/RsvpShell";
 import { dateText, locationText } from "@/features/rsvp/public/format";
@@ -14,7 +14,8 @@ import { getNow } from "@/lib/clock";
 
 /**
  * Static on purpose: the preview and the tab never carry names (design §1.1), and there is no image.
- * No `loading.tsx` in this segment: it would turn the 404 into a 200 (Next 16, `notFound()`).
+ * There is no `not-found.tsx` and no `notFound()` here: the 404 of a dead link is answered by the
+ * proxy with a script-free body (Arbitrato S3).
  */
 export const metadata: Metadata = {
   title: { absolute: "Conferma la tua presenza" },
@@ -24,22 +25,28 @@ export const metadata: Metadata = {
 };
 
 /**
- * Guest page (ADR-0003). The token is shape-checked before any DB call; every link that does not
- * work (unknown, revoked, expired, no recipient) is the same `notFound()`: 404 and the neutral view.
- * `rsvp_page` never writes except a failed lookup, which the DB counts per IP. The proxy sets
- * `Referrer-Policy: no-referrer`, `no-store` and, for a working link, the theme header.
+ * Guest page (ADR-0003). The token is shape-checked before any DB call. A link that does not work
+ * normally never gets here (the proxy answers the neutral 404); if it does (the proxy gate timed
+ * out, or a race), the same neutral view is rendered with status 200. `rsvp_page` never writes
+ * except a failed lookup, which the DB counts per IP. The proxy sets `Referrer-Policy:
+ * no-referrer`, `no-store` and, for a working link, the theme header.
  */
 export default async function RsvpPage({ params }: { params: Promise<{ token: string }> }) {
   await connection();
   const { token } = await params;
-  if (!isRsvpTokenShape(token)) notFound();
+  const neutral = (
+    <RsvpShell>
+      <LinkUnavailable />
+    </RsvpShell>
+  );
+  if (!isRsvpTokenShape(token)) return neutral;
 
   const result = await rsvpLoadPage({
     token,
     ip: clientIp(await headers()),
     now: await getNow(),
   });
-  if (result.state === "neutral") notFound();
+  if (result.state === "neutral") return neutral;
   if (result.state === "retry") {
     return (
       <RsvpShell>

@@ -88,14 +88,16 @@ describe("parseAnswers", () => {
     expect(parsed).toMatchObject({ ok: true, chosen: 0 });
   });
 
-  it("ignores an unreadable seen_at instead of forwarding it", () => {
-    const parsed = parseAnswers(
-      form([
-        ["p", A],
-        [`status:${A}`, "yes"],
-        [`seen:${A}`, "garbage"],
-      ]),
-    );
-    expect(parsed.ok && parsed.answers[0]?.seen_at).toBeNull();
+  it("ignores an unreadable or oversized seen_at instead of forwarding it", () => {
+    for (const seen of ["garbage", `2027-03-10T10:00:00${" ".repeat(60)}Z`]) {
+      const parsed = parseAnswers(
+        form([
+          ["p", A],
+          [`status:${A}`, "yes"],
+          [`seen:${A}`, seen],
+        ]),
+      );
+      expect(parsed.ok && parsed.answers[0]?.seen_at).toBeNull();
+    }
   });
 });

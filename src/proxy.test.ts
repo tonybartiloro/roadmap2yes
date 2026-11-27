@@ -12,7 +12,8 @@ vi.mock("@supabase/ssr", () => ({
 }));
 const rsvpGate = vi.fn();
 vi.mock("@/features/auth/guards", () => ({ evaluateGuards }));
-vi.mock("@/features/rsvp/public-rpc", () => ({ rsvpGate }));
+const rsvpLoadPage = vi.fn();
+vi.mock("@/features/rsvp/public-rpc", () => ({ rsvpGate, rsvpLoadPage }));
 
 const { proxy } = await import("./proxy");
 
@@ -25,6 +26,7 @@ beforeEach(() => {
   vi.stubEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "sb_publishable_fake");
   getClaims.mockReset();
   rsvpGate.mockReset().mockResolvedValue({ blocked: false, retryAfterSeconds: 0, themeId: null });
+  rsvpLoadPage.mockReset().mockResolvedValue({ state: "ok" });
   evaluateGuards.mockReset();
   evaluateGuards.mockResolvedValue({ action: "next" });
   getClaims.mockResolvedValue({ data: null, error: null });
@@ -320,16 +322,86 @@ describe("proxy: RSVP gate on /rsvp/{token} (AC10)", () => {
     expect(theme(await proxy(forged(`/rsvp/${TOKEN}`)))).toBeNull();
   });
 
-  it.each(["/rsvp", "/rsvp/", "/rsvp/short", `/rsvp/${"A".repeat(44)}`, `/rsvp/${"é".repeat(43)}`, `/rsvp/${TOKEN}/x`])(
-    "does not call the gate (no DB) for %s",
+  it.each(["/rsvp", "/rsvp/", `/rsvp/${TOKEN}/x`])(
+    "does not touch the DB for %s (not a token path)",
     async (path) => {
       await proxy(request(path));
       expect(rsvpGate).not.toHaveBeenCalled();
+      expect(rsvpLoadPage).not.toHaveBeenCalled();
     },
   );
 
+  describe("the neutral 404 answered by the proxy (Arbitrato S3)", () => {
+    const body = async (response: Response) => response.text();
+    const check = (response: Response) => {
+      expect(response.status).toBe(404);
+      expect(response.headers.get("content-type")).toBe("text/html; charset=utf-8");
+      expect(response.headers.get("x-robots-tag")).toBe("noindex, nofollow");
+      expect(response.headers.get("cache-control")).toBe("private, no-store");
+      expect(response.headers.get("referrer-policy")).toBe("no-referrer");
+      expect(response.headers.get("retry-after")).toBeNull();
+    };
+
+    it.each(["/rsvp/short", `/rsvp/${"A".repeat(44)}`, `/rsvp/${"é".repeat(43)}`])(
+      "answers it for the malformed %s without any DB call",
+      async (path) => {
+        const response = await proxy(request(path));
+        check(response);
+        expect(await body(response)).toContain("Questo link non funziona più");
+        expect(rsvpGate).not.toHaveBeenCalled();
+        expect(rsvpLoadPage).not.toHaveBeenCalled();
+      },
+    );
+
+    it("is byte-identical for a malformed token and a link that does not work", async () => {
+      const malformed = await body(await proxy(request("/rsvp/short")));
+      rsvpLoadPage.mockResolvedValue({ state: "neutral" });
+      const dead = await proxy(request(`/rsvp/${TOKEN}`));
+      check(dead);
+      expect(await body(dead)).toBe(malformed);
+      expect(malformed).not.toContain("<script");
+      expect(malformed).not.toContain(TOKEN);
+    });
+
+    it("asks rsvp_page once, bounded and with the request IP and clock, only when the gate has no theme", async () => {
+      rsvpLoadPage.mockResolvedValue({ state: "neutral" });
+      await proxy(
+        new NextRequest(new URL(`/rsvp/${TOKEN}`, "http://localhost:3000"), {
+          headers: { "x-forwarded-for": "203.0.113.7" },
+        }),
+      );
+      expect(rsvpLoadPage).toHaveBeenCalledTimes(1);
+      expect(rsvpLoadPage).toHaveBeenCalledWith(
+        expect.objectContaining({ token: TOKEN, ip: "203.0.113.7", timeoutMs: 3000 }),
+      );
+    });
+
+    it("lets the request through (fail-open) on ok, retry or a timeout", async () => {
+      for (const state of [{ state: "ok" }, { state: "retry" }]) {
+        rsvpLoadPage.mockResolvedValue(state);
+        expect((await proxy(request(`/rsvp/${TOKEN}`))).status).toBe(200);
+      }
+    });
+
+    it("never calls rsvp_page for a working link, a blocked IP, a failed gate or a POST", async () => {
+      rsvpGate.mockResolvedValue({ blocked: false, retryAfterSeconds: 0, themeId: "velluto" });
+      await proxy(request(`/rsvp/${TOKEN}`));
+      rsvpGate.mockResolvedValue({ blocked: true, retryAfterSeconds: 60, themeId: null });
+      await proxy(request(`/rsvp/${TOKEN}`));
+      rsvpGate.mockResolvedValue(null);
+      await proxy(request(`/rsvp/${TOKEN}`));
+      await proxy(
+        new NextRequest(new URL(`/rsvp/${TOKEN}`, "http://localhost:3000"), { method: "POST" }),
+      );
+      expect(rsvpLoadPage).not.toHaveBeenCalled();
+    });
+  });
+
   it("does not call the gate on an outage, or when the guards do not let the request through", async () => {
-    getClaims.mockResolvedValue({ data: null, error: { name: "AuthApiError", message: "", status: 540 } });
+    getClaims.mockResolvedValue({
+      data: null,
+      error: { name: "AuthApiError", message: "", status: 540 },
+    });
     evaluateGuards.mockResolvedValue({ action: "rewrite", to: "/servizio?motivo=paused" });
     await proxy(request(`/rsvp/${TOKEN}`));
     expect(rsvpGate).not.toHaveBeenCalled();
@@ -364,9 +436,13 @@ describe("proxy: RSVP gate on /rsvp/{token} (AC10)", () => {
     await proxy(request(`/rsvp/%41${"A".repeat(42)}`));
     expect(rsvpGate).toHaveBeenCalledWith(expect.objectContaining({ token: TOKEN }));
     rsvpGate.mockClear();
-    // an escape that decodes to something that is not a token, and a malformed escape: no gate, no throw
-    for (const path of [`/rsvp/%2F${"A".repeat(42)}`, `/rsvp/%E0%A4%A${"A".repeat(38)}`, `/rsvp/%ZZ${"A".repeat(41)}`]) {
-      expect((await proxy(request(path))).status).toBe(200);
+    // an escape that decodes to something that is not a token, and a malformed escape: neutral 404, no gate, no throw
+    for (const path of [
+      `/rsvp/%2F${"A".repeat(42)}`,
+      `/rsvp/%E0%A4%A${"A".repeat(38)}`,
+      `/rsvp/%ZZ${"A".repeat(41)}`,
+    ]) {
+      expect((await proxy(request(path))).status).toBe(404);
     }
     expect(rsvpGate).not.toHaveBeenCalled();
   });

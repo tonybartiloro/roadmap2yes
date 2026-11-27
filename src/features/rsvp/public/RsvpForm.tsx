@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { LinkUnavailable } from "./LinkUnavailable";
 import { RsvpPersonCard } from "./RsvpPersonCard";
 import { RsvpSummary } from "./RsvpSummary";
-import { coupleNames, coupleTitle } from "./format";
+import { DATE_TBC, LOCATION_TBC, coupleNameList, coupleNames, coupleTitle } from "./format";
 import {
   IDLE,
   MESSAGES,
@@ -48,6 +48,7 @@ export function RsvpForm({
   const [pending, setPending] = useState(false);
   const [networkError, setNetworkError] = useState(false);
   const [saves, setSaves] = useState(0);
+  const [saved, setSaved] = useState<{ people: Person[]; changed: string[] } | null>(null);
   const enhanced = useSyncExternalStore(
     noop,
     () => true,
@@ -57,8 +58,11 @@ export function RsvpForm({
   const errorLine = useRef<HTMLParagraphElement>(null);
 
   const state = live ?? serverState;
-  const people = state.status === "saved" ? state.people : initialPeople;
-  const known = state.status === "saved" || hasAnswers(people);
+  // The last SAVED snapshot is kept apart from the last result: a failed re-submit must not bring
+  // back the page-load answers (REV-19). `serverState` carries the no-JS POST result.
+  const snapshot = saved ?? (serverState.status === "saved" ? serverState : null);
+  const people = snapshot ? snapshot.people : initialPeople;
+  const known = snapshot !== null || hasAnswers(people);
   const errorKind = networkError ? "save" : state.status === "error" ? state.kind : null;
   const sentValues: FormValues | null = state.status === "error" ? state.values : null;
 
@@ -70,7 +74,7 @@ export function RsvpForm({
     if (errorKind) errorLine.current?.focus();
   }, [errorKind, live]);
 
-  if (state.status === "unavailable") return <LinkUnavailable />;
+  if (state.status === "unavailable") return <LinkUnavailable moveFocus />;
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -80,7 +84,10 @@ export function RsvpForm({
     setNetworkError(false);
     try {
       const next = await action(state, data);
-      if (next.status === "saved") setSaves((n) => n + 1);
+      if (next.status === "saved") {
+        setSaved({ people: next.people, changed: next.changed });
+        setSaves((n) => n + 1);
+      }
       setLive(next);
     } catch {
       setNetworkError(true);
@@ -112,7 +119,7 @@ export function RsvpForm({
         <h1 className="font-heading text-[30px] leading-9">{coupleTitle(couple)}</h1>
         <p>{dateLabel}</p>
         <p>{locationLabel}</p>
-        {dateLabel === "Data da confermare" || locationLabel === "Luogo da confermare" ? (
+        {dateLabel === DATE_TBC || locationLabel === LOCATION_TBC ? (
           <p className="text-muted-foreground mt-2">
             Puoi rispondere adesso e cambiare quando vuoi.
           </p>
@@ -143,7 +150,7 @@ export function RsvpForm({
       <footer className="text-muted-foreground flex flex-col gap-2 text-sm">
         <p>
           Le risposte le vedono solo {label}, servono per organizzare il matrimonio; per farle
-          cancellare scrivi a {couple.filter(Boolean).length === 2 ? "loro" : "chi ti ha invitato"}.
+          cancellare scrivi a {coupleNameList(couple).length === 2 ? "loro" : "chi ti ha invitato"}.
         </p>
         <p>Manca qualcuno o c&apos;è un nome sbagliato? Scrivi a chi ti ha invitato.</p>
       </footer>
@@ -177,7 +184,13 @@ function PeopleForm({
   const chosen = people.filter((p) => values[p.id]?.status != null).length;
 
   return (
-    <form action={formAction} onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
+    <form
+      action={formAction}
+      onSubmit={onSubmit}
+      autoComplete="off"
+      className="flex flex-col gap-4"
+      noValidate
+    >
       <p className="font-medium">{many ? "Dicci chi di voi viene." : "Dicci se ci sei."}</p>
       {enhanced && many ? (
         <Button

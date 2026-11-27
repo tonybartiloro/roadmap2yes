@@ -8,22 +8,27 @@ const DATE_FORMAT = new Intl.DateTimeFormat("it-IT", {
   timeZone: "UTC",
 });
 
+export const DATE_TBC = "Data da confermare";
+export const LOCATION_TBC = "Luogo da confermare";
+
 /** "2027-09-03" -> "sabato 3 settembre 2027"; null or unreadable -> "Data da confermare". */
 export function dateText(date: string | null): string {
-  if (!date) return "Data da confermare";
+  if (!date) return DATE_TBC;
   const parsed = new Date(`${date.slice(0, 10)}T00:00:00Z`);
-  return Number.isNaN(parsed.getTime()) ? "Data da confermare" : DATE_FORMAT.format(parsed);
+  return Number.isNaN(parsed.getTime()) ? DATE_TBC : DATE_FORMAT.format(parsed);
 }
 
 /** "Villa Aurora, Tivoli"; null -> "Luogo da confermare". */
 export function locationText(location: { name: string; comune: string | null } | null): string {
-  if (!location) return "Luogo da confermare";
+  if (!location) return LOCATION_TBC;
   return location.comune ? `${location.name}, ${location.comune}` : location.name;
 }
 
-function names(couple: readonly (string | null)[]): string[] {
+/** The one definition of "has a name": trimmed and not blank. */
+export function coupleNameList(couple: readonly (string | null)[]): string[] {
   return couple.filter((name): name is string => Boolean(name && name.trim()));
 }
+const names = coupleNameList;
 
 /** h1 of the page. */
 export function coupleTitle(couple: readonly (string | null)[]): string {

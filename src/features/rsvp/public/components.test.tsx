@@ -151,6 +151,65 @@ describe("RsvpForm (with JavaScript)", () => {
   });
 });
 
+describe("RsvpForm: review fixes", () => {
+  const SAVED_AT = "2027-03-10T10:00:00.123456+00:00";
+
+  it("keeps the saved snapshot after a failed re-submit: no false 'already changed', summary stays (REV-19)", async () => {
+    const user = userEvent.setup();
+    const results: RsvpFormState[] = [
+      {
+        status: "saved",
+        people: [{ ...MARIO, status: "yes", answered_at: SAVED_AT }],
+        changed: [],
+      },
+      { status: "error", kind: "blocked", values: {} },
+      { status: "saved", people: [{ ...MARIO, status: "no", answered_at: SAVED_AT }], changed: [] },
+    ];
+    const action = vi.fn<RsvpAction>(async () => results.shift()!);
+    setup(action, [MARIO]);
+    await user.click(screen.getByLabelText("Sì, ci sono"));
+    await user.click(screen.getByRole("button", { name: "Invia le risposte" }));
+    await screen.findByText("Grazie! Abbiamo ricevuto le risposte");
+    // Modifica, change the answer, hit the limit.
+    await user.click(screen.getByText("Modifica"));
+    await user.click(screen.getByLabelText("No, non posso"));
+    await user.click(screen.getByRole("button", { name: "Invia le risposte" }));
+    await screen.findByText("Troppi tentativi: riprova tra 15 minuti");
+    expect(screen.getByText(/Mario Rossi:/).textContent).toContain("Sì");
+    // The retry reports what the page showed: the guest's own save, not the page-load state.
+    await user.click(screen.getByRole("button", { name: "Invia le risposte" }));
+    await waitFor(() => expect(action).toHaveBeenCalledTimes(3));
+    expect(action.mock.calls[2]![1].get(`seen:${MARIO.id}`)).toBe(SAVED_AT);
+    expect(screen.queryByTestId("rsvp-changed")).toBeNull();
+  });
+
+  it("has no dangling aria-controls, and the note field is kept out of browser memory (REV-20, REV-118)", () => {
+    const { container } = setup(never, [MARIO]);
+    expect(container.querySelector("[aria-controls]")).toBeNull();
+    expect(container.querySelector("form")?.getAttribute("autocomplete")).toBe("off");
+    const note = container.querySelector<HTMLInputElement>("input[name^='note:']");
+    expect(note).toBeNull();
+    return userEvent
+      .setup()
+      .click(screen.getByLabelText("Sì, ci sono"))
+      .then(() => {
+        const field = container.querySelector<HTMLInputElement>("input[name^='note:']")!;
+        expect(field.getAttribute("autocomplete")).toBe("off");
+        expect(field.getAttribute("spellcheck")).toBe("false");
+        expect(field.getAttribute("autocapitalize")).toBe("off");
+      });
+  });
+
+  it("moves the focus to the heading when the neutral view replaces the page (REV-22)", async () => {
+    const user = userEvent.setup();
+    setup(async () => ({ status: "unavailable" }), [MARIO]);
+    await user.click(screen.getByLabelText("Sì, ci sono"));
+    await user.click(screen.getByRole("button", { name: "Invia le risposte" }));
+    const heading = await screen.findByRole("heading", { level: 1 });
+    expect(document.activeElement).toBe(heading);
+  });
+});
+
 describe("RsvpForm (server render, no JavaScript)", () => {
   it("renders native radios, always-visible preferences labelled 'Solo se vieni', no JS-only controls", () => {
     const html = renderToString(

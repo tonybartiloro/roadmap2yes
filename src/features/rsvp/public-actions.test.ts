@@ -63,6 +63,31 @@ describe("submitRsvp", () => {
     expect(await submitRsvp(TOKEN, IDLE, yes)).toMatchObject(expected);
   });
 
+  it("validates its arguments at runtime and ignores a token field in the form (REV-116)", async () => {
+    const bad = [
+      [["x".repeat(43)], yes],
+      [{ toString: 1 }, yes],
+      [TOKEN, { getAll: () => [] }],
+      [TOKEN, null],
+    ] as unknown as [string, FormData][];
+    for (const [token, data] of bad) {
+      expect(await submitRsvp(token, IDLE, data)).toEqual({ status: "unavailable" });
+    }
+    expect(submit).not.toHaveBeenCalled();
+
+    submit.mockResolvedValue({ state: "ok", people: [], changedMeanwhile: [] });
+    const other = "Z".repeat(43);
+    const withField = new FormData();
+    for (const [k, v] of [
+      ["token", other],
+      ["p", A],
+      [`status:${A}`, "yes"],
+    ])
+      withField.append(k!, v!);
+    await submitRsvp(TOKEN, IDLE, withField);
+    expect(submit).toHaveBeenCalledWith(expect.objectContaining({ token: TOKEN }));
+  });
+
   it("keeps the submitted choices on an error and returns nothing but codes", async () => {
     submit.mockResolvedValue({ state: "blocked", retryAfterSeconds: 60 });
     const state = await submitRsvp(TOKEN, IDLE, yes);

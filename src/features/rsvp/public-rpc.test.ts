@@ -39,13 +39,25 @@ const noLogs = () => logs.forEach((spy) => expect(spy).not.toHaveBeenCalled());
 
 describe("rsvpSubmit", () => {
   it("passes p_ip_key: null explicitly when there is no IP (no default in SQL)", async () => {
-    rpc.mockResolvedValue({ data: { ok: true, people: [PERSON], changed_meanwhile: [] }, error: null });
+    rpc.mockResolvedValue({
+      data: { ok: true, people: [PERSON], changed_meanwhile: [] },
+      error: null,
+    });
     await rsvpSubmit({ token: TOKEN, ip: null, answers: ANSWERS, now: NOW });
     const args = rpc.mock.calls[0]?.[1] as Record<string, unknown>;
     expect("p_ip_key" in args).toBe(true);
     expect(args["p_ip_key"]).toBeNull();
     expect(args["p_token_hash"]).toBe(hashRsvpToken(TOKEN));
     expect(args["p_now"]).toBe(NOW.toISOString());
+  });
+
+  it("projects the people of a submit to the AC3 keys too (REV-117)", async () => {
+    rpc.mockResolvedValue({
+      data: { ok: true, people: [{ ...PERSON, email: "a@example.test" }], changed_meanwhile: [] },
+      error: null,
+    });
+    const result = await rsvpSubmit({ token: TOKEN, ip: null, answers: ANSWERS, now: NOW });
+    expect(JSON.stringify(result)).not.toContain("example.test");
   });
 
   it("passes the keyed digest of the IP, never the IP", async () => {
@@ -86,7 +98,10 @@ describe("rsvpSubmit", () => {
     expect(await answer()).toEqual({ state: "invalid" });
     rpc.mockResolvedValueOnce({
       data: null,
-      error: { code: "22P05", message: "unsupported Unicode escape sequence \\u0000 cannot be converted to text" },
+      error: {
+        code: "22P05",
+        message: "unsupported Unicode escape sequence \\u0000 cannot be converted to text",
+      },
     });
     expect(await answer()).toEqual({ state: "retry" });
     rpc.mockResolvedValueOnce({ data: null, error: { code: "P0001", message: "invalid_key" } });
@@ -127,13 +142,25 @@ describe("rsvpSubmit", () => {
 });
 
 describe("rsvpLoadPage", () => {
-  const PAGE = { ok: true, couple: ["A", "B"], date: null, location: null, theme_id: "giardino", people: [PERSON] };
+  const PAGE = {
+    ok: true,
+    couple: ["A", "B"],
+    date: null,
+    location: null,
+    theme_id: "giardino",
+    people: [PERSON],
+  };
 
   it("returns the page, the neutral state, or a generic retry", async () => {
     rpc.mockResolvedValueOnce({ data: PAGE, error: null });
     expect(await rsvpLoadPage({ token: TOKEN, ip: null, now: NOW })).toEqual({
       state: "ok",
-      page: PAGE,
+      page: {
+        couple: PAGE.couple,
+        date: PAGE.date,
+        location: PAGE.location,
+        people: PAGE.people,
+      },
     });
     rpc.mockResolvedValueOnce({ data: { ok: false }, error: null });
     expect(await rsvpLoadPage({ token: TOKEN, ip: null, now: NOW })).toEqual({ state: "neutral" });
@@ -144,6 +171,38 @@ describe("rsvpLoadPage", () => {
     rpc.mockRejectedValueOnce(new Error("down"));
     expect(await rsvpLoadPage({ token: TOKEN, ip: null, now: NOW })).toEqual({ state: "retry" });
     noLogs();
+  });
+
+  it("returns only the AC3 keys: an extra key from the DB never reaches the caller (REV-117)", async () => {
+    const dirty = {
+      ...PAGE,
+      couple_email: "x@example.test",
+      location: { name: "Villa", comune: null, address: "secret" },
+      people: [{ ...PERSON, email: "a@example.test", side: "A", diet: ["vegan", "evil"] }],
+    };
+    rpc.mockResolvedValueOnce({ data: dirty, error: null });
+    const result = await rsvpLoadPage({ token: TOKEN, ip: null, now: NOW });
+    const text = JSON.stringify(result);
+    for (const leak of ["example.test", "secret", "side", "evil", "theme_id"]) {
+      expect(text).not.toContain(leak);
+    }
+    expect(result).toMatchObject({ state: "ok", page: { people: [{ diet: ["vegan"] }] } });
+    rpc.mockResolvedValueOnce({
+      data: { ...PAGE, people: [{ ...PERSON, category: "alien" }] },
+      error: null,
+    });
+    expect(await rsvpLoadPage({ token: TOKEN, ip: null, now: NOW })).toEqual({ state: "retry" });
+  });
+
+  it("applies a timeout only when asked", async () => {
+    const abortable = {
+      abortSignal: vi.fn().mockResolvedValue({ data: { ok: false }, error: null }),
+    };
+    rpc.mockReturnValueOnce(abortable);
+    expect(await rsvpLoadPage({ token: TOKEN, ip: null, now: NOW, timeoutMs: 3000 })).toEqual({
+      state: "neutral",
+    });
+    expect(abortable.abortSignal).toHaveBeenCalledWith(expect.any(AbortSignal));
   });
 
   it("skips the DB for a malformed token and omits the IP key when there is no IP", async () => {

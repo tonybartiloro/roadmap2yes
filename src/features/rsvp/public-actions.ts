@@ -20,7 +20,11 @@ export async function submitRsvp(
   _previous: RsvpFormState,
   formData: FormData,
 ): Promise<RsvpFormState> {
-  if (!isRsvpTokenShape(token)) return { status: "unavailable" };
+  // A server action is a public endpoint: the arguments come from the request whatever the types
+  // say, so check them at runtime (REV-116). Only the bound `token` counts, never a form field.
+  if (typeof token !== "string" || !isRsvpTokenShape(token) || !(formData instanceof FormData)) {
+    return { status: "unavailable" };
+  }
 
   const parsed = parseAnswers(formData);
   if (!parsed.ok) return { status: "error", kind: "invalid", values: parsed.values };

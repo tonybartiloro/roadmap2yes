@@ -11,7 +11,8 @@ import {
 } from "@/features/auth/guards";
 import { clientIp } from "@/features/auth/limiter-keys";
 import { blockedHtml } from "@/features/rsvp/blocked-html";
-import { rsvpGate } from "@/features/rsvp/public-rpc";
+import { neutralHtml } from "@/features/rsvp/neutral-html";
+import { rsvpGate, rsvpLoadPage } from "@/features/rsvp/public-rpc";
 import { isRsvpTokenShape } from "@/features/rsvp/token";
 import { resolveNow, TEST_NOW_COOKIE } from "@/lib/clock";
 import { isApprovedThemeId } from "@/themes/approved";
@@ -55,6 +56,17 @@ function decorate(response: NextResponse, pathname: string, cookies: CookieToSet
   response.headers.set("Referrer-Policy", referrerPolicyFor(pathname));
   response.headers.set("Cache-Control", "private, no-store");
   return response;
+}
+
+/** The neutral 404: same bytes and headers for every cause (AC6). `decorate` adds no-store/no-referrer. */
+function neutralResponse(): NextResponse {
+  return new NextResponse(neutralHtml(), {
+    status: 404,
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+      "X-Robots-Tag": "noindex, nofollow",
+    },
+  });
 }
 
 function respond(
@@ -186,14 +198,15 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
         token = undefined;
       }
     }
+    // Malformed token (or broken escape) on `/rsvp/{x}`: the neutral 404, no DB (QA-15).
+    if (RSVP_PATH.test(pathname) && (token === undefined || !isRsvpTokenShape(token))) {
+      return decorate(neutralResponse(), pathname, cookiesToSet);
+    }
     if (token !== undefined && isRsvpTokenShape(token)) {
-      const gate = await rsvpGate({
-        token,
-        ip: clientIp(request.headers),
-        // QA-1: the only source of `p_now`; the cookie counts only with E2E_CLOCK and no VERCEL.
-        now: resolveNow({ cookieValue: request.cookies.get(TEST_NOW_COOKIE)?.value }),
-        timeoutMs: BACKEND_TIMEOUT_MS,
-      });
+      const ip = clientIp(request.headers);
+      // QA-1: the only source of `p_now`; the cookie counts only with E2E_CLOCK and no VERCEL.
+      const now = resolveNow({ cookieValue: request.cookies.get(TEST_NOW_COOKIE)?.value });
+      const gate = await rsvpGate({ token, ip, now, timeoutMs: BACKEND_TIMEOUT_MS });
       if (gate?.blocked) {
         const blocked = new NextResponse(blockedHtml(), {
           status: 429,
@@ -207,6 +220,14 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
       }
       const themeId = gate?.themeId;
       if (isApprovedThemeId(themeId)) forwarded.set(THEME_HEADER, themeId);
+      // Gate answered "no theme" = a link that does not work (`weddings.theme_id` is not null): ask
+      // the page RPC once (it counts the failed lookup, BR9) and answer the neutral 404 here, because
+      // `notFound()` gives an empty body without JS. A working link never gets here, so the page's own
+      // call stays the only one; `ok`, `retry` and a timeout let the request through (fail-open).
+      if (gate !== null && gate.themeId === null) {
+        const page = await rsvpLoadPage({ token, ip, now, timeoutMs: BACKEND_TIMEOUT_MS });
+        if (page.state === "neutral") return decorate(neutralResponse(), pathname, cookiesToSet);
+      }
     }
   }
   return respond(decision, request, forwarded, cookiesToSet);

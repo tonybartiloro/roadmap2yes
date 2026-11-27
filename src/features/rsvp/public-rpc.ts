@@ -26,11 +26,11 @@ export type RsvpPerson = {
   answered_at: string | null;
 };
 
+/** Exactly the AC3 data; the theme id is the gate's business (proxy), not the page's. */
 export type RsvpPageData = {
   couple: [string | null, string | null];
   date: string | null;
   location: { name: string; comune: string | null } | null;
-  theme_id: string | null;
   people: RsvpPerson[];
 };
 
@@ -46,7 +46,8 @@ export type RsvpAnswer = {
 export type GateResult = { blocked: boolean; retryAfterSeconds: number; themeId: string | null };
 
 /** `neutral` = the one answer for every link that does not work; `retry` = infrastructure, try again. */
-export type PageResult = { state: "ok"; page: RsvpPageData } | { state: "neutral" } | { state: "retry" };
+export type PageResult =
+  { state: "ok"; page: RsvpPageData } | { state: "neutral" } | { state: "retry" };
 
 export type SubmitResult =
   | { state: "ok"; people: RsvpPerson[]; changedMeanwhile: string[] }
@@ -57,6 +58,61 @@ export type SubmitResult =
 
 type Obj = Record<string, unknown>;
 const isObj = (v: unknown): v is Obj => typeof v === "object" && v !== null && !Array.isArray(v);
+
+const DIET = ["vegetarian", "vegan", "gluten_free", "lactose_free"];
+const strOrNull = (v: unknown): string | null | undefined =>
+  v === null ? null : typeof v === "string" ? v : undefined;
+
+/**
+ * Defence in depth (REV-117): what leaves this module to the browser is rebuilt from the AC3 keys
+ * only, so a key added to the SQL one day (email, side, table...) can never reach a page or a
+ * server-action response. A malformed person is `null` (the caller answers `retry`).
+ */
+function pickPerson(raw: unknown): RsvpPerson | null {
+  if (!isObj(raw)) return null;
+  const { id, first_name, category, status, diet } = raw;
+  const last = strOrNull(raw["last_name"]);
+  const note = strOrNull(raw["diet_note"]);
+  const answered = strOrNull(raw["answered_at"]);
+  if (typeof id !== "string" || typeof first_name !== "string") return null;
+  if (last === undefined || note === undefined || answered === undefined) return null;
+  if (category !== "adult" && category !== "child" && category !== "infant") return null;
+  if (status !== null && status !== "yes" && status !== "no") return null;
+  if (!Array.isArray(diet)) return null;
+  return {
+    id,
+    first_name,
+    last_name: last,
+    category,
+    status,
+    diet: diet.filter((d): d is string => typeof d === "string" && DIET.includes(d)),
+    diet_note: note,
+    answered_at: answered,
+  };
+}
+
+function pickPeople(raw: unknown): RsvpPerson[] | null {
+  if (!Array.isArray(raw)) return null;
+  const people = raw.map(pickPerson);
+  return people.every((p): p is RsvpPerson => p !== null) ? people : null;
+}
+
+function pickPage(data: Obj): RsvpPageData | null {
+  const people = pickPeople(data["people"]);
+  const couple = data["couple"];
+  if (!people || !Array.isArray(couple)) return null;
+  const [a, b] = [strOrNull(couple[0]), strOrNull(couple[1])];
+  const date = strOrNull(data["date"]);
+  if (a === undefined || b === undefined || date === undefined) return null;
+  const loc = data["location"];
+  let location: RsvpPageData["location"] = null;
+  if (loc !== null && loc !== undefined) {
+    const comune = isObj(loc) ? strOrNull(loc["comune"]) : undefined;
+    if (!isObj(loc) || typeof loc["name"] !== "string" || comune === undefined) return null;
+    location = { name: loc["name"], comune };
+  }
+  return { couple: [a, b], date, location, people };
+}
 
 function ipKeyFor(ip: string | null): string | null {
   return ip === null ? null : rsvpIpKey(readSupabaseSecretKey(), ip);
@@ -103,20 +159,24 @@ export async function rsvpLoadPage(input: {
   token: string;
   ip: string | null;
   now: Date;
+  /** The proxy bounds the call (fail-open); the page does not. */
+  timeoutMs?: number;
 }): Promise<PageResult> {
   if (!isRsvpTokenShape(input.token)) return { state: "neutral" };
   try {
-    const { data, error } = await createAdminClient().rpc("rsvp_page", {
+    const call = createAdminClient().rpc("rsvp_page", {
       p_token_hash: hashRsvpToken(input.token),
       p_ip_key: ipKeyFor(input.ip) ?? undefined,
       p_now: input.now.toISOString(),
     });
+    const { data, error } = await (input.timeoutMs === undefined
+      ? call
+      : call.abortSignal(AbortSignal.timeout(input.timeoutMs)));
     if (error || !isObj(data)) return { state: "retry" };
     if (data["ok"] === false) return { state: "neutral" };
-    if (data["ok"] !== true || !Array.isArray(data["people"]) || !Array.isArray(data["couple"])) {
-      return { state: "retry" };
-    }
-    return { state: "ok", page: data as unknown as RsvpPageData };
+    if (data["ok"] !== true) return { state: "retry" };
+    const page = pickPage(data);
+    return page ? { state: "ok", page } : { state: "retry" };
   } catch {
     return { state: "retry" };
   }
@@ -143,10 +203,11 @@ export async function rsvpSubmit(input: {
     if (!isObj(data)) return { state: "retry" };
     if (data["ok"] === true) {
       const changed = data["changed_meanwhile"];
-      if (!Array.isArray(data["people"]) || !Array.isArray(changed)) return { state: "retry" };
+      const people = pickPeople(data["people"]);
+      if (!people || !Array.isArray(changed)) return { state: "retry" };
       return {
         state: "ok",
-        people: data["people"] as RsvpPerson[],
+        people,
         changedMeanwhile: changed.filter((id): id is string => typeof id === "string"),
       };
     }
