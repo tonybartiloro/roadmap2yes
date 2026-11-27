@@ -49,6 +49,7 @@ const PUBLIC_PREFIXES = [
   "/invito",
   "/su-invito",
   "/email",
+  "/rsvp",
   "/servizio",
   "/robots.txt",
   "/manifest.webmanifest",

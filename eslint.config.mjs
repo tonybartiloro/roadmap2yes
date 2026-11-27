@@ -99,14 +99,15 @@ const r2yPlugin = {
 
 // Integration/acceptance tests do NOT import admin.ts (it is `server-only`): their helper builds a
 // service client directly with `createClient` from `@supabase/supabase-js` (tests/ only), so no
-// fifth scope is needed.
-// 3. Scopes allowed to import the secret-key client (plan §1 and ADR-0001).
+// extra scope is needed for them.
+// 3. Scopes allowed to import the secret-key client (plan §1, ADR-0001; the fifth is ADR-0003).
 export const ADMIN_ALLOWED_SCOPES = [
   "src/features/auth/login.ts",
   "src/features/auth/bootstrap.ts",
   "src/features/accounts/admin-ops.ts",
   "src/features/jobs/**",
   "src/app/(public)/email/**",
+  "src/features/rsvp/public-rpc.ts",
 ];
 
 const CACHE_PATHS = [
@@ -127,7 +128,7 @@ const ADMIN_PATTERN = {
     "./admin.js",
   ],
   message:
-    "lib/supabase/admin.ts (secret key) may only be imported from features/auth/{login,bootstrap}.ts, features/accounts/admin-ops.ts, features/jobs/** and app/(public)/email/** (plan §1).",
+    "lib/supabase/admin.ts (secret key) may only be imported from features/auth/{login,bootstrap}.ts, features/accounts/admin-ops.ts, features/jobs/**, app/(public)/email/** and features/rsvp/public-rpc.ts (plan §1, ADR-0003).",
 };
 
 export default defineConfig([
@@ -144,7 +145,7 @@ export default defineConfig([
     },
   },
   {
-    // The 4 allowed scopes may import admin.ts (the cache ban still applies).
+    // The 5 allowed scopes may import admin.ts (the cache ban still applies).
     files: ADMIN_ALLOWED_SCOPES,
     rules: {
       "r2y/no-admin-dynamic-import": "off",

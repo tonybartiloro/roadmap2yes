@@ -9,6 +9,12 @@ import {
   type GuardClaims,
   type GuardDecision,
 } from "@/features/auth/guards";
+import { clientIp } from "@/features/auth/limiter-keys";
+import { blockedHtml } from "@/features/rsvp/blocked-html";
+import { rsvpGate } from "@/features/rsvp/public-rpc";
+import { isRsvpTokenShape } from "@/features/rsvp/token";
+import { resolveNow, TEST_NOW_COOKIE } from "@/lib/clock";
+import { isApprovedThemeId } from "@/themes/approved";
 
 /**
  * Edge of every request (Next 16 "proxy"): refreshes the Supabase session, resolves the claims
@@ -23,7 +29,13 @@ const BACKEND_HEADER = "x-r2y-backend";
 /** Total time allowed to the backend per proxied request (claims, refresh, guard lookups each). */
 const BACKEND_TIMEOUT_MS = 3000;
 
-const NO_REFERRER_PREFIXES = ["/invito", "/auth", "/email"];
+/** Request header with the wedding theme of a working RSVP link (read by `themes/server.ts`). */
+const THEME_HEADER = "x-r2y-theme";
+
+const NO_REFERRER_PREFIXES = ["/invito", "/auth", "/email", "/rsvp"];
+
+/** `/rsvp/{token}` (a trailing slash is a 308 redirect done by Next before the proxy). */
+const RSVP_PATH = /^\/rsvp\/([^/]+)$/;
 
 function referrerPolicyFor(pathname: string): string {
   const strict = NO_REFERRER_PREFIXES.some(
@@ -80,6 +92,9 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   // header set by the first pass must survive (it only skips a DB theme lookup: harmless if forged).
   const isServicePage = pathname === "/servizio";
   if (!isServicePage) forwarded.delete(BACKEND_HEADER);
+  // `x-r2y-theme` is proxy-owned too: it makes the root layout paint a wedding's theme, so a client
+  // can never send one. Only the RSVP gate below sets it, from the DB.
+  forwarded.delete(THEME_HEADER);
 
   let claims: GuardClaims | null = null;
   let backend: BackendStatus = "ok";
@@ -154,6 +169,34 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
 
   const decision = await evaluateGuards({ pathname, searchParams, claims, backend, supabase });
   if (decision.action === "rewrite" && backend !== "ok") forwarded.set(BACKEND_HEADER, backend);
+
+  // RSVP gate (AC10): only a well-formed token on a healthy backend and an allowed request. Bounded
+  // and fail-open: if the gate does not answer, the page decides anyway.
+  if (decision.action === "next" && backend === "ok") {
+    const token = RSVP_PATH.exec(pathname)?.[1];
+    if (token !== undefined && isRsvpTokenShape(token)) {
+      const gate = await rsvpGate({
+        token,
+        ip: clientIp(request.headers),
+        // QA-1: the only source of `p_now`; the cookie counts only with E2E_CLOCK and no VERCEL.
+        now: resolveNow({ cookieValue: request.cookies.get(TEST_NOW_COOKIE)?.value }),
+        timeoutMs: BACKEND_TIMEOUT_MS,
+      });
+      if (gate?.blocked) {
+        const blocked = new NextResponse(blockedHtml(), {
+          status: 429,
+          headers: {
+            "Content-Type": "text/html; charset=utf-8",
+            "Retry-After": String(Math.max(1, gate.retryAfterSeconds)),
+            "X-Robots-Tag": "noindex, nofollow",
+          },
+        });
+        return decorate(blocked, pathname, cookiesToSet);
+      }
+      const themeId = gate?.themeId;
+      if (isApprovedThemeId(themeId)) forwarded.set(THEME_HEADER, themeId);
+    }
+  }
   return respond(decision, request, forwarded, cookiesToSet);
 }
 

@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // The proxy is tested in isolation: Supabase and the guard rules (T7a) are mocked, so these tests
 // only prove the mechanics (claims resolution, outage classification, decision application,
@@ -10,7 +10,9 @@ const evaluateGuards = vi.fn();
 vi.mock("@supabase/ssr", () => ({
   createServerClient: vi.fn(() => ({ auth: { getClaims } })),
 }));
+const rsvpGate = vi.fn();
 vi.mock("@/features/auth/guards", () => ({ evaluateGuards }));
+vi.mock("@/features/rsvp/public-rpc", () => ({ rsvpGate }));
 
 const { proxy } = await import("./proxy");
 
@@ -22,6 +24,7 @@ beforeEach(() => {
   vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "http://127.0.0.1:54421");
   vi.stubEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "sb_publishable_fake");
   getClaims.mockReset();
+  rsvpGate.mockReset().mockResolvedValue({ blocked: false, retryAfterSeconds: 0, themeId: null });
   evaluateGuards.mockReset();
   evaluateGuards.mockResolvedValue({ action: "next" });
   getClaims.mockResolvedValue({ data: null, error: null });
@@ -205,7 +208,7 @@ describe("proxy: applying the decision", () => {
 });
 
 describe("proxy: headers", () => {
-  it.each(["/invito/abc", "/auth/conferma", "/email/disattiva", "/invito"])(
+  it.each(["/invito/abc", "/auth/conferma", "/email/disattiva", "/invito", "/rsvp/abc"])(
     "sends Referrer-Policy: no-referrer on %s",
     async (path) => {
       const response = await proxy(request(path));
@@ -258,5 +261,119 @@ describe("proxy: x-r2y-backend (proxy-owned header)", () => {
   it("does not set it on a rewrite that is not an outage", async () => {
     evaluateGuards.mockResolvedValue({ action: "rewrite", to: "/altro" });
     expect(forwardedHeader(await proxy(request("/x")))).toBeNull();
+  });
+});
+
+describe("proxy: RSVP gate on /rsvp/{token} (AC10)", () => {
+  const TOKEN = "A".repeat(43);
+  const theme = (response: Response) => response.headers.get("x-middleware-request-x-r2y-theme");
+
+  it("answers 429 with Retry-After, X-Robots-Tag, no-store, no-referrer and an accessible page", async () => {
+    rsvpGate.mockResolvedValue({ blocked: true, retryAfterSeconds: 640, themeId: null });
+    const response = await proxy(request(`/rsvp/${TOKEN}`));
+    expect(response.status).toBe(429);
+    expect(response.headers.get("retry-after")).toBe("640");
+    expect(response.headers.get("x-robots-tag")).toBe("noindex, nofollow");
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+    expect(response.headers.get("referrer-policy")).toBe("no-referrer");
+    expect(response.headers.get("content-type")).toContain("text/html");
+    const html = await response.text();
+    expect(html).toContain('<html lang="it">');
+    expect(html).toContain("width=device-width");
+    expect(html).toContain("color-scheme");
+    expect(html).toContain("prefers-color-scheme:dark");
+    expect(html).toContain("Troppi tentativi: riprova tra 15 minuti");
+    expect(html).toContain("font:18px");
+    expect(html).not.toContain("<script");
+    expect(html).not.toContain(TOKEN);
+  });
+
+  it("never sends a Retry-After below 1", async () => {
+    rsvpGate.mockResolvedValue({ blocked: true, retryAfterSeconds: 0, themeId: null });
+    expect((await proxy(request(`/rsvp/${TOKEN}`))).headers.get("retry-after")).toBe("1");
+  });
+
+  it("forwards the wedding theme to the page when the link works", async () => {
+    rsvpGate.mockResolvedValue({ blocked: false, retryAfterSeconds: 0, themeId: "velluto" });
+    const response = await proxy(request(`/rsvp/${TOKEN}`));
+    expect(response.status).toBe(200);
+    expect(theme(response)).toBe("velluto");
+  });
+
+  it("ignores a theme id that is not approved, and a gate that fails or times out (fail-open)", async () => {
+    rsvpGate.mockResolvedValue({ blocked: false, retryAfterSeconds: 0, themeId: "<x>" });
+    expect(theme(await proxy(request(`/rsvp/${TOKEN}`)))).toBeNull();
+    rsvpGate.mockResolvedValue(null);
+    const response = await proxy(request(`/rsvp/${TOKEN}`));
+    expect(response.status).toBe(200);
+    expect(theme(response)).toBeNull();
+  });
+
+  it("strips a client-sent x-r2y-theme on every path, RSVP or not", async () => {
+    const forged = (path: string) =>
+      new NextRequest(new URL(path, "http://localhost:3000"), {
+        headers: { "x-r2y-theme": "velluto" },
+      });
+    expect(theme(await proxy(forged("/percorso")))).toBeNull();
+    expect(theme(await proxy(forged("/servizio")))).toBeNull();
+    // gate says "no theme" (unknown link): the forged one must not survive
+    expect(theme(await proxy(forged(`/rsvp/${TOKEN}`)))).toBeNull();
+  });
+
+  it.each(["/rsvp", "/rsvp/", "/rsvp/short", `/rsvp/${"A".repeat(44)}`, `/rsvp/${"é".repeat(43)}`, `/rsvp/${TOKEN}/x`])(
+    "does not call the gate (no DB) for %s",
+    async (path) => {
+      await proxy(request(path));
+      expect(rsvpGate).not.toHaveBeenCalled();
+    },
+  );
+
+  it("does not call the gate on an outage, or when the guards do not let the request through", async () => {
+    getClaims.mockResolvedValue({ data: null, error: { name: "AuthApiError", message: "", status: 540 } });
+    evaluateGuards.mockResolvedValue({ action: "rewrite", to: "/servizio?motivo=paused" });
+    await proxy(request(`/rsvp/${TOKEN}`));
+    expect(rsvpGate).not.toHaveBeenCalled();
+  });
+
+  it("is a bounded call with the request IP (never from the client body or query)", async () => {
+    const withIp = new NextRequest(new URL(`/rsvp/${TOKEN}?ip=9.9.9.9`, "http://localhost:3000"), {
+      headers: { "x-forwarded-for": "203.0.113.7, 10.0.0.1" },
+    });
+    await proxy(withIp);
+    expect(rsvpGate).toHaveBeenCalledWith(
+      expect.objectContaining({ token: TOKEN, ip: "203.0.113.7", timeoutMs: 3000 }),
+    );
+    await proxy(request(`/rsvp/${TOKEN}`));
+    expect(rsvpGate).toHaveBeenLastCalledWith(expect.objectContaining({ ip: null }));
+  });
+
+  describe("p_now comes only from resolveNow() on the request cookie (QA-1)", () => {
+    const WHEN = "2027-03-28T23:30:00.000Z";
+    const withClock = () =>
+      new NextRequest(new URL(`/rsvp/${TOKEN}`, "http://localhost:3000"), {
+        headers: { cookie: `r2y-test-now=${WHEN}` },
+      });
+    const nowGiven = () => (rsvpGate.mock.calls.at(-1)?.[0] as { now: Date }).now;
+    afterEach(() => vi.unstubAllEnvs());
+
+    it("honours the cookie only with E2E_CLOCK=1 and no VERCEL", async () => {
+      vi.stubEnv("E2E_CLOCK", "1");
+      vi.stubEnv("VERCEL", undefined);
+      await proxy(withClock());
+      expect(nowGiven().toISOString()).toBe(WHEN);
+    });
+
+    it("ignores the cookie without E2E_CLOCK", async () => {
+      vi.stubEnv("E2E_CLOCK", "");
+      await proxy(withClock());
+      expect(Math.abs(nowGiven().getTime() - Date.now())).toBeLessThan(5000);
+    });
+
+    it("ignores the cookie when VERCEL is defined, whatever E2E_CLOCK says", async () => {
+      vi.stubEnv("E2E_CLOCK", "1");
+      vi.stubEnv("VERCEL", "1");
+      await proxy(withClock());
+      expect(Math.abs(nowGiven().getTime() - Date.now())).toBeLessThan(5000);
+    });
   });
 });
