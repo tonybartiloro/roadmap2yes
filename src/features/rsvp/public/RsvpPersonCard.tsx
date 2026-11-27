@@ -30,7 +30,9 @@ export function RsvpPersonCard({
     person.category === "child" ? "Bambino" : person.category === "infant" ? "Neonato" : null;
 
   const choice = (status: "yes" | "no", label: string, Icon: typeof Check) => (
-    <label className="border-input has-[:checked]:border-primary has-[:checked]:bg-primary/10 has-[:focus-visible]:ring-ring flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-md border-2 px-3 py-2 text-center has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-offset-2">
+    // Icon above the text on narrow screens (320 px): the label stays balanced and centred, and
+    // the height does not change when the icon appears on selection (DES-39).
+    <label className="border-input has-[:checked]:border-primary has-[:checked]:bg-primary/15 has-[:focus-visible]:ring-ring flex min-h-12 cursor-pointer flex-col items-center justify-center gap-1 rounded-md border-2 px-2 py-2 text-center text-balance has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-offset-2 sm:flex-row sm:gap-2 sm:px-3">
       <input
         type="radio"
         name={`status:${id}`}
@@ -54,70 +56,81 @@ export function RsvpPersonCard({
   );
 
   return (
+    // The fieldset has no border: a bordered fieldset cuts a gap in its border where a long legend
+    // wraps (DES-38). The card is the inner div; the legend is read by screen readers and the
+    // visible name is the first line of the card.
     <fieldset
-      className="border-border bg-card flex flex-col gap-4 rounded-lg border p-4"
+      className="min-w-0 border-0 p-0"
       aria-describedby={describedBy}
       data-testid={`rsvp-person-${id}`}
     >
-      <legend className="px-1 font-semibold">
+      <legend className="sr-only">
         {kind ? `${fullName(person)} · ${kind}` : fullName(person)}
       </legend>
-      <input type="hidden" name="p" value={id} />
-      <input type="hidden" name={`seen:${id}`} value={person.answered_at ?? ""} />
-      <div className="grid grid-cols-2 gap-2">
-        {choice("yes", "Sì, ci sono", Check)}
-        {choice("no", "No, non posso", X)}
-      </div>
-      {showDiet ? (
-        <fieldset id={`diet-${id}`} className="flex flex-col gap-1">
-          <legend className="mb-1 font-medium">
-            Preferenze alimentari (facoltative)
-            {enhanced ? null : <span className="text-muted-foreground"> · Solo se vieni</span>}
-          </legend>
-          {DIET_OPTIONS.map((option) => (
-            <label key={option.value} className="flex min-h-11 cursor-pointer items-center gap-3">
-              <input
-                type="checkbox"
-                name={`diet:${id}`}
-                value={option.value}
-                checked={value.diet.includes(option.value)}
-                onChange={(event) =>
-                  onChange({
-                    ...value,
-                    diet: event.target.checked
-                      ? [...value.diet, option.value]
-                      : value.diet.filter((d) => d !== option.value),
-                  })
-                }
-                className="accent-primary size-6 shrink-0"
-              />
-              {option.label}
-            </label>
-          ))}
-          <Label htmlFor={`note-${id}`} className="mt-2 text-base font-medium">
-            Allergie o altro (max {NOTE_MAX} caratteri)
-          </Label>
-          <Input
-            id={`note-${id}`}
-            name={`note:${id}`}
-            value={value.note}
-            maxLength={NOTE_MAX}
-            // Health data of a third party: no browser form memory or spell-check service (AC11, BR11).
-            autoComplete="off"
-            autoCorrect="off"
-            autoCapitalize="off"
-            spellCheck={false}
-            onChange={(event) => onChange({ ...value, note: event.target.value })}
-            className="h-12 text-base"
-          />
-          {enhanced ? (
-            <span className="text-muted-foreground text-sm" aria-hidden="true">
-              {value.note.length}/{NOTE_MAX}
-            </span>
+      <div className="border-border bg-card flex flex-col gap-4 rounded-lg border p-4">
+        <p className="font-semibold" aria-hidden="true">
+          {fullName(person)}
+          {kind ? (
+            <span className="text-muted-foreground block text-base font-normal">{kind}</span>
           ) : null}
-          <p className="text-muted-foreground text-sm">Lo vedono solo {coupleLabel}.</p>
-        </fieldset>
-      ) : null}
+        </p>
+        <input type="hidden" name="p" value={id} />
+        <input type="hidden" name={`seen:${id}`} value={person.answered_at ?? ""} />
+        <div className="grid grid-cols-2 gap-2">
+          {choice("yes", "Sì, ci sono", Check)}
+          {choice("no", "No, non posso", X)}
+        </div>
+        {showDiet ? (
+          <fieldset id={`diet-${id}`} className="flex flex-col gap-1">
+            <legend className="mb-1 font-medium">
+              Preferenze alimentari (facoltative)
+              {enhanced ? null : <span className="text-muted-foreground"> · Solo se vieni</span>}
+            </legend>
+            {DIET_OPTIONS.map((option) => (
+              <label key={option.value} className="flex min-h-11 cursor-pointer items-center gap-3">
+                <input
+                  type="checkbox"
+                  name={`diet:${id}`}
+                  value={option.value}
+                  checked={value.diet.includes(option.value)}
+                  onChange={(event) =>
+                    onChange({
+                      ...value,
+                      diet: event.target.checked
+                        ? [...value.diet, option.value]
+                        : value.diet.filter((d) => d !== option.value),
+                    })
+                  }
+                  className="accent-primary size-6 shrink-0"
+                />
+                {option.label}
+              </label>
+            ))}
+            <Label htmlFor={`note-${id}`} className="mt-2 text-base font-medium">
+              Allergie o altro (max {NOTE_MAX} caratteri)
+            </Label>
+            <Input
+              id={`note-${id}`}
+              name={`note:${id}`}
+              value={value.note}
+              maxLength={NOTE_MAX}
+              // Health data of a third party: no browser form memory or spell-check service (AC11, BR11).
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck={false}
+              onChange={(event) => onChange({ ...value, note: event.target.value })}
+              className="h-12 text-base"
+            />
+            {enhanced ? (
+              <span className="text-muted-foreground text-sm" aria-hidden="true">
+                {value.note.length}/{NOTE_MAX}
+              </span>
+            ) : null}
+            <p className="text-muted-foreground text-sm">Lo vedono solo {coupleLabel}.</p>
+          </fieldset>
+        ) : null}
+      </div>
     </fieldset>
   );
 }

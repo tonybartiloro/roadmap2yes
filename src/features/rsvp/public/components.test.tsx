@@ -239,7 +239,7 @@ describe("RsvpForm (server render, no JavaScript)", () => {
         people={[{ ...MARIO, status: "yes", answered_at: "2027-03-10T10:00:00+00:00" }, ANNA]}
       />,
     );
-    expect(html).toMatch(/<details[^>]*>\s*<summary[^>]*>Modifica<\/summary>/);
+    expect(html).toMatch(/<details[^>]*>\s*<summary[^>]*>Modifica<svg[^>]*aria-hidden="true"/);
     expect(html).toMatch(/Mario Rossi(<!-- -->)?: /);
   });
 });

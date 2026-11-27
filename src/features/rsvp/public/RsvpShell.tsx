@@ -7,6 +7,9 @@ import type { ReactNode } from "react";
 export function RsvpShell({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-dvh flex-col text-lg">
+      {/* `same-origin`, not `no-referrer`: without JS Chromium would post `Origin: null` and Next
+          would reject the form (DES-37). Nothing here links or loads from another origin. */}
+      <meta name="referrer" content="same-origin" />
       <a
         href="#contenuto"
         className="bg-primary text-primary-foreground sr-only z-50 rounded-md px-4 py-2 focus:not-sr-only focus:absolute focus:top-2 focus:left-2"

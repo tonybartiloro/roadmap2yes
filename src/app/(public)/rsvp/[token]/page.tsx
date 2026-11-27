@@ -29,7 +29,7 @@ export const metadata: Metadata = {
  * normally never gets here (the proxy answers the neutral 404); if it does (the proxy gate timed
  * out, or a race), the same neutral view is rendered with status 200. `rsvp_page` never writes
  * except a failed lookup, which the DB counts per IP. The proxy sets `Referrer-Policy:
- * no-referrer`, `no-store` and, for a working link, the theme header.
+ * same-origin` (DES-37), `no-store` and, for a working link, the theme header.
  */
 export default async function RsvpPage({ params }: { params: Promise<{ token: string }> }) {
   await connection();

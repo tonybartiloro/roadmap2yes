@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { FormEvent, Ref } from "react";
+import { ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LinkUnavailable } from "./LinkUnavailable";
 import { RsvpPersonCard } from "./RsvpPersonCard";
@@ -136,10 +137,14 @@ export function RsvpForm({
           <details
             key={saves}
             open={errorKind !== null}
-            className="border-border rounded-lg border"
+            className="border-border group rounded-lg border"
           >
-            <summary className="flex min-h-12 cursor-pointer items-center px-4 font-semibold">
+            <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between px-4 font-semibold [&::-webkit-details-marker]:hidden">
               Modifica
+              <ChevronDown
+                className="size-5 transition-transform group-open:rotate-180 motion-reduce:transition-none"
+                aria-hidden="true"
+              />
             </summary>
             <div className="p-4 pt-0">{form}</div>
           </details>

@@ -210,13 +210,22 @@ describe("proxy: applying the decision", () => {
 });
 
 describe("proxy: headers", () => {
-  it.each(["/invito/abc", "/auth/conferma", "/email/disattiva", "/invito", "/rsvp/abc"])(
+  it.each(["/invito/abc", "/auth/conferma", "/email/disattiva", "/invito"])(
     "sends Referrer-Policy: no-referrer on %s",
     async (path) => {
       const response = await proxy(request(path));
       expect(response.headers.get("referrer-policy")).toBe("no-referrer");
     },
   );
+
+  it("sends same-origin on the RSVP page and on its server-action POST (DES-37), no-referrer on the pages the proxy writes", async () => {
+    const path = `/rsvp/${"A".repeat(43)}`;
+    expect((await proxy(request(path))).headers.get("referrer-policy")).toBe("same-origin");
+    const post = new NextRequest(new URL(path, "http://localhost:3000"), { method: "POST" });
+    expect((await proxy(post)).headers.get("referrer-policy")).toBe("same-origin");
+    // neutral 404 (malformed, and a dead link) and 429 have no form
+    expect((await proxy(request("/rsvp/abc"))).headers.get("referrer-policy")).toBe("no-referrer");
+  });
 
   it.each(["/", "/percorso", "/accesso", "/invitofake", "/emailing"])(
     "sends strict-origin-when-cross-origin on %s",

@@ -33,7 +33,15 @@ const BACKEND_TIMEOUT_MS = 3000;
 /** Request header with the wedding theme of a working RSVP link (read by `themes/server.ts`). */
 const THEME_HEADER = "x-r2y-theme";
 
-const NO_REFERRER_PREFIXES = ["/invito", "/auth", "/email", "/rsvp"];
+const NO_REFERRER_PREFIXES = ["/invito", "/auth", "/email"];
+
+/**
+ * `/rsvp` pages that reach the form use `same-origin`, not `no-referrer` (DES-37): with
+ * `no-referrer` Chromium posts the no-JS form with `Origin: null` and Next rejects the server
+ * action. Nothing leaves the origin either way (no third-party resource or link). The pages the
+ * proxy writes itself (neutral 404, 429) have no form and keep `no-referrer`.
+ */
+const SAME_ORIGIN_PREFIXES = ["/rsvp"];
 
 /** `/rsvp/{token}` (a trailing slash is a 308 redirect done by Next before the proxy). */
 const RSVP_PATH = /^\/rsvp\/([^/]+)$/;
@@ -42,7 +50,11 @@ function referrerPolicyFor(pathname: string): string {
   const strict = NO_REFERRER_PREFIXES.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
   );
-  return strict ? "no-referrer" : "strict-origin-when-cross-origin";
+  if (strict) return "no-referrer";
+  const sameOrigin = SAME_ORIGIN_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+  );
+  return sameOrigin ? "same-origin" : "strict-origin-when-cross-origin";
 }
 
 type CookieToSet = {
@@ -51,14 +63,19 @@ type CookieToSet = {
   options?: Parameters<NextResponse["cookies"]["set"]>[2];
 };
 
-function decorate(response: NextResponse, pathname: string, cookies: CookieToSet[]): NextResponse {
+function decorate(
+  response: NextResponse,
+  pathname: string,
+  cookies: CookieToSet[],
+  referrerPolicy: string = referrerPolicyFor(pathname),
+): NextResponse {
   for (const { name, value, options } of cookies) response.cookies.set(name, value, options);
-  response.headers.set("Referrer-Policy", referrerPolicyFor(pathname));
+  response.headers.set("Referrer-Policy", referrerPolicy);
   response.headers.set("Cache-Control", "private, no-store");
   return response;
 }
 
-/** The neutral 404: same bytes and headers for every cause (AC6). `decorate` adds no-store/no-referrer. */
+/** The neutral 404: same bytes and headers for every cause (AC6). the caller adds no-store and `no-referrer` (no form on this page). */
 function neutralResponse(): NextResponse {
   return new NextResponse(neutralHtml(), {
     status: 404,
@@ -200,7 +217,7 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
     }
     // Malformed token (or broken escape) on `/rsvp/{x}`: the neutral 404, no DB (QA-15).
     if (RSVP_PATH.test(pathname) && (token === undefined || !isRsvpTokenShape(token))) {
-      return decorate(neutralResponse(), pathname, cookiesToSet);
+      return decorate(neutralResponse(), pathname, cookiesToSet, "no-referrer");
     }
     if (token !== undefined && isRsvpTokenShape(token)) {
       const ip = clientIp(request.headers);
@@ -216,7 +233,7 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
             "X-Robots-Tag": "noindex, nofollow",
           },
         });
-        return decorate(blocked, pathname, cookiesToSet);
+        return decorate(blocked, pathname, cookiesToSet, "no-referrer");
       }
       const themeId = gate?.themeId;
       if (isApprovedThemeId(themeId)) forwarded.set(THEME_HEADER, themeId);
@@ -226,7 +243,9 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
       // call stays the only one; `ok`, `retry` and a timeout let the request through (fail-open).
       if (gate !== null && gate.themeId === null) {
         const page = await rsvpLoadPage({ token, ip, now, timeoutMs: BACKEND_TIMEOUT_MS });
-        if (page.state === "neutral") return decorate(neutralResponse(), pathname, cookiesToSet);
+        if (page.state === "neutral") {
+          return decorate(neutralResponse(), pathname, cookiesToSet, "no-referrer");
+        }
       }
     }
   }
