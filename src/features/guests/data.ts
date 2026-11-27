@@ -31,7 +31,13 @@ import {
 export type Db = SupabaseClient<Database>;
 
 export type GuestView = Guest & { version: number };
-export type GroupView = GuestGroup & { version: number };
+/** How a group answers (FEAT-2026-004 BR1): one link for the group, or one per person. */
+export type RsvpMode = "together" | "separate";
+/**
+ * `rsvpMode` is always set by `loadGuests`; it is optional only so the fixtures written before
+ * R-04 keep compiling (read it with `?? "together"`, the column default).
+ */
+export type GroupView = GuestGroup & { version: number; rsvpMode?: RsvpMode };
 export type TableView = GuestTable & { version: number };
 
 /** Everything the module shows, deleted rows included ("Eliminati di recente"). */
@@ -162,7 +168,8 @@ function versionedFailure(error: unknown): VersionedResult {
 
 const GUEST_COLUMNS =
   "id, first_name, last_name, category, side, phone, email, notes, group_id, table_id, deleted_at, version";
-const GROUP_COLUMNS = "id, name, deleted_at, version";
+const GROUP_COLUMNS = "id, name, deleted_at, version, rsvp_mode";
+const GROUP_COLUMNS_LEGACY = "id, name, deleted_at, version";
 const TABLE_COLUMNS = "id, name, capacity, deleted_at, version";
 
 function oneOf<T extends string>(values: readonly T[], value: string | null, fallback: T): T {
@@ -177,9 +184,16 @@ export async function loadGuests(db: Db): Promise<GuestsSnapshot> {
   try {
     const [guests, groups, tables] = await Promise.all([
       allPages((from, to) => db.from("guests").select(GUEST_COLUMNS).order("id").range(from, to)),
+      // Code deployed before the R-04 migration: no `rsvp_mode` column yet (42703). Read the old
+      // columns instead, so the list keeps opening (every group is then "together").
       allPages((from, to) =>
         db.from("guest_groups").select(GROUP_COLUMNS).order("id").range(from, to),
-      ),
+      ).catch((error: unknown) => {
+        if (!(error instanceof PageReadError) || error.code !== "42703") throw error;
+        return allPages((from, to) =>
+          db.from("guest_groups").select(GROUP_COLUMNS_LEGACY).order("id").range(from, to),
+        ).then((rows) => rows.map((row) => ({ ...row, rsvp_mode: "together" })));
+      }),
       allPages((from, to) =>
         db.from("guest_tables").select(TABLE_COLUMNS).order("id").range(from, to),
       ),
@@ -210,6 +224,7 @@ export async function loadGuests(db: Db): Promise<GuestsSnapshot> {
         name: g.name,
         deletedAt: g.deleted_at,
         version: g.version,
+        rsvpMode: g.rsvp_mode === "separate" ? ("separate" as const) : ("together" as const),
       })),
       tables: unique(tables).map((t) => ({
         id: t.id,
@@ -348,7 +363,7 @@ function guestFields(row: Tables<"guests">): Record<string, unknown> {
 }
 
 function groupFields(row: Tables<"guest_groups">): Record<string, unknown> {
-  return { name: row.name, version: row.version };
+  return { name: row.name, rsvpMode: row.rsvp_mode, version: row.version };
 }
 
 function tableFields(row: Tables<"guest_tables">): Record<string, unknown> {

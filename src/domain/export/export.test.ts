@@ -187,10 +187,48 @@ describe("export (AC42, AC60, plan §10)", () => {
         "guests",
         "guestGroups",
         "guestTables",
+        "rsvpResponses",
+        "rsvpLinks",
       ]),
     );
     expect(Object.keys(json.budget)).toEqual(["versions", "categories", "items", "payments"]);
     expect(json.tasks).toHaveLength(3);
+  });
+
+  it("carries the RSVP answers and link states (empty when absent), CSV unchanged (AC13)", () => {
+    expect(json.rsvpResponses).toEqual([]);
+    expect(json.rsvpLinks).toEqual([]);
+    const withRsvp = buildExport(
+      {
+        ...input,
+        rsvpResponses: [
+          {
+            guestId: "g1",
+            status: "yes",
+            diet: ["vegan"],
+            dietNote: "niente noci",
+            source: "guest",
+            answeredAt: "2026-11-20T10:00:00Z",
+          },
+        ],
+        rsvpLinks: [
+          {
+            id: "l1",
+            groupId: "gr1",
+            guestId: null,
+            createdAt: "2026-11-19T10:00:00Z",
+            revokedAt: null,
+            sharedAt: "2026-11-19T11:00:00Z",
+          },
+        ],
+      },
+      now,
+    );
+    const doc = JSON.parse(withRsvp.json);
+    expect(doc.rsvpResponses[0]).toMatchObject({ guestId: "g1", status: "yes", diet: ["vegan"] });
+    expect(doc.rsvpLinks[0]).toMatchObject({ id: "l1", groupId: "gr1", revokedAt: null });
+    expect(withRsvp.json).not.toMatch(/token|[0-9a-f]{64}/i);
+    expect(withRsvp.guestsCsv).toBe(bundle.guestsCsv);
   });
 
   it("never contains birth dates, token hashes or codes", () => {

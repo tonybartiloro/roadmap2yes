@@ -182,13 +182,21 @@ describe("undoGuestImportAction", () => {
   const batchId = "00000000-0000-4000-8000-0000000000aa";
 
   it("removes the batch through the RPC and refreshes", async () => {
-    state.rpc.mockResolvedValue({ data: { guests: 3, groups: 1 }, error: null });
+    state.rpc.mockResolvedValue({ data: { guests: 3, groups: 1, skipped: 2 }, error: null });
     expect(await undoGuestImportAction({ batchId })).toEqual({
       ok: true,
-      data: { guests: 3, groups: 1 },
+      data: { guests: 3, groups: 1, skipped: 2 },
     });
     expect(state.rpc).toHaveBeenCalledWith("undo_guest_import", { p_batch_id: batchId });
     expect(state.revalidated).toEqual(["/invitati", "/altro/impostazioni"]);
+  });
+
+  it("reports no skipped people when the database does not say (schema before R-04)", async () => {
+    state.rpc.mockResolvedValue({ data: { guests: 3, groups: 1 }, error: null });
+    expect(await undoGuestImportAction({ batchId })).toEqual({
+      ok: true,
+      data: { guests: 3, groups: 1, skipped: 0 },
+    });
   });
 
   it("rejects a malformed id and hides a database failure", async () => {
