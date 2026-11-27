@@ -6,12 +6,9 @@
 
 ## Current state
 - **Invitati (R-03).**
-  - Tabelle `guests`, `guest_groups`, `guest_tables` (`supabase/migrations/20261202100000_guests.sql:35-104`).
-  - Eliminazione logica che conserva il puntatore: "senza gruppo" è calcolato dall'app (`guests.sql:9-10`).
-  - Audit con colonne personali escluse, e il test allowlist obbliga a classificare ogni colonna nuova (`guests.sql:14-16,197-203`; `supabase/tests/guests_model.test.sql:294-314`).
-  - Cancellazione fisica solo su righe già eliminate (`guests.sql:240-241`).
-  - Conflitti con `version` + `versionedUpdate` (`src/features/guests/data.ts:383-410`).
-  - La lista carica tutto con `loadGuests` (`data.ts:176`); la pagina è `src/app/(app)/invitati/page.tsx:47-55`.
+  - Tabelle `guests`, `guest_groups`, `guest_tables` (`supabase/migrations/20261202100000_guests.sql:35-104`); eliminazione logica, "senza gruppo" calcolato dall'app (`:9-10`); cancellazione fisica solo di righe eliminate (`:240-241`).
+  - Audit senza colonne personali; l'allowlist obbliga a classificare ogni colonna nuova (`guests.sql:14-16,197-203`; `supabase/tests/guests_model.test.sql:294-314`).
+  - Conflitti con `version` + `versionedUpdate` (`src/features/guests/data.ts:383-410`); `loadGuests` (`data.ts:176`) in `src/app/(app)/invitati/page.tsx:47-55`.
 - **Annulla importazione.** `undo_guest_import` cancella fisicamente gli importati con `version = 1`, senza finestra temporale (`20261202200000_guests_import.sql:164-166`). Con le risposte in una tabella separata, cancellerebbe anche chi ha già risposto.
 - **Link pubblici esistenti.**
   - `/invito/[token]`: token casuale, solo sha256 nel DB, RPC solo-chiave `invitation_by_token` (`core.sql:1012-1042`, grant a `service_role` a `core.sql:1403-1409`). La pagina usa `connection()` e `await params` (`src/app/(public)/invito/[token]/page.tsx:28-33`).
@@ -23,7 +20,7 @@
   - `X-Robots-Tag` è globale (`next.config.ts:46`).
 - **Chiave segreta.** `src/lib/supabase/admin.ts` è importabile solo da 4 ambiti (`eslint.config.mjs:100-151`).
 - **Limitatore di login.** `private.login_attempts` + `register_login_failure` (`core.sql:253-259,1272-1295`). La pulizia di `login_record` cancella *ogni* riga con la finestra del login (`core.sql:1324-1329`). Chiavi HMAC e `clientIp` in `src/features/auth/limiter-keys.ts`.
-- **Tema.** Il layout radice legge il tema dalla sessione, poi dal cookie, poi usa il predefinito (`src/themes/server.ts:59-78`). I selettori sono `[data-theme][data-mode]` sullo stesso elemento (`src/app/themes.css:3,28`), quindi un `div` annidato non basta.
+- **Tema.** Sessione → cookie → predefinito (`src/themes/server.ts:59-78`); selettori `[data-theme][data-mode]` sullo stesso elemento (`src/app/themes.css:3,28`).
 - **Next 16.** `notFound()` dà 404 solo se avviene prima dello streaming; con `loading.tsx`/`Suspense` lo stato resta 200 (`.../04-functions/not-found.md:193-195`). Una server action non può impostare lo stato HTTP.
 - **Dati della pagina.**
   - Data e location scelte: `decisions` (`key` `date`/`location`, `status`, `chosen_option_id`), `decision_options.title/comune`, `date_scenarios.date_from` (`20261201200000_decisions_timeline.sql:36-113`). `choose_option` rende fissa la data scelta (`:874-899`).
@@ -98,26 +95,22 @@ Tutto nelle forme già in uso: SQL con RLS, RPC con codici stabili, server actio
 - **`src/proxy.ts`** su `/rsvp/{token}`, solo se la forma è valida e il backend risponde:
   - chiama `gate` con tempo limitato; se scade lascia passare;
   - bloccato → `429` con `Retry-After`, `X-Robots-Tag` e una pagina HTML minima (schema di `src/app/(public)/email/disattiva/html.ts`), con `lang="it"`, viewport, `color-scheme` e CSS inline chiaro/scuro, h1 e testo a 18 px (DES-29);
+  - forma non valida o link che non funziona → 404 neutra in HTML (Arbitrato S3);
   - altrimenti imposta l'intestazione di richiesta `x-r2y-theme`. Il proxy la toglie sempre dalle richieste del client, come `x-r2y-backend`;
   - aggiunge `/rsvp` a `NO_REFERRER_PREFIXES`.
 - **`guards.ts`**: `/rsvp` in `PUBLIC_PREFIXES`. **`themes/server.ts`**: `x-r2y-theme`, se presente e approvato, vince su tutto.
 - **Pagina `src/app/(public)/rsvp/[token]/page.tsx`**:
-  - `connection()`; forma non valida o `ok:false` → `notFound()`;
-  - `not-found.tsx` = pagina neutra (404, tema predefinito); **niente `loading.tsx`** nel segmento;
+  - `connection()`; la neutra all'apertura (404) la risponde il proxy; nella pagina `neutral` → `LinkUnavailable` in 200 (Arbitrato S3); **niente `loading.tsx`** nel segmento;
   - `metadata` statico: noindex, titolo e anteprima "Conferma la tua presenza" / "Ci vuole un minuto", nessuna immagine;
-  - il modulo è un client component con `useActionState` sulla server action `submitRsvp` (legata al token): funziona senza JS, e con JS aggiunge "Vengono tutti", la comparsa delle preferenze e il contatore (design §1.1);
-  - **senza JS** (DES-24, DES-34): riepilogo e modulo in un `<details>` renderizzato dal server, "Modifica" = `summary`; preferenze sempre visibili; il controllo "zero scelte" avviene sul server;
-  - **campi controllati** inizializzati dall'ultimo stato inviato, così le scelte restano dopo un errore (DES-26). Un errore di rete viene catturato in un wrapper client (`try/catch`) e mostrato in `role="alert"`;
-  - `ok:false` durante la compilazione → `{state:"unavailable"}`: la pagina sostituisce **tutto** il contenuto con `LinkUnavailable` (DES-25). Stato 200, lo stesso per ogni causa (Q-P2);
+  - modulo client con `useActionState` su `submitRsvp` (legata al token): funziona senza JS; con JS aggiunge "Vengono tutti", preferenze che compaiono e contatore (design §1.1);
+  - **senza JS** (DES-24, DES-34): riepilogo e modulo in un `<details>` dal server, "Modifica" = `summary`; preferenze sempre visibili; "zero scelte" controllato sul server;
+  - **campi controllati** dall'ultimo stato inviato: le scelte restano dopo un errore (DES-26); errore di rete preso da un wrapper client (`try/catch`) in `role="alert"`;
+  - `ok:false` durante la compilazione → `{state:"unavailable"}`: `LinkUnavailable` al posto di **tutto** il contenuto (DES-25), 200, uguale per ogni causa (Q-P2);
   - nessuna bozza nel dispositivo (AC11).
 - **Lato coppia `src/features/rsvp/actions.ts`**: `createLinks`, `getLinkUrl` (sola lettura: RLS + `guests/write`, ricalcolo e controllo dell'hash), `rotateLink`, `revokeLink`, `markShared`/`unmarkShared`, `setGroupMode` (versionata).
-  - Il foglio link carica l'URL all'apertura. Copia, Condividi e WhatsApp (`<a href="https://wa.me/?text=…">`) usano poi un URL già presente in pagina: un solo tocco anche su iOS (AC1).
-  - "Crea link" è un'azione separata.
-  - "Condiviso il" si registra solo dopo una copia riuscita o una condivisione completata: `AbortError` o permesso negato non lo registrano (QA-12).
-  - "Crea link per tutti (N)" (DES-31, PO-7):
-    - N = destinatari senza link funzionante, compresi i "Da rimandare";
-    - conferma con N e l'avviso "data non scelta" se la data non è scelta; poi toast "Ho creato N link", senza Annulla;
-    - dopo la scadenza è disattivato, con un testo che lo spiega.
+  - Il foglio carica l'URL all'apertura: Copia, Condividi e WhatsApp (`<a href="https://wa.me/?text=…">`) lo usano con un solo tocco, anche su iOS (AC1). "Crea link" è un'azione separata.
+  - "Condiviso il" solo dopo una copia riuscita o una condivisione completata (`AbortError` o permesso negato no, QA-12).
+  - "Crea link per tutti (N)" (DES-31, PO-7): N = destinatari senza link funzionante, "Da rimandare" compresi; conferma con N e avviso "data non scelta"; toast "Ho creato N link", senza Annulla; dopo la scadenza disattivato, con spiegazione.
 - **Esportazione** (AC13): `gatherGuests` aggiunge `rsvpResponses` e `rsvpLinks` (mai `token_hash`: la colonna non è leggibile).
 
 ## Alternatives considered
@@ -130,22 +123,10 @@ Tutto nelle forme già in uso: SQL con RLS, RPC con codici stabili, server actio
 | Tema con `div[data-theme]` annidato | Niente proxy | I selettori del tema richiedono `data-mode` sullo stesso elemento: si cambierebbe il CSS dei 12 temi | Intestazione dal proxy, nessun lampeggio |
 
 ## Impacts
-- **Dati e migrazioni.**
-  - Due migrazioni additive:
-    - `20261203100000_rsvp.sql`: schema, RLS, RPC della coppia, `undo_guest_import`;
-    - `20261203200000_rsvp_public.sql`: limitatore e RPC pubbliche.
-  - Nessuna colonna rimossa. Il codice precedente gira sul nuovo schema: Instant Rollback possibile. Si torna indietro solo con una nuova migrazione.
-- **Contratti.**
-  - Nuove RPC (sopra).
-  - `GroupView` guadagna `rsvpMode`.
-  - Il JSON di esportazione aggiunge due chiavi; il CSV non cambia (D13).
-- **Prestazioni.**
-  - Pagina pubblica: 2 RPC (gate + pagina) per apertura, nessuna libreria di terzi.
-  - Invitati: + `rsvp_status` e `rsvp_responses` paginate (≤ 500 righe), entro < 1 s.
-- **Sicurezza.**
-  - Quinto ambito per la chiave segreta (ADR-0003).
-  - Superficie pubblica nuova: round di sicurezza in F3.
-  - Dati sanitari fuori da audit, log e "Novità".
+- **Dati e migrazioni.** Due additive: `20261203100000_rsvp.sql` (schema, RLS, RPC coppia, `undo_guest_import`), `20261203200000_rsvp_public.sql` (limitatore, RPC pubbliche). Nessuna colonna rimossa: il codice precedente gira sul nuovo schema (Instant Rollback); indietro solo con una migrazione nuova.
+- **Contratti.** Nuove RPC (sopra); `GroupView.rsvpMode`; due chiavi nel JSON di esportazione, CSV invariato (D13).
+- **Prestazioni.** Pagina pubblica: 2 RPC per apertura (gate + pagina, o gate + `rsvp_page` nel proxy per un link morto), nessuna libreria di terzi. Invitati: + `rsvp_status` e `rsvp_responses` paginate (≤ 500), < 1 s.
+- **Sicurezza.** Quinto ambito della chiave segreta (ADR-0003); superficie pubblica nuova: round di sicurezza in F3; dati sanitari fuori da audit, log e "Novità".
 - **Dipendenze.** Nessuna.
 - **Configurazione.**
   - **`RSVP_LINK_SECRET`** (almeno 32 caratteri): Vercel Production e Preview con valori diversi, `.env.local`, valore finto in `ci.yml` e `.env.example` (D4).
@@ -179,9 +160,9 @@ Tutto nelle forme già in uso: SQL con RLS, RPC con codici stabili, server actio
 | T2 | Migrazione pubblica: `rsvp_attempts`, `rsvp_gate`, `rsvp_page`, `rsvp_submit` (solo `service_role`); pgTAP (insieme di chiavi, neutre, BR1-BR4, scadenza, invii, limiti); allowlist e tipi | developer | `supabase/migrations/20261203200000_rsvp_public.sql`, `supabase/tests/rsvp_public.test.sql`, + le stesse allowlist e tipi di T1 | T1 | AC3-AC6, AC10-AC12, AC14 |
 | T3 | Seed locale: un matrimonio di prova con gruppo "insieme", gruppo "separato", persona senza gruppo, un link con token **finto** documentato (solo locale, BR12) | developer | `supabase/seeds/05_rsvp.sql`, `supabase/config.toml` (se serve l'elenco dei seed) | T1 | — |
 | T4 | Token e configurazione: `token.ts` + unit (vettori fissi, forma, URL); `readRsvpLinkSecret`; variabile in `.env.example`, `ci.yml` e `vitest.config.ts` (valore finto, 32+ caratteri, QA-6) | developer | `src/features/rsvp/token.ts`, `src/features/rsvp/token.test.ts`, `src/lib/app-config.ts`, `src/lib/app-config.test.ts`, `.env.example`, `.github/workflows/ci.yml`, `vitest.config.ts` | — | AC1, AC2 |
-| T5 | Bordo pubblico: `public-rpc.ts`, `limiter.ts` (+ unit /64), pagina 429; proxy (gate, 429, `x-r2y-theme`, no-referrer), guardie, tema; quinto ambito in ESLint e nel commento di `admin.ts`; lint fixture; `p_now` da `resolveNow()` sul cookie della richiesta (+ unit: ignorato senza `E2E_CLOCK` o con `VERCEL`); `x-r2y-theme`/`x-r2y-backend` del client ignorati | developer | `src/features/rsvp/public-rpc.ts`, `src/features/rsvp/limiter.ts`, `src/features/rsvp/limiter.test.ts`, `src/features/rsvp/blocked-html.ts`, `src/proxy.ts`, `src/features/auth/guards.ts`, `src/themes/server.ts`, `eslint.config.mjs`, `src/lib/supabase/admin.ts`, `tests/lint-fixtures/*` (nuovi) | T2, T4 | AC2, AC6, AC10 |
+| T5 | Bordo pubblico: `public-rpc.ts`, `limiter.ts` (+ unit /64), pagina 429; proxy (gate, 429, `x-r2y-theme`, no-referrer), guardie, tema; quinto ambito in ESLint e nel commento di `admin.ts`; lint fixture; `p_now` da `resolveNow()` sul cookie della richiesta (+ unit: ignorato senza `E2E_CLOCK` o con `VERCEL`); `x-r2y-theme`/`x-r2y-backend` del client ignorati | developer | `src/features/rsvp/public-rpc.ts`, `src/features/rsvp/limiter.ts`, `src/features/rsvp/limiter.test.ts`, `src/features/rsvp/blocked-html.ts`, `src/features/rsvp/neutral-html.ts` (+ test), `src/proxy.ts`, `src/features/auth/guards.ts`, `src/themes/server.ts`, `eslint.config.mjs`, `src/lib/supabase/admin.ts`, `tests/lint-fixtures/*` (nuovi) | T2, T4 | AC2, AC6, AC10 |
 | T6 | Lato coppia, dati e azioni: `data.ts` (`loadRsvp`, degrado se non migrato), `view.ts` (destinatari, stato del link, riepilogo "2 sì · 1 in attesa", testo WhatsApp con al massimo 3 nomi) + unit; `actions.ts`; `rsvpMode` in `guests/data.ts`; `skipped` di `undo_guest_import` nell'azione d'importazione; esportazione JSON + test; `now` da `resolveNow()` | developer | `src/features/rsvp/data.ts`, `src/features/rsvp/view.ts`, `src/features/rsvp/view.test.ts`, `src/features/rsvp/actions.ts`, `src/features/guests/data.ts`, `src/features/guests/import-actions.ts`, `src/features/guests/import-actions.test.ts`, `src/features/export/data.ts`, `src/features/export/data.test.ts`, `tests/integration/rsvp.actions.test.ts` | T1, T4 | AC1, AC7-AC9, AC12, AC13 |
-| T7 | Pagina pubblica: route, `not-found`, `RsvpShell`, `RsvpForm`, `RsvpPersonCard`, `RsvpSummary`, `LinkUnavailable`; server action `submitRsvp` (legata al token, `now` da `resolveNow()`, nessun log di valori); `<details>` senza JS, campi controllati, errore di rete, vista `unavailable` (DES-24..26); testo della pagina di servizio adatto anche agli invitati (AC6) | developer | `src/app/(public)/rsvp/[token]/page.tsx`, `src/app/(public)/rsvp/[token]/not-found.tsx`, `src/features/rsvp/public/*`, `src/features/rsvp/public-actions.ts`, `src/components/ServiceDownPage.tsx` | T5 | AC2-AC6, AC11 |
+| T7 | Pagina pubblica: route, `not-found`, `RsvpShell`, `RsvpForm`, `RsvpPersonCard`, `RsvpSummary`, `LinkUnavailable`; server action `submitRsvp` (legata al token, `now` da `resolveNow()`, nessun log di valori); `<details>` senza JS, campi controllati, errore di rete, vista `unavailable` (DES-24..26); testo della pagina di servizio adatto anche agli invitati (AC6) | developer | `src/app/(public)/rsvp/[token]/page.tsx`, `src/app/(public)/rsvp/[token]/not-found.tsx` (da eliminare, Arbitrato S3), `src/features/rsvp/public/*`, `src/features/rsvp/public-actions.ts`, `src/components/ServiceDownPage.tsx` | T5 | AC2-AC6, AC11 |
 | T8 | Foglio "Link di {destinatario}" e dialoghi: crea, copia, condividi, WhatsApp, nuovo, revoca, Annulla di "Condiviso", avviso "data non scelta", "Scade il", conferma della modalità del gruppo | developer | `src/features/rsvp/LinkSheet.tsx`, `src/features/rsvp/GroupModeDialog.tsx`, `src/features/rsvp/components.test.tsx` | T6 | AC1, AC7, AC12 |
 | T9 | Integrazione in Invitati: stato per persona (testo + icona), riepilogo del gruppo, stato del link e "Invia" sul titolo del gruppo **e sulla seconda riga dei destinatari individuali** (DES-27), "Crea link per tutti (N)" in Altro, "Come rispondono" nel menu del gruppo, presenza in sola lettura nel foglio persona, toast "N restano" dopo Annulla importazione (DES-28); caricamento nella pagina | developer | `src/features/guests/GuestsScreen.tsx`, `GroupHeader.tsx`, `GuestRow.tsx` (`rowColumns`), `row-columns.test.ts`, `GuestSheet.tsx`, `ImportSheet.tsx`, `src/app/(app)/invitati/page.tsx`, `src/features/guests/components.test.tsx` | T6, T8 | AC1, AC8, AC9 |
 | T10 | Test di accettazione e integrazione QA (vedi Test plan): PostgREST, bordo HTTP, neutra normalizzata, 429, concorrenza, log, "Novità". Helper: IP sintetico per test (`x-forwarded-for`) e pulizia di `private.rsvp_attempts` (QA-2) | qa-engineer | `tests/acceptance/rsvp.test.ts`, `tests/acceptance/rsvp.concurrency.test.ts`, `tests/acceptance/support/*` (aggiunte), `tests/integration/rsvp.logs.test.ts`, `tests/integration/home.data.test.ts` | T2, T5, T7 | AC2, AC6, AC10, AC11, AC14 |
@@ -189,7 +170,7 @@ Tutto nelle forme già in uso: SQL con RLS, RPC con codici stabili, server actio
 | T12 | Documentazione (vedi piano) | technical-writer | `docs/functional/*`, `docs/technical/*`, `docs/adr/0002-…`, `docs/adr/0003-…` | T9 | — |
 | T13 | Checklist di rilascio: variabile d'ambiente, migrate, controlli post-deploy, rollback; verifica che `05_rsvp.sql` non giri mai su staging o produzione (QA-17) | release-manager | `docs/technical/ambienti-e-rilascio.md` (sezioni di rilascio; T12 ne cura il resto, in sequenza dopo T12) | T12 | — |
 
-**In parallelo:** in S1 T3 dopo T1, mentre T2 procede. T4 può partire subito; dopo T1, T4 e T2, procedono in parallelo T5 e T6. Poi T7 (dipende da T5) in parallelo con T8 e T9, che sono sequenziali tra loro. T10 parte appena T2 e T5 sono pronti; T11 alla fine. Le allowlist pgTAP e `database.types.ts` sono condivise da T1 e T2: per questo T2 viene dopo T1.
+**In parallelo:** T3 dopo T1, con T2; T4 subito; T5 e T6 dopo T1, T2, T4. T7 (dopo T5) in parallelo con T8 → T9. T10 dopo T2 e T5; T11 alla fine. T2 dopo T1 per le allowlist e `database.types.ts` condivise.
 
 ## Test plan
 | Level | What | Cases (incl. edge cases) | AC covered | Owner |
@@ -200,7 +181,7 @@ Tutto nelle forme già in uso: SQL con RLS, RPC con codici stabili, server actio
 | Unit | `token.ts`, `limiter.ts`, `view.ts`, `app-config`, clock | Vettori fissi; 32 byte decodificati; 1000 id → 1000 token distinti; segreto o id diversi → token diverso; `hashRsvpToken` uguale al `digest` pgTAP; forme malformate scartate senza DB (QA-15); IPv6 /64, IP assente; precedenza dei 4 stati, Scaduto prima di tutto; destinatari con gruppo eliminato o "separato"; "2 sì · 1 in attesa"; saluto WhatsApp con 1, 3, 4 persone e caratteri codificati; segreto mancante o corto; `resolveNow` ignorato senza `E2E_CLOCK` o con `VERCEL` | AC1, AC2, AC8, AC9, AC12 | developer |
 | Integration | Azioni coppia ed esportazione | Senza `guests/write` → `forbidden`; URL ricalcolato = link salvato, hash diverso → "va rigenerato"; Annulla di "Condiviso" ripristina `shared_at` e fotografia; `setGroupMode` con conflitto; export con `rsvpResponses`/`rsvpLinks`; nel JSON serializzato nessun token, nessun hash a 64 caratteri esadecimali, nessun segreto; export anche con `not_migrated` (QA-16) | AC1, AC7, AC8, AC13 | developer |
 | Integration (QA) | Log e "Novità" (QA-7, QA-10) | `public-rpc.ts`/`submitRsvp` con un errore Postgres che contiene hash e nota → `console` senza token, hash, nota, stato o id, e al browser solo codici; "Novità" senza righe `rsvp_*` dopo risposte e link | AC14 | qa-engineer |
-| Acceptance (HTTP) | Bordo pubblico (IP sintetico per test, pulizia di `rsvp_attempts`) | Neutra (QA-4): stato, HTML normalizzato (senza nonce o build id) e intestazioni (`Cache-Control`, `X-Robots-Tag`, `Referrer-Policy`, `Content-Type`) identici per le 5 cause; nessuna traccia del tema del matrimonio né di `x-r2y-theme`; invio su link revocato, scaduto o sconosciuto → stesso contenuto neutro per tutte le cause. 429: `Retry-After` in (0, 900], sblocco spostando la riga (schema `login-neutral.test.ts`). OG statico, meta noindex. "Aprire non modifica" (QA-11): conteggi e `max(updated_at)` di `rsvp_responses`, `rsvp_links`, `guests`, `audit_log` invariati dopo GET valido e non valido. Cookie dell'orologio ignorato da un server senza `E2E_CLOCK`. Nessun accesso PostgREST | AC2, AC6, AC10, AC14 | qa-engineer |
+| Acceptance (HTTP) | Bordo pubblico (IP sintetico per test, pulizia di `rsvp_attempts`) | Neutra (QA-4, Arbitrato S3): stato, corpo e intestazioni (`Cache-Control`, `X-Robots-Tag`, `Referrer-Policy`, `Content-Type`) identici per le 5 cause; nessuna traccia del tema del matrimonio né di `x-r2y-theme`; invio su link revocato, scaduto o sconosciuto → stesso contenuto neutro per tutte le cause. 429: `Retry-After` in (0, 900], sblocco spostando la riga (schema `login-neutral.test.ts`). OG statico, meta noindex. "Aprire non modifica" (QA-11): conteggi e `max(updated_at)` di `rsvp_responses`, `rsvp_links`, `guests`, `audit_log` invariati dopo GET valido e non valido. Cookie dell'orologio ignorato da un server senza `E2E_CLOCK`. Nessun accesso PostgREST | AC2, AC6, AC10, AC14 | qa-engineer |
 | Acceptance | Concorrenza (QA-9) | N `rsvp_submit` paralleli sulla stessa persona → una riga, vince l'ultimo, nessun errore; 25 invii paralleli → al massimo 20 scritture | AC11 | qa-engineer |
 | E2E | Pagina pubblica | 320 px e desktop; un solo spec senza JS (invio, riga "zero scelte", Modifica con `<details>`); gruppo di 4 con bambino e neonato, "Vengono tutti", invio parziale, contatore; conferma, Modifica, riapertura; due schede → "erano già cambiate"; revoca durante la compilazione → vista neutra completa; offline (`setOffline`) → scelte conservate + avviso; partner con sessione vede la pagina pubblica col tema del matrimonio (QA-14); nessuna richiesta a terzi. Scadenza in `rsvp.time.spec.ts` | AC2-AC6, AC11, AC12 | qa-engineer |
 | E2E | Lato coppia (solo ciò che pgTAP non prova, QA-13) | Crea link, Copia (Chromium con permessi clipboard), `href` WhatsApp, Condividi annullato o copia negata → nessun "Condiviso il", Annulla; URL aggiornato dopo un nuovo link; Nuovo/Revoca → neutra; "Crea link per tutti (N)"; sposta → "Da rimandare"; elimina/ripristina; elimina definitivamente; sola lettura; Annulla importazione con "N restano"; nota con `<script>` mostrata come testo | AC1, AC7-AC9, AC13 | qa-engineer |
@@ -211,8 +192,8 @@ Tutto nelle forme già in uso: SQL con RLS, RPC con codici stabili, server actio
 ## Documentation plan
 | Type | Destination | What changes |
 |---|---|---|
-| Functional | `docs/functional/conferme-di-presenza.md` (nuova, + riga in `README.md` per la Guida) | Cosa vede l'invitato, come creare e condividere i link, messaggio WhatsApp e nota privacy (DES-36), stati del link, modalità del gruppo (e gruppi "ognuno per sé": un foglio per persona, DES-35), Da rimandare, **solo** scadenza dei link (data + 30; nessuna scadenza delle risposte, PO-7), privacy |
-| Functional | `invitati.md`, `esportazione.md`, `servizio-in-pausa.md` | Stati di presenza e link nella lista; Annulla importazione che lascia chi ha risposto o ha un link; eliminare definitivamente un gruppo cancella anche il suo link e la fotografia (QA-Q3); nuove chiavi del JSON; testo per gli invitati |
+| Functional | `docs/functional/conferme-di-presenza.md` (nuova, + riga in `README.md`) | Cosa vede l'invitato; creare e condividere i link; WhatsApp e nota privacy (DES-36); stati del link; modalità del gruppo ("ognuno per sé" = un foglio per persona, DES-35); Da rimandare; **solo** scadenza dei link (data + 30, PO-7); privacy |
+| Functional | `invitati.md`, `esportazione.md`, `servizio-in-pausa.md` | Stati nella lista; Annulla importazione lascia chi ha risposto o ha un link; elimina definitivamente un gruppo = via link e fotografia (P6); chiavi del JSON; testo per gli invitati |
 | Technical | `modello-dati.md` | Tabelle `rsvp_*`, `rsvp_mode`, RPC, matrice delle scritture, allowlist |
 | Technical | `sicurezza.md` | Sezione "Pagina pubblica RSVP": token derivato, quinto ambito della chiave segreta, limiti (IP affidabile solo dietro Vercel, falsificabile in locale e nei test, QA-2), 404/429, residuo dei log (rimando ad ADR-0003) |
 | Technical | `architettura.md`, `sviluppo-locale-e-test.md` | Passo RSVP nel proxy e intestazione del tema; link di prova del seed, segreto di test, orologio |
@@ -222,12 +203,8 @@ Tutto nelle forme già in uso: SQL con RLS, RPC con codici stabili, server actio
 
 ## Release plan
 - **Percorso**: PR → preview Vercel (staging, senza le migrazioni di R-04, come D-A di R-03) → merge su main = **produzione** (`merge_deploys_production: true`).
-- **Prima del merge (sviluppatore, guidato dal release-manager):**
-  - creare `RSVP_LINK_SECRET` in Vercel, *Sensitive*: Production e Preview con valori diversi, generati in locale (per esempio `openssl rand -base64 48`), mai incollati in chat o nei file;
-  - il release-manager verifica che il nome esista nei due ambienti (solo il nome, mai il valore) prima di approvare il merge.
-- **Ordine al merge**:
-  - il deploy di Vercel e `migrate.yml` partono in parallelo, `migrate` con l'approvazione del reviewer;
-  - per qualche minuto la lista si apre senza stati RSVP e la pagina pubblica dà la neutra (nessun link esiste ancora).
+- **Prima del merge (sviluppatore, guidato dal release-manager):** `RSVP_LINK_SECRET` in Vercel, *Sensitive*, Production e Preview con valori diversi generati in locale (es. `openssl rand -base64 48`), mai in chat o nei file; il release-manager verifica solo il nome nei due ambienti prima di approvare.
+- **Ordine al merge**: deploy di Vercel e `migrate.yml` in parallelo (`migrate` con approvazione); per qualche minuto la lista è senza stati RSVP e la pagina pubblica dà la neutra (nessun link esiste).
 - **Feature flag**: nessuno; finché la coppia non crea link, la superficie pubblica non dà nulla.
 - **Rollback**:
   - codice: Instant Rollback di Vercel (lo schema additivo resta compatibile);
@@ -249,57 +226,29 @@ Tutto nelle forme già in uso: SQL con RLS, RPC con codici stabili, server actio
 | P2 | Destinatario e funzionamento del link calcolati da una sola funzione SQL; "Da rimandare" dalla fotografia `rsvp_link_people` | architect | 2026-11-26 |
 | P3 | 429 dal proxy sul GET; il tema arriva dal proxy (`x-r2y-theme`); `public-rpc.ts` quinto ambito di `admin.ts` (ADR-0003) | architect | 2026-11-26 |
 | P4 | Precisazione di D4: ruotare il segreto non invalida i link già condivisi (il DB confronta lo sha256); per invalidarli si revocano (runbook) | architect | 2026-11-26 |
-
 | P5 | IP assente = nessun limite per IP, resta quello per link (QA-Q4): un contenitore comune bloccherebbe tutti, come nel login (R27(b)) | architect | 2026-11-26 |
 | P6 | Eliminare definitivamente un gruppo cancella il suo link e la fotografia: i membri passano a "Nessun link", non a "Da rimandare" (QA-Q3). È coerente con ADR-0002 §2 ("elimina definitivamente" = dimenticare); il caso è fissato nella matrice | architect | 2026-11-26 |
 | P7 | AC11 "erano già cambiate" = la scelta è salvata comunque; la frase segnala chi era stato cambiato da altri dopo l'apertura della pagina (`seen_at` → `changed_meanwhile`, PO-1) | architect, PO | 2026-11-26 |
 
-### Modifiche agli AC da approvare al Gate B (Q-P1, Q-P2, Q-P3; accettate da PO, designer e QA)
-- **AC3**, fine frase: "La funzione pubblica restituisce esattamente questi dati più l'identificativo del tema **e, per ogni persona, un identificativo opaco e la categoria (adulto, bambino, neonato)** (pgTAP sull'insieme delle chiavi): mai altri invitati, contatti, note, lato, tavolo."
-- **AC6**, "stesso codice HTTP" diventa: "**all'apertura sempre 404; all'invio, lo stesso contenuto neutro per tutte le cause (stato 200: una server action non può cambiarlo)**".
-- **AC10**, ultima frase: "**all'apertura**, oltre il limite per IP di BR9, risponde 429 con `Retry-After` e 'Troppi tentativi: riprova tra 15 minuti'; **sull'invio, oltre il limite per link, lo stesso messaggio compare nel modulo**."
-- **AC12**: "Given la regola di D7, when il link è scaduto, then dà la pagina neutra; il foglio del link mostra prima 'Scade il {data}' e poi '**Scaduto il {data}. Se sposti la data, i link tornano a funzionare da soli.**', **senza azioni di creazione o rigenerazione ('Crea link per tutti' disattivato con spiegazione); se la data scelta cambia, i link non revocati tornano a funzionare** (BR4)."
+### Modifiche agli AC (Q-P1..Q-P3, QA-Q1, QA-Q2; accettate da PO, designer e QA)
+AC3 (id opaco e categoria per persona), AC6 (all'apertura sempre 404; all'invio neutra in 200), AC10 (429 all'apertura, messaggio nel modulo all'invio), AC12 (testi della scadenza, nessuna creazione dopo, link che tornano a funzionare): approvate al Gate B, testo in `brief.md`. QA-Q3 e QA-Q4 sono P6 e P5.
 
-Nessun'altra domanda per lo sviluppatore: QA-Q1, QA-Q2 sono le modifiche sopra; QA-Q3 e QA-Q4 sono decisioni tecniche (P5, P6).
+### Arbitrato S3: 404 senza JS (architect, 2026-11-27)
+- **Causa.** Il confine di `not-found.tsx` è un error boundary client (`next/dist/client/components/http-access-fallback/error-boundary.js:18,36`), che React non esegue in SSR: il `notFound()` della pagina rompe la shell, Next mette 404 e invia `<html id="__next_error__">` col `<body>` vuoto (`next/dist/server/app-render/app-render.js:2507-2510,1324-1330`). Non è config né layout (`next.config.ts:58-65`; nessun layout in `(public)`). Riprodotto (build, `next start` :3300): `/rsvp/AAAA…` → 404 `__next_error__`, solo `<title>`; `/rsvp/a/b` (senza rotta) → 404 col corpo. `/invito` non usa `notFound()`; `global-not-found` vale solo senza rotta (`not-found.md:51`). Idem, per costruzione (non riprodotto), dopo un invio senza JS su link morto: la pagina si rifà dopo l'azione.
+- **Decisione: la neutra all'apertura la risponde il proxy**, come il 429 (`proxy.ts:189-210`):
+  - forma non valida o escape rotto → 404 neutra, senza DB;
+  - gate non bloccato e `themeId === null` (link morto: `weddings.theme_id` è `not null`, `core.sql:116`) → `rsvpLoadPage` (conta l'errore, BR9) → `neutral` → 404 neutra; `ok`, `retry` o gate `null` → pagina;
+  - `neutralHtml()` in `src/features/rsvp/neutral-html.ts` (schema di `blocked-html.ts`, senza script): stringa costante, byte identici per ogni causa; intestazioni del 429 senza `Retry-After`; esporta i testi che `LinkUnavailable` importa;
+  - la pagina non chiama più `notFound()`: `neutral` → `RsvpShell` + `LinkUnavailable` in 200 (gate scaduto o invio senza JS; AC6: all'invio 200).
+- **Residuo.** Gate scaduto (3 s) ma pagina viva: link morto in 200 con la neutra (corpo prima dello stato; `noindex` resta). Aspetto = 429 (DES-29), non il tema React: lo verifica il designer in S3.
+- **Scartata.** Rewrite a URL senza rotta + `app/not-found.tsx` radice guidato da un'intestazione: cambia il 404 dell'app ed è spedito con ogni rotta (`not-found.md:138`).
+- **File.** T5: `src/proxy.ts`, `neutral-html.ts` + test (nuovi). Poi T7: `page.tsx`, `LinkUnavailable.tsx`, elimina `not-found.tsx`.
+- **Test.** T10: 5 cause + forma non valida → 404, corpo identico byte per byte, senza `<script>` né `__next_error__`; un incremento di `rsvp_attempts` per apertura. T11: senza JS, link morto e invio su link revocato mostrano il testo.
 
 ## Risposte alle obiezioni F2
-- **QA (17, accettate 17).**
-  - QA-1: `resolveNow()` → `p_now`, mai dal client; `rsvp.time.spec.ts` (T5, T6, T7, T11).
-  - QA-2: IP sintetico, pulizia, P5, nota in `sicurezza.md` (T10).
-  - QA-3: matrice tabellare.
-  - QA-4: neutra normalizzata + caso POST.
-  - QA-5: limiti della scadenza con DST. Una data scelta è sempre fissa (`choose_option`, `date_from`).
-  - QA-6: env in T4/T11; seed e2e separato.
-  - QA-7: log in integrazione + stdout di e2e.
-  - QA-8: validazione, codice `invalid_answers`.
-  - QA-9: concorrenza, conteggio prima delle scritture.
-  - QA-10: "Novità".
-  - QA-11: definizione e `rsvp_gate` STABLE.
-  - QA-12: niente "Condiviso il" se l'azione non riesce.
-  - QA-13: e2e ridotti.
-  - QA-14: partner con sessione.
-  - QA-15: test sul token. Correzione: una variante ben formata (per esempio con maiuscole) è un token sconosciuto, quindi va al DB e conta; senza DB si scartano solo le forme non valide. Lo slash finale segue il redirect 308 di Next.
-  - QA-16: export.
-  - QA-17: seed mai remoto (T13).
-- **Designer (13, accettate 13).**
-  - DES-24: `<details>`.
-  - DES-25: vista `unavailable`.
-  - DES-26: campi controllati + errore di rete.
-  - DES-27: seconda riga e `rowColumns` (T9).
-  - DES-28: `skipped` + toast (T6, T9).
-  - DES-29: pagina 429 accessibile, axe.
-  - DES-30: AC12 sopra.
-  - DES-31: N e conferma.
-  - DES-32: stati del foglio dalla design §2.
-  - DES-33: nomi in "Da rimandare" dalla design §1.2.
-  - DES-34: senza JS.
-  - DES-35, DES-36: Guida.
-- **PO (7, accettate 7).**
-  - PO-1: P7.
-  - PO-2: regola stretta per `undo_guest_import`.
-  - PO-3, PO-4, PO-5: modifiche agli AC sopra (PO-4 caso POST nel test della neutra).
-  - PO-6: D4 già corretto nel brief.
-  - PO-7: documentazione + avviso nella conferma di "Crea link per tutti".
+- **QA (17/17):** 1 `resolveNow()` → `p_now` (T5-T7, T11); 2 IP sintetico, pulizia, P5, `sicurezza.md`; 3 matrice; 4 neutra + POST; 5 scadenza con DST (data scelta fissa); 6 env T4/T11, seed e2e separato; 7 log; 8 `invalid_answers`; 9 concorrenza; 10 "Novità"; 11 `rsvp_gate` STABLE; 12 niente "Condiviso il" se fallisce; 13 e2e ridotti; 14 partner con sessione; 16 export; 17 seed mai remoto (T13). QA-15: una variante ben formata (es. maiuscole) è un token sconosciuto, va al DB e conta; senza DB si scartano solo le forme non valide; slash finale = redirect 308.
+- **Designer (13/13):** 24 `<details>`; 25 `unavailable`; 26 campi controllati + errore di rete; 27 `rowColumns` (T9); 28 `skipped` + toast; 29 429 accessibile; 30 AC12; 31 N e conferma; 32-33 design §2, §1.2; 34 senza JS; 35-36 Guida.
+- **PO (7/7):** 1 P7; 2 `undo_guest_import` stretta; 3-5 AC sopra (4: caso POST); 6 D4 nel brief; 7 documentazione + avviso in "Crea link per tutti".
 
 ## Change log
 | Date | Change | Why | Approved by |
@@ -309,5 +258,8 @@ Nessun'altra domanda per lo sviluppatore: QA-Q1, QA-Q2 sono le modifiche sopra; 
 | 2026-11-26 | Revisione S1: `rsvp_create_links`/`rsvp_rotate_link` rifiutano dopo la scadenza (Q2); caso NUL spostato a `public-rpc.ts` + T10 (REV-2); nota vuota → null nella server action T7 (Q1); REV-104 residuo accettato, da documentare in `sicurezza.md` (T12) | Revisioni code-1, code-2 | coordinatore |
 | 2026-11-27 | T6: aggiunti `src/domain/export/types.ts`, `build.ts`, `export.test.ts` (chiavi `rsvpResponses`/`rsvpLinks` nel JSON) | `ExportInput` e `buildExportJson` elencano le chiavi in modo esplicito | coordinatore |
 | 2026-11-27 | Nuova RPC `rsvp_link_matches(p_link_id, p_hash)` (DEFINER, `guests/write`) nella migrazione di T1, fatta da T6; `GroupView.rsvpMode` facoltativo (T9 può renderlo obbligatorio) | `token_hash` non leggibile dal client: senza RPC il controllo "va rigenerato" del piano non si può fare | coordinatore |
+| 2026-11-27 | Arbitrato S3: neutra all'apertura dal proxy (`neutral-html.ts`, T5); pagina senza `notFound()` né `not-found.tsx` (T7); test T10/T11 | `notFound()` in Next 16.4.6 dà 404 col corpo vuoto senza JS (DES-24, DES-34) | architect (arbitrato) |
+| 2026-11-27 | T7: `retry` dell'invio = errore nel modulo con scelte conservate (non `unavailable`); input nativi invece di Radix; niente `aria-expanded` sul Sì; nota > 200 e NUL scartati in locale; titolo `absolute`. Revisione S3: T7 tocca anche `proxy.ts`, `neutral-html.ts`, `public-rpc.ts` (proiezione sulle chiavi AC3, REV-117) | `retry` è transitorio, non un link morto; Radix non invia senza JS; code-5 REV-23, code-6 | coordinatore |
+| 2026-11-27 | `Referrer-Policy: same-origin` sulla pagina del modulo (header del proxy e meta di `RsvpShell`); neutra e 429 restano `no-referrer`; T10 controlla l'header per tipo di pagina, T11 invia davvero senza JS; T12 aggiorna ADR-0003 (riga "Sempre: … no-referrer") | DES-37: con `no-referrer` l'invio senza JS dà 500 (`Origin: null`) | sviluppatore (brief D15) |
 
 ## Outcome

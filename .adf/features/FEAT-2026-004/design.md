@@ -10,7 +10,7 @@ Modulo HTML con server action: funziona anche **senza JavaScript** (browser inte
 **A. Prima risposta (link valido)**
 1. In testa h1 "{A} e {B} si sposano"; sotto la data ("sabato 3 settembre 2027" o "Data da confermare") e la location ("Villa Aurora, Tivoli" o "Luogo da confermare"); se una delle due è da confermare: "Puoi rispondere adesso e cambiare quando vuoi" (BR8).
 2. Frase guida "Dicci chi di voi viene." (più persone) / "Dicci se ci sei." (una).
-3. Una **carta per persona** in `fieldset`: legenda = nome e cognome (+ "Bambino"/"Neonato" in testo), due scelte grandi affiancate **Sì, ci sono** / **No, non posso** (radio nativi, ≥ 48 px, icona + testo + bordo, mai solo colore). Con 2+ persone, sopra le carte "Vengono tutti" (solo JS; imposta Sì a tutte, si corregge dopo).
+3. Una **carta per persona** in `fieldset`: legenda = nome e cognome (+ "Bambino"/"Neonato" in testo), due scelte grandi affiancate **Sì, ci sono** / **No, non posso** (`input type="radio"` nativi, ≥ 48 px; selezione con spunta + testo + bordo, mai solo colore). Con 2+ persone, sopra le carte "Vengono tutti" (solo JS; imposta Sì a tutte, si corregge dopo).
 4. **Preferenze alimentari (facoltative)** in ogni carta: quattro caselle + "Allergie o altro" (200 caratteri, contatore con JS) e "Lo vedono solo {A} e {B}". Con JS compaiono solo dopo Sì; **senza JS sono sempre visibili** con l'etichetta "Solo se vieni". Con No vengono cancellate al salvataggio (BR11).
 5. Contatore `aria-live` "Hai scelto per 3 di 4 persone" (solo JS) e **Invia le risposte** (nel flusso, non fisso). Invio parziale ammesso: chi non ha scelto resta "In attesa". Con zero scelte il pulsante resta attivo e il server risponde con la riga "Scegli Sì o No per almeno una persona" (AC4); lo stesso senza JS.
 6. In coda, ≥ 14 px: nota privacy (D6) e "Manca qualcuno o c'è un nome sbagliato? Scrivi a chi ti ha invitato."
@@ -19,7 +19,7 @@ Modulo HTML con server action: funziona anche **senza JavaScript** (browser inte
 
 **B. Ritorno (risposte già date):** la pagina si apre sul riepilogo (senza il "Grazie") con **Modifica**; mai il modulo vuoto se ci sono risposte. Nessuna scadenza delle risposte in questa feature (BR7): si modifica finché il link funziona.
 
-**C. Link non valido (AC6):** sconosciuto, revocato, scaduto, senza destinatario, forma errata: pagina neutra `not-found` (404), tema predefinito, **nessun nome, data o marchio**, h1 "Questo link non funziona più", testo "Se pensi sia un errore, scrivi a chi ti ha invitato.", nessun pulsante né link al login. Se il link diventa non valido **durante la compilazione**, l'invio sostituisce l'intera pagina con questa stessa vista (nomi compresi: spariscono), senza dire altro (AC11, DES-25).
+**C. Link non valido (AC6):** sconosciuto, revocato, scaduto, senza destinatario, forma errata: pagina neutra `not-found` (404), tema predefinito, **nessun nome, data o marchio**, h1 "Questo link non funziona più", testo "Se pensi sia un errore, scrivi a chi ti ha invitato.", nessun pulsante né link al login. All'apertura la risponde il **proxy** (404, HTML scritto a mano e senza script, `src/features/rsvp/neutral-html.ts`, stesso schema del 429; Arbitrato S3: `notFound()` dà un corpo vuoto senza JS), con tema fisso crema/antracite dal dispositivo, h1 28 px sans, testi identici per ogni causa. Se il link diventa non valido **durante la compilazione** (o il proxy lascia passare la pagina), l'invio sostituisce l'intera pagina con `LinkUnavailable` (200, stessi testi, nomi spariti), senza dire altro (AC11, DES-25); il focus va all'h1 (REV-22).
 
 **D. Troppi tentativi (AC10):** all'apertura, `429` dal proxy con pagina HTML minima: h1 "Troppi tentativi", testo "Riprova tra 15 minuti.", `lang="it"`, viewport, `color-scheme` chiaro/scuro con CSS inline, 18 px, contrasto ≥ 4.5:1 (DES-29). Sugli **invii** il blocco per link mostra nel modulo (stato 200, scelte conservate) "Troppi tentativi: riprova tra 15 minuti" (Q-P2).
 
@@ -58,8 +58,8 @@ Modulo HTML con server action: funziona anche **senza JavaScript** (browser inte
 | Bisogno | Riuso (percorso) | Nuovo? |
 |---|---|---|
 | Guscio pubblico | `src/components/PublicShell.tsx` (salto a `#contenuto`) | `RsvpShell`: nomi della coppia, tema dal proxy, 18 px |
-| Scelte, caselle, campi, avvisi | `ui/radio-group.tsx`, `checkbox.tsx`, `input.tsx`, `label.tsx`, `alert.tsx`, `card.tsx` | `RsvpPersonCard`, `RsvpSummary`, `LinkUnavailable` (pagina `not-found` e sostituzione dopo l'invio) |
-| Pagina 429 | schema di `src/app/(public)/email/disattiva/html.ts` | `blocked-html.ts` |
+| Scelte, caselle, campi, avvisi | **input nativi** `radio` e `checkbox` stilati (Radix non invia il modulo senza JS: deviazione registrata in `plan.md → Change log`, REV-23); `ui/input.tsx`, `label.tsx`, `alert.tsx`, `card.tsx` | `RsvpPersonCard`, `RsvpSummary`, `LinkUnavailable` (pagina `not-found` e sostituzione dopo l'invio) |
+| Pagine 429 e neutra | schema di `src/app/(public)/email/disattiva/html.ts` | `blocked-html.ts`, `neutral-html.ts` (servite dal proxy) |
 | Lista, riga, gruppo, menu | `GuestRow.tsx`, `GroupHeader.tsx` (`ActionMenu`), `GuestSheet.tsx`, `GuestsScreen.tsx` | estendere (presenza, seconda riga, "Invia") |
 | Fogli e dialoghi | `ui/sheet.tsx`, `timeline/PanelContent.tsx`, `ui/alert-dialog.tsx`, `ConflictDialog.tsx` | `LinkSheet`, `GroupModeDialog` |
 | Annulla ≥ 8 s, errori | `timeline/actions.ts`, `Notices.tsx`, `ui/sonner.tsx`, `ErrorState.tsx` | no |
@@ -78,7 +78,7 @@ Modulo HTML con server action: funziona anche **senza JavaScript** (browser inte
 Mai "RSVP", "token", "destinatario" nelle etichette per la coppia ("RSVP" si spiega in Guida).
 
 ## 5. Accessibilità
-Pagina pubblica: `lang="it"`, un solo `h1`, carte in `fieldset` con legenda = nome (mai "Persona 1"); bersagli ≥ 48 px con distanza ≥ 8 px; selezione con icona, testo e bordo (3:1 sul bordo, 4.5:1 sul testo, solo token del tema); preferenze con `aria-expanded` senza spostare il focus; errori `aria-invalid` + `aria-describedby`, al primo errore il focus va alla riga d'errore; conferma e contatore `role="status"`, focus sul pannello dopo l'invio; nessun timeout; zoom 200 % senza scorrimento orizzontale; `prefers-reduced-motion`. Coppia, come FEAT-2026-003 §6: foglio con focus trap, stato del link nel nome accessibile del gruppo ("Famiglia Rossi, 2 sì, 1 in attesa, link condiviso il 12 marzo"), dialoghi distruttivi con focus su "Annulla", Annulla dei toast ≥ 8 s e raggiungibile da tastiera.
+Pagina pubblica: `lang="it"`, un solo `h1`, carte in `fieldset` con legenda = nome (mai "Persona 1"); bersagli ≥ 48 px con distanza ≥ 8 px; selezione con icona, testo e bordo (3:1 sul bordo, 4.5:1 sul testo, solo token del tema); preferenze mostrate dopo il Sì senza spostare il focus (nessun `aria-expanded`/`aria-controls` sul Sì: è un radio, non un disclosure); riga d'errore `role="alert"` con focus (zero scelte); nessun `aria-invalid` (l'errore è uno solo, la riga d'avviso col focus); `aria-describedby` sul campo "Allergie o altro" per contatore e riservatezza; quando `LinkUnavailable` sostituisce il modulo il focus va all'h1; conferma e contatore `role="status"`, focus sul pannello dopo l'invio; nessun timeout; zoom 200 % senza scorrimento orizzontale; `prefers-reduced-motion`. Coppia, come FEAT-2026-003 §6: foglio con focus trap, stato del link nel nome accessibile del gruppo ("Famiglia Rossi, 2 sì, 1 in attesa, link condiviso il 12 marzo"), dialoghi distruttivi con focus su "Annulla", Annulla dei toast ≥ 8 s e raggiungibile da tastiera.
 
 ## 6. Responsive
 Pagina pubblica: una colonna a 320, centrata `max-w-xl` da 768, nessun layout a più colonne; `dvh`, nessuna barra fissa (browser interno di WhatsApp). Lista: a 320 presenza accanto al nome, link su seconda riga; da 768 colonna "Presenza" e fogli laterali. Barra a 6 voci invariata.
@@ -102,6 +102,9 @@ Nota privacy · Manca qualcuno?    ---------------------------------
                                   [Nuovo link]   [Revoca link]
 ```
 
+## Verifica F3 (S3)
+Pagina pubblica provata il 2026-11-27: `reviews/design-1.md` (DES-37 bloccante: invio senza JS rotto da `no-referrer`).
+
 ## Obiezioni F1: esito
 DES-1..23 chiuse (accolte, tranne DES-17 in parte, DES-4/7/10/13 e filtri di DES-11 rimandate a R-07, DES-21 respinta): tabella in `reviews/f2-designer.md`, con le nuove DES-24..36.
 
@@ -112,7 +115,7 @@ DES-1..23 chiuse (accolte, tranne DES-17 in parte, DES-4/7/10/13 e filtri di DES
 - [ ] Senza JavaScript: invio, preferenze sempre visibili, Modifica con `<details>`, riga d'errore a zero scelte.
 - [ ] Dopo l'invio: conferma e riepilogo; riapertura: riepilogo; "erano già cambiate" con due schede; link revocato durante la compilazione: pagina neutra senza nomi.
 - [ ] Neutra identica (testo, aspetto) per sconosciuto, revocato, scaduto, senza destinatario; 429 all'apertura (pagina minima accessibile, chiaro/scuro); blocco sugli invii nel modulo con scelte conservate; offline con scelte conservate.
-- [ ] Rete: nessuna risorsa di terzi; `noindex`, `no-referrer`, `no-store`; anteprima statica senza nomi. axe pulito su tutte le viste; tastiera e lettore di schermo (legende, focus dopo l'invio).
+- [ ] Rete: nessuna risorsa di terzi; `noindex`, `no-store`, `Referrer-Policy: same-origin` sulla pagina con il modulo (con `no-referrer` il POST senza JS porta `Origin: null` e Next lo rifiuta, DES-37; `no-referrer` resta su neutra e 429); anteprima statica senza nomi. axe pulito su tutte le viste; tastiera e lettore di schermo (legende, focus dopo l'invio).
 - [ ] Invitati a 320 e 1280: presenza nella riga, link su seconda riga per i destinatari individuali, titolo di gruppo con stato e "Invia", nessun troncamento.
 - [ ] Foglio link: Crea, Copia, WhatsApp (testo modificabile), Condividi nascosto senza `navigator.share`, "Condiviso il" con Annulla, Nuovo link e Revoca con conseguenza, "Crea un nuovo link", Scaduto, "Da rimandare" con nomi; link da iPhone reale e dal browser interno di WhatsApp (Gate C).
 - [ ] "Come rispondono" con conseguenza scritta; "Crea link per tutti (N)" con conferma e toast; Annulla importazione con il nuovo testo.

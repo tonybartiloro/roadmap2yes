@@ -55,3 +55,16 @@
 - Reviews: code-3 (general) REV-11..18 → fixed/closed, approved; code-4 (security) REV-111..115 → 111 decode-then-shape-check, 112 gate only GET/HEAD, 113 fake secret refused on any `VERCEL_ENV`; 114/115 residuals for `sicurezza.md` (T12). Fixes c42a4d0, 6e4582f.
 - Tests: unit 1434, integration 908 (+1 pre-existing skip), db:test green; `adf verify` pass on b27cdfc01b20; built app curl on `/rsvp/<seed token>` → 404 with noindex, no-store, no-referrer (page = T7).
 - Carry-overs for S3/S4: T7 shape-checks `params.token` with `isRsvpTokenShape`, sends blank note as null and `answered_at` untouched as `seen_at`, uses `rsvpLoadPage`/`rsvpSubmit` from `public-rpc.ts`; T8 imports client constants from `src/features/rsvp/constants.ts`; T9 may make `GroupView.rsvpMode` required.
+- Developer: resumed with `/adf:resume` (new session) → S3.
+
+## F3 step S3 progress — 2026-11-27
+- T7 (eae198c): public page, `submitRsvp`, components; declared deviations accepted (plan Change log).
+- Blank 404 without JS (`notFound()` in Next 16.4.6 renders via a client boundary) → architect arbitration: proxy serves the neutral 404 from `neutral-html.ts`; page renders `LinkUnavailable` in 200 only on fail-open (`plan.md → Decisions → Arbitrato S3`).
+- Reviews: code-5 REV-19..23 and code-6 REV-116..122 → fixed in 25c677f, both approved round 2. Residuals for `sicurezza.md` (T12): REV-114/115, D5 token in logs/history, preview crawlers, CSP `unsafe-inline`, guest uuid as opaque id, unlimited invalid payloads, fail-open 200/9 s/double count (REV-122), token in own Flight payload.
+- `adf verify` pass (lint, typecheck, unit, build). Designer design-1: DES-37 **blocking** — no-JS submit fails in Chromium: `Referrer-Policy: no-referrer` → `Origin: null` → Next rejects the server action (500). Fix `same-origin` conflicts with AC10 and ADR-0003 → question for the developer. DES-38/39 should (320 px legend gap, Sì/No wrapping); notes DES-40..44. design.md updated for the deviations.
+- Developer: "Sì, same-origin" → brief D15, AC10 updated; ADR-0003 line to update in T12.
+
+## F3 step S3 checkpoint — 2026-11-27
+- Fix 048bcbc: `same-origin` on pages that reach `/rsvp/[token]` (header + meta), neutral 404/429 keep `no-referrer`; DES-38/39/43 fixed, DES-40 partly. No-JS submit verified in headless Chromium at 320 px.
+- Reviews closed: code-5 approved (round 2), code-6 approved (round 3, residual 10 = own-origin Referer), design-1 approved on 048bcbc (notes DES-40/41/44 open, no action).
+- Carry-overs: T10 checks the neutral 404 body = `neutralHtml()`, one BR9 failure per dead open, `Referrer-Policy` per page type (dead-link 404 branch has no test yet); T11 submits for real without JS, checks no-JS dead link and revoked-link submit; T12: `sicurezza.md` residuals (10, list in `reviews/code-6.md`), ADR-0003 referrer line, stale comment `next.config.ts:43`, `servizio-in-pausa.md` "dal pannello".
