@@ -103,11 +103,11 @@ Il link personale è l'unica area pubblica con dati di terzi. Le regole di acces
 |---|---|---|
 | Token | `src/features/rsvp/token.ts` | Token derivato da `RSVP_LINK_SECRET` e dall'id del link; forma, hash e URL. Il segreto si legge con `readRsvpLinkSecret()` in `app-config.ts` |
 | Bordo pubblico | `src/proxy.ts`, `public-rpc.ts`, `limiter.ts` | Il proxy chiama `rsvp_gate` con timeout di 3 secondi, fail-open. Un blocco dà 429 con `Retry-After`; un link che non funziona dà la 404 neutra scritta a mano (`neutral-html.ts`). Il proxy imposta `x-r2y-theme` con il tema del matrimonio e toglie quella del client |
-| Pagina pubblica | `src/app/(public)/rsvp/[token]/`, `src/features/rsvp/public/` | Pagina senza JavaScript obbligatorio, con `RsvpShell` e il modulo con `submitRsvp`. `not-found` non esiste: la neutra è del proxy, e la pagina mostra `LinkUnavailable` in 200 solo se il gate scade |
+| Pagina pubblica | `src/app/(public)/rsvp/[token]/`, `src/features/rsvp/public/` | Pagina senza JavaScript obbligatorio, con `RsvpShell` e il modulo con `submitRsvp`. `not-found` non esiste: la neutra è del proxy, e la pagina mostra `LinkUnavailable` in 200 se il gate scade, se un invio arriva su un link morto o revocato durante la compilazione (ADR-0003, Arbitrato S3) |
 | Lato coppia | `src/features/rsvp/actions.ts`, `data.ts`, `view.ts`, `LinkSheet.tsx` | Azioni sui link (crea, copia, rigenera, revoca, "Condiviso il"), stati calcolati in `view.ts`, lettura di `rsvp_status` |
 | Esportazione | `src/features/export/data.ts` | `rsvpResponses` e `rsvpLinks` nel JSON, mai il token né l'hash |
 
-Regole di invariante: `p_now` arriva solo dal server (`resolveNow()`), mai dalla richiesta; le RPC pubbliche sono solo per `service_role`; la pagina pubblica non ha un `loading.tsx`, perché uno streaming darebbe 200 a un link morto.
+Regole di invariante: `p_now` arriva dal server (`resolveNow()`) e mai da un parametro del client; il cookie di test `r2y-test-now` vale solo con `E2E_CLOCK` e senza `VERCEL`. Le RPC pubbliche sono solo per `service_role`. La pagina pubblica non ha un `loading.tsx`, perché uno streaming darebbe 200 a un link morto.
 
 ## Guida d'uso (`/guida`)
 

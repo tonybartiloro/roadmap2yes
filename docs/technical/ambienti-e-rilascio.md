@@ -312,7 +312,7 @@ Checklist di FEAT-2026-004. Nessun feature flag: finché la coppia non crea un l
 - `supabase/config.toml:28-31`: i seed (`./seeds/*.sql`) sono attivi, ma `config.toml` vale solo per locale e CI.
 - `package.json:72`: `db:reset` è `supabase db reset` senza `--linked`, quindi locale.
 - `.github/workflows/migrate.yml:59` e `:65`: l'unico comando verso il remoto è `db push --remote` (dry-run e applicazione), senza `--include-seed`. I commenti a `:6-10` e `:63` vietano seed e `reset --linked`.
-- Nessun altro workflow in `.github/workflows/` contiene `seed`, `db reset` o `--linked`.
+- Nessun workflow fa `db reset` o `--linked` verso un database remoto. `.github/workflows/ci.yml` esegue `npm run db:reset` solo sullo stack locale del runner, senza `--linked` né `supabase link`: il seed gira lì e basta.
 - `supabase/seeds/05_rsvp.sql:2-3` dichiara che è solo locale e CI.
 
 Resta fuori dal codice: un comando manuale `supabase db reset --linked` dal portatile. Il runbook lo vieta (regole in cima).

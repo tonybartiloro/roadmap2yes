@@ -33,7 +33,7 @@ Se la data non è ancora scelta puoi creare e mandare i link lo stesso. Il fogli
 
 **Il messaggio con il link passa da WhatsApp.** Resta nella chat e nella cronologia del telefono, e chi lo riceve può inoltrarlo. Mandalo solo alle persone invitate.
 
-Quando tocchi Copia link, Condividi o WhatsApp, il foglio scrive **"Condiviso il {data}"**, con un **Annulla** per 8 secondi. Vuol dire che hai copiato o aperto il messaggio, non che l'invitato l'ha ricevuto.
+Quando tocchi Copia link, Condividi o WhatsApp, il foglio scrive **"Condiviso il {data}"**, con un **Annulla** per qualche secondo. Vuol dire che hai copiato o aperto il messaggio, non che l'invitato l'ha ricevuto.
 
 ## Stati del link
 

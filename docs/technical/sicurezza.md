@@ -252,6 +252,7 @@ La pagina `/rsvp/{token}` è l'unica area pubblica che legge e scrive dati di te
 - **Risposte.** Link che non funziona in apertura: 404 neutro dal proxy, byte identici per ogni causa. Invio su un link che non funziona: stessa pagina neutra con stato 200, perché una server action non cambia lo stato HTTP. Il messaggio di blocco compare nel modulo.
 - **Log.** Il codice non scrive token, hash, note, stato o id negli errori. Il browser riceve solo codici. Un test di integrazione spia `console`.
 - **Dati di salute.** Preferenze alimentari e nota sono fuori dall'audit, da "Novità" e dai log. Nessun invio da link genera un evento di analytics.
+- **Colonne esplicite.** Le letture di `rsvp_links` elencano sempre le colonne, mai `select('*')`: la colonna `token_hash` non è leggibile da `authenticated` e un `*` farebbe fallire la query invece di tacere (REV-105).
 - **Residui accettati.** Sono elencati in una tabella sotto: si accettano per il rischio e l'uso del link, e sono tracciati nella revisione di sicurezza di F3.
 
 | Residuo | Perché si accetta |
@@ -269,6 +270,8 @@ La pagina `/rsvp/{token}` è l'unica area pubblica che legge e scrive dati di te
 | Diete e note di tutti gli invitati stanno nel payload della lista per chi ha `guests/read` (REV-124) | Stesso accesso della RLS; la coppia le vede già in Invitati |
 | Il link esce dall'app solo con Copia link, Condividi e WhatsApp: il messaggio WhatsApp con l'URL passa dalla query di `wa.me` e può restare nella cronologia (REV-126). La tastiera può inviare il campo con l'URL a servizi cloud (REV-125) | Scelta della coppia, sempre manuale. Lo spellcheck è disattivato sui campi con il link |
 | `getLinkUrlAction` non ha limite di frequenza né audit | Solo chi ha `guests/write` può chiamarla; ricalcola il link e lo confronta con l'hash |
+| La derivazione del token è un invariante dell'app, non del database: `rsvp_create_links` e `rsvp_rotate_link` ricevono `link_id` e `token_hash` dal client, quindi un partner può registrare l'hash di un token scelto da lui (solo nel proprio matrimonio; il foglio mostra poi "Nuovo link") (REV-104) | Il rischio resta nel perimetro della coppia. Regola per il codice futuro: derivare il token solo per un link letto tramite RLS (come fa `getLinkUrlAction`), mai per un `link_id` indicato dal chiamante |
+| Finestra fissa dei limiti: al confine di due finestre un IP o un link può fare fino al doppio del limite (per esempio 20 link non validi, 40 invii per link) (REV-106) | Il limite serve a frenare, non a contare con precisione; il token da 256 bit resta la difesa principale. Un IP `null` non ha limite per IP, come da P5 |
 
 ## Segreti
 
