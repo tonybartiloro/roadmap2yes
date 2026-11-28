@@ -13,6 +13,8 @@ export type WeddingThemeLookup = () => Promise<string | null>;
 /** Budget of the WHOLE lookup (client creation, claims, query) so a hanging backend never blocks the first byte (DES-16). */
 export const LOOKUP_TIMEOUT_MS = 1500;
 export const BACKEND_HEADER = "x-r2y-backend";
+/** Proxy-owned (stripped from client requests): the wedding theme of a working RSVP link. */
+export const THEME_HEADER = "x-r2y-theme";
 
 /** Resolves with `fallback` when `promise` is not settled within `ms` (or rejects). Never rejects. */
 export async function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
@@ -51,7 +53,7 @@ export const lookupWeddingThemeFromDb: WeddingThemeLookup = async () => {
 };
 
 /**
- * Active theme id for the root layout: DB, else the `r2y-theme` cookie, else "giardino".
+ * Active theme id for the root layout: the proxy's `x-r2y-theme` (RSVP link), else DB, else the `r2y-theme` cookie, else "giardino".
  * The proxy sets `x-r2y-backend` on the outage rewrite to `/servizio` (and strips client-sent
  * copies): with it present the database is not touched at all. Otherwise the whole lookup runs
  * under one timeout race.
@@ -62,8 +64,13 @@ export async function getActiveThemeId(
   let fromCookie: string | undefined;
   let backendDown = false;
   try {
+    const requestHeaders = await headers();
+    // The proxy sets it only for a working RSVP link: it wins over everything (public page, no
+    // session, no DB lookup) and only an approved id counts.
+    const fromProxy = requestHeaders.get(THEME_HEADER);
+    if (isApprovedThemeId(fromProxy)) return fromProxy;
     fromCookie = (await cookies()).get(THEME_COOKIE)?.value;
-    backendDown = (await headers()).has(BACKEND_HEADER);
+    backendDown = requestHeaders.has(BACKEND_HEADER);
   } catch {
     return DEFAULT_THEME_ID;
   }

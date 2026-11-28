@@ -35,8 +35,32 @@ describe("guards: no session", () => {
     "/invito/abc",
     "/servizio",
     "/email/disattiva",
+    "/rsvp/AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-abcde",
   ])("lets the public page %s through", async (path) => {
     expect(await evaluateGuards(ctx(path))).toEqual({ action: "next" });
+  });
+
+  it("lets a signed-in member open the public RSVP page, and keeps /rsvp-like paths private", async () => {
+    expect(await evaluateGuards(ctx("/rsvp/abc", { claims: signedIn() }))).toEqual({
+      action: "next",
+    });
+    expect(await evaluateGuards(ctx("/rsvpx/abc"))).toEqual({ action: "redirect", to: "/accesso" });
+    expect(await evaluateGuards(ctx("/rsvp/%2e%2e/percorso"))).toEqual({
+      action: "redirect",
+      to: "/accesso",
+    });
+  });
+
+  // QA-A: a broken escape on /rsvp/{x} reaches the proxy (neutral 404); other paths stay private.
+  it("lets a broken percent escape on /rsvp through, but not on other prefixes", async () => {
+    expect(await evaluateGuards(ctx("/rsvp/%E0%A4%A"))).toEqual({ action: "next" });
+    expect(await evaluateGuards(ctx("/rsvp/%E0%A4%A", { claims: signedIn() }))).toEqual({
+      action: "next",
+    });
+    expect(await evaluateGuards(ctx("/percorso/%E0%A4%A"))).toEqual({
+      action: "redirect",
+      to: "/accesso",
+    });
   });
 
   it.each(["/", "/percorso", "/altro/account", "/onboarding"])(

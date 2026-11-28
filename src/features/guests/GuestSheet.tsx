@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { toast } from "sonner";
-import { ChevronDown, ChevronRight, Trash2 } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, Clock, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -37,7 +37,65 @@ import {
   resolveGroup,
   type GroupChoice,
 } from "./GroupPicker";
+import { DIET_OPTIONS } from "@/features/rsvp/constants";
+import {
+  formatSharedDay as formatDay,
+  type Presence,
+  type RsvpResponse,
+} from "@/features/rsvp/view";
 import { fullName, liveGroupId, type PartnerNames } from "./view";
+
+/** Read-only "Presenza" of the person sheet (design §1.2). */
+export interface GuestSheetRsvp {
+  presence: Presence;
+  response: RsvpResponse | null;
+  /** "Invito: risponde con il gruppo Famiglia Rossi" and what "Apri link" opens. */
+  invite: { text: string; onOpen: () => void } | null;
+}
+
+const PRESENCE_VIEW = {
+  yes: { Icon: Check, text: "Sì" },
+  no: { Icon: X, text: "No" },
+  pending: { Icon: Clock, text: "In attesa" },
+} as const;
+const DIET_LABELS = new Map<string, string>(DIET_OPTIONS.map((o) => [o.value, o.label]));
+
+function PresenceSection({ rsvp }: { rsvp: GuestSheetRsvp }) {
+  const { response } = rsvp;
+  const { Icon, text } = PRESENCE_VIEW[rsvp.presence];
+  const prefs =
+    rsvp.presence === "yes" && response
+      ? [...response.diet.map((d) => DIET_LABELS.get(d) ?? d), response.dietNote ?? ""].filter(
+          Boolean,
+        )
+      : [];
+  return (
+    <section aria-labelledby="presence-title" className="border-border rounded-md border p-3">
+      <h3 id="presence-title" className="text-base font-semibold">
+        Presenza
+      </h3>
+      <p className="flex items-center gap-1 text-base">
+        <Icon aria-hidden className="size-4 shrink-0" />
+        {text}
+      </p>
+      {prefs.length > 0 ? <p className="text-base">Preferenze: {prefs.join(", ")}</p> : null}
+      {response ? (
+        <p className="text-muted-foreground text-sm">
+          {/* Every answer is the guest's own until R-07 lets the couple answer: then read `source`. */}
+          Ultima risposta: {formatDay(response.answeredAt)}, dall&apos;invitato
+        </p>
+      ) : null}
+      {rsvp.invite ? (
+        <div className="mt-2 flex flex-col gap-2">
+          <p className="text-base">{rsvp.invite.text}</p>
+          <Button type="button" variant="outline" className="min-h-11" onClick={rsvp.invite.onOpen}>
+            Apri link
+          </Button>
+        </div>
+      ) : null}
+    </section>
+  );
+}
 
 interface Form {
   firstName: string;
@@ -102,7 +160,10 @@ export function GuestSheet({
   partners,
   onDelete,
   onStale,
+  rsvp,
 }: {
+  /** Presence and invite, read only; absent while the RSVP data is not there. */
+  rsvp?: GuestSheetRsvp | undefined;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** `null` to add. */
@@ -421,6 +482,8 @@ export function GuestSheet({
                 </Field>
               </div>
             </div>
+
+            {guest && rsvp ? <PresenceSection rsvp={rsvp} /> : null}
 
             {formError ? (
               <p role="alert" className="text-destructive text-base">

@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { displayName } from "@/lib/display-name";
 import { canReadGuests, GuestsLoadError, loadGuests, type Db } from "@/features/guests/data";
-import { GuestsScreen } from "@/features/guests/GuestsScreen";
+import { GuestsScreen, type RsvpProps } from "@/features/guests/GuestsScreen";
+import { loadRsvp, RsvpLoadError } from "@/features/rsvp/data";
+import { getNow } from "@/lib/clock";
 import { pageContext } from "@/features/guests/server";
 import { LoadError } from "./LoadError";
 
@@ -52,5 +54,53 @@ export default async function GuestsRoute() {
     throw error;
   }
   const names = await partnerNames(db);
-  return <GuestsScreen snapshot={snapshot} partners={names.shown} importNames={names.real} />;
+  const rsvp = await rsvpProps(db, [names.real.a, names.real.b]);
+  return (
+    <GuestsScreen
+      snapshot={snapshot}
+      partners={names.shown}
+      importNames={names.real}
+      {...(rsvp ? { rsvp } : {})}
+    />
+  );
+}
+
+/** `guests/write` of the caller (the actions are hidden without it; the server decides anyway). */
+async function canWriteGuests(db: Db): Promise<boolean> {
+  const wedding = await db.from("weddings").select("id").limit(1).maybeSingle();
+  if (wedding.error || !wedding.data) return false;
+  const allowed = await db.rpc("has_permission", {
+    p_wedding_id: wedding.data.id,
+    p_area: "guests",
+    p_action: "write",
+  });
+  return allowed.data === true;
+}
+
+/**
+ * The RSVP states. A missing schema (`loadRsvp` answers `null`) or a failed read leaves the list
+ * as it was, without states and without an error: the guests list must open anyway.
+ */
+async function rsvpProps(db: Db, couple: (string | null)[]): Promise<RsvpProps | null> {
+  try {
+    const now = await getNow();
+    // In parallel: the permission check does not depend on the snapshot.
+    const [snapshot, canWrite] = await Promise.all([loadRsvp(db, now), canWriteGuests(db)]);
+    if (!snapshot) return null; // schema not migrated: the old list, silently
+    return {
+      snapshot,
+      now: now.toISOString(),
+      couple: couple.filter((n): n is string => Boolean(n)),
+      canWrite,
+    };
+  } catch (error) {
+    // The list opens anyway, but the failure is not silent: a fixed code only (no error object,
+    // no names, no token or hash).
+    console.error(
+      error instanceof RsvpLoadError
+        ? `invitati: rsvp load failed (${error.infra ?? "read"})`
+        : "invitati: rsvp load failed (unexpected)",
+    );
+    return null;
+  }
 }

@@ -9,6 +9,13 @@ import {
   type GuardClaims,
   type GuardDecision,
 } from "@/features/auth/guards";
+import { clientIp } from "@/features/auth/limiter-keys";
+import { blockedHtml } from "@/features/rsvp/blocked-html";
+import { neutralHtml } from "@/features/rsvp/neutral-html";
+import { rsvpGate, rsvpLoadPage } from "@/features/rsvp/public-rpc";
+import { isRsvpTokenShape } from "@/features/rsvp/token";
+import { resolveNow, TEST_NOW_COOKIE } from "@/lib/clock";
+import { isApprovedThemeId } from "@/themes/approved";
 
 /**
  * Edge of every request (Next 16 "proxy"): refreshes the Supabase session, resolves the claims
@@ -23,13 +30,31 @@ const BACKEND_HEADER = "x-r2y-backend";
 /** Total time allowed to the backend per proxied request (claims, refresh, guard lookups each). */
 const BACKEND_TIMEOUT_MS = 3000;
 
+/** Request header with the wedding theme of a working RSVP link (read by `themes/server.ts`). */
+const THEME_HEADER = "x-r2y-theme";
+
 const NO_REFERRER_PREFIXES = ["/invito", "/auth", "/email"];
+
+/**
+ * `/rsvp` pages that reach the form use `same-origin`, not `no-referrer` (DES-37): with
+ * `no-referrer` Chromium posts the no-JS form with `Origin: null` and Next rejects the server
+ * action. Nothing leaves the origin either way (no third-party resource or link). The pages the
+ * proxy writes itself (neutral 404, 429) have no form and keep `no-referrer`.
+ */
+const SAME_ORIGIN_PREFIXES = ["/rsvp"];
+
+/** `/rsvp/{token}` (a trailing slash is a 308 redirect done by Next before the proxy). */
+const RSVP_PATH = /^\/rsvp\/([^/]+)$/;
 
 function referrerPolicyFor(pathname: string): string {
   const strict = NO_REFERRER_PREFIXES.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
   );
-  return strict ? "no-referrer" : "strict-origin-when-cross-origin";
+  if (strict) return "no-referrer";
+  const sameOrigin = SAME_ORIGIN_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+  );
+  return sameOrigin ? "same-origin" : "strict-origin-when-cross-origin";
 }
 
 type CookieToSet = {
@@ -38,11 +63,27 @@ type CookieToSet = {
   options?: Parameters<NextResponse["cookies"]["set"]>[2];
 };
 
-function decorate(response: NextResponse, pathname: string, cookies: CookieToSet[]): NextResponse {
+function decorate(
+  response: NextResponse,
+  pathname: string,
+  cookies: CookieToSet[],
+  referrerPolicy: string = referrerPolicyFor(pathname),
+): NextResponse {
   for (const { name, value, options } of cookies) response.cookies.set(name, value, options);
-  response.headers.set("Referrer-Policy", referrerPolicyFor(pathname));
+  response.headers.set("Referrer-Policy", referrerPolicy);
   response.headers.set("Cache-Control", "private, no-store");
   return response;
+}
+
+/** The neutral 404: same bytes and headers for every cause (AC6). the caller adds no-store and `no-referrer` (no form on this page). */
+function neutralResponse(): NextResponse {
+  return new NextResponse(neutralHtml(), {
+    status: 404,
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+      "X-Robots-Tag": "noindex, nofollow",
+    },
+  });
 }
 
 function respond(
@@ -80,6 +121,9 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   // header set by the first pass must survive (it only skips a DB theme lookup: harmless if forged).
   const isServicePage = pathname === "/servizio";
   if (!isServicePage) forwarded.delete(BACKEND_HEADER);
+  // `x-r2y-theme` is proxy-owned too: it makes the root layout paint a wedding's theme, so a client
+  // can never send one. Only the RSVP gate below sets it, from the DB.
+  forwarded.delete(THEME_HEADER);
 
   let claims: GuardClaims | null = null;
   let backend: BackendStatus = "ok";
@@ -154,6 +198,57 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
 
   const decision = await evaluateGuards({ pathname, searchParams, claims, backend, supabase });
   if (decision.action === "rewrite" && backend !== "ok") forwarded.set(BACKEND_HEADER, backend);
+
+  // RSVP gate (AC10): only a well-formed token on a healthy backend and an allowed request. Bounded
+  // and fail-open: if the gate does not answer, the page decides anyway.
+  // GET/HEAD only: the submit is a server-action POST to the same path and must reach `rsvp_submit`,
+  // which answers neutral/blocked by itself with a 200 the client can parse (ADR-0003 §6).
+  const isPageLoad = request.method === "GET" || request.method === "HEAD";
+  if (isPageLoad && decision.action === "next" && backend === "ok") {
+    // Decode once, like the page does for `params`: gate and page must see the same token (REV-111).
+    // A malformed escape is not a token: skip the gate, the page answers neutral.
+    let token: string | undefined = RSVP_PATH.exec(pathname)?.[1];
+    if (token !== undefined) {
+      try {
+        token = decodeURIComponent(token);
+      } catch {
+        token = undefined;
+      }
+    }
+    // Malformed token (or broken escape) on `/rsvp/{x}`: the neutral 404, no DB (QA-15).
+    if (RSVP_PATH.test(pathname) && (token === undefined || !isRsvpTokenShape(token))) {
+      return decorate(neutralResponse(), pathname, cookiesToSet, "no-referrer");
+    }
+    if (token !== undefined && isRsvpTokenShape(token)) {
+      const ip = clientIp(request.headers);
+      // QA-1: the only source of `p_now`; the cookie counts only with E2E_CLOCK and no VERCEL.
+      const now = resolveNow({ cookieValue: request.cookies.get(TEST_NOW_COOKIE)?.value });
+      const gate = await rsvpGate({ token, ip, now, timeoutMs: BACKEND_TIMEOUT_MS });
+      if (gate?.blocked) {
+        const blocked = new NextResponse(blockedHtml(), {
+          status: 429,
+          headers: {
+            "Content-Type": "text/html; charset=utf-8",
+            "Retry-After": String(Math.max(1, gate.retryAfterSeconds)),
+            "X-Robots-Tag": "noindex, nofollow",
+          },
+        });
+        return decorate(blocked, pathname, cookiesToSet, "no-referrer");
+      }
+      const themeId = gate?.themeId;
+      if (isApprovedThemeId(themeId)) forwarded.set(THEME_HEADER, themeId);
+      // Gate answered "no theme" = a link that does not work (`weddings.theme_id` is not null): ask
+      // the page RPC once (it counts the failed lookup, BR9) and answer the neutral 404 here, because
+      // `notFound()` gives an empty body without JS. A working link never gets here, so the page's own
+      // call stays the only one; `ok`, `retry` and a timeout let the request through (fail-open).
+      if (gate !== null && gate.themeId === null) {
+        const page = await rsvpLoadPage({ token, ip, now, timeoutMs: BACKEND_TIMEOUT_MS });
+        if (page.state === "neutral") {
+          return decorate(neutralResponse(), pathname, cookiesToSet, "no-referrer");
+        }
+      }
+    }
+  }
   return respond(decision, request, forwarded, cookiesToSet);
 }
 

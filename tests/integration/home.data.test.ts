@@ -11,6 +11,7 @@ import {
   type TestPartnerB,
   type TestWedding,
 } from "../support/supabase";
+import { newGroup, newLink, newPerson, revoke, submitRpc } from "../acceptance/support/rsvp";
 
 /**
  * T14: the Home against the real local stack, with the user's clients (RLS and the T2/T8/T9
@@ -402,6 +403,71 @@ describe("Home (T14) on the local stack", () => {
     // 31 days later (injected calendar day): the reminder is on.
     const later = await loadHomeData(a, wedding.founder.id, { today: "2026-12-31" });
     expect(later?.lastExport.reminder).toBe(true);
+  });
+
+  it("RSVP links and answers never reach 'Novità', though their audit rows exist and hold no answer (QA-10, AC14)", async () => {
+    const other = await createWedding();
+    const second = await addPartnerB(other);
+    const asA = other.founderClient;
+    const loadOther = (nowMs?: number) =>
+      loadHomeData(second.client, second.user.id, { today: TODAY, ...(nowMs ? { nowMs } : {}) });
+    await serviceClient()
+      .from("wedding_partners")
+      .update({ first_name: "Jessica" })
+      .eq("user_id", second.user.id);
+    await asA
+      .from("wedding_partners")
+      .update({ first_name: "Tony" })
+      .eq("user_id", other.founder.id);
+    await loadOther(); // first visit of B: what follows is "news" for B
+
+    // Tony does one thing the Home reports, then the whole RSVP life: link, answers, revoke, new link.
+    const task = await asA
+      .from("tasks")
+      .insert({ wedding_id: other.weddingId, title: "Compito di Tony" });
+    expect(task.error).toBeNull();
+    const group = await newGroup(other, "Famiglia Segreta");
+    const ada = await newPerson(other, "Ada", group);
+    const link = await newLink(other, { groupId: group });
+    const answered = await submitRpc(link.hash, [
+      { id: ada, status: "yes", diet: ["vegan"], diet_note: "senza-noci-QA-4417" },
+    ]);
+    expect(answered.data).toMatchObject({ ok: true });
+    const lone = await newPerson(other, "Bea");
+    const second_ = await newLink(other, { guestId: lone });
+    await revoke(other, second_.linkId);
+    await newLink(other, { guestId: lone });
+
+    const back = await loadOther(Date.now() + 2 * HOUR);
+    if (!back?.news.ok || back.news.data === null) throw new Error("no news");
+    const shown = JSON.stringify(back.news.data);
+    expect(back.news.data.map((n) => n.text)).toEqual([
+      "Tony ha aggiunto il compito «Compito di Tony»",
+    ]);
+    for (const word of [
+      "rsvp",
+      "Famiglia Segreta",
+      "Ada",
+      "Bea",
+      "senza-noci",
+      "vegan",
+      link.token,
+    ]) {
+      expect(shown.toLowerCase(), word).not.toContain(word.toLowerCase());
+    }
+
+    // The exclusion is the whitelist's doing: the audit rows are there...
+    const audit = await serviceClient()
+      .from("audit_log")
+      .select("table_name,op,old_data,new_data")
+      .eq("wedding_id", other.weddingId)
+      .in("table_name", ["rsvp_links", "rsvp_responses"]);
+    const tables = new Set((audit.data ?? []).map((r) => r.table_name));
+    expect(tables).toEqual(new Set(["rsvp_links", "rsvp_responses"]));
+    // ...and carry no answer, no preference, no note and no token hash (AC14).
+    const text = JSON.stringify(audit.data);
+    expect(text).not.toMatch(/"(status|diet|diet_note|token_hash)"/);
+    expect(text).not.toContain("senza-noci");
   });
 
   describe("server action", () => {

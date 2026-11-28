@@ -4,19 +4,27 @@ import { rowColumns } from "./GuestRow";
 // DES-08: at 768 px the fixed columns must leave Nome readable in every combination.
 describe("rowColumns", () => {
   it.each([
-    [false, false],
-    [true, false],
-    [false, true],
-    [true, true],
-  ])("group %s, table %s: Nome keeps at least 8rem and the others stay narrow", (g, t) => {
-    const template = rowColumns(g, t);
-    expect(template).toContain("minmax(8rem,1fr)");
-    const widths = [...template.matchAll(/_(?:minmax\(0,)?(\d+(?:\.\d+)?)rem/g)].map((m) =>
-      Number(m[1]),
-    );
-    expect(widths.length).toBe(2 + Number(g) + Number(t));
-    // the 768 px content width is ~37rem: 8rem Nome + the other columns + 3 gaps of 0.75rem fits
-    const others = widths.reduce((a, b) => a + b, 0) + 0.75 * widths.length;
-    expect(others).toBeLessThanOrEqual(27);
-  });
+    [false, false, false],
+    [true, false, false],
+    [false, true, false],
+    [true, true, false],
+    [false, false, true],
+    [true, false, true],
+    [false, true, true],
+    [true, true, true],
+  ])(
+    "group %s, table %s, presence %s: Nome keeps at least 8rem and the others stay narrow",
+    (g, t, p) => {
+      const template = rowColumns(g, t, p);
+      expect(template).toContain("minmax(8rem,1fr)");
+      const widths = [...template.matchAll(/_(?:minmax\(0,)?(\d+(?:\.\d+)?)rem/g)].map((m) =>
+        Number(m[1]),
+      );
+      expect(widths.length).toBe(2 + Number(g) + Number(t) + Number(p));
+      // the 768 px content width is ~37rem: 8rem Nome + the other columns + the gaps (0.75rem each)
+      // (the presence layout uses 0.5rem gaps, see rowGap; the send slot is 4.75rem there)
+      const others = widths.reduce((a, b) => a + b, 0) + (p ? 0.5 : 0.75) * widths.length;
+      expect(others).toBeLessThanOrEqual(p ? 29 : 27);
+    },
+  );
 });

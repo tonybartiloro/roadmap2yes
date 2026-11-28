@@ -98,6 +98,7 @@ export function GroupHeader({
   onToggle,
   controlsId,
   actions,
+  rsvp,
 }: {
   name: string;
   summary: string;
@@ -105,15 +106,24 @@ export function GroupHeader({
   onToggle: () => void;
   controlsId: string;
   actions: readonly MenuAction[];
+  /** Second line of the title: link state and "Invia" (design §1.2). */
+  rsvp?: {
+    /** "Famiglia Rossi, 2 sì, 1 in attesa, link condiviso il 12 marzo". */
+    accessibleName: string;
+    /** "Condiviso il 12 marzo" / "Risponde ognuno per sé". */
+    line: string;
+    onSend: (() => void) | null;
+  };
 }) {
   const titleId = useId();
   return (
-    <div className="bg-muted/50 flex items-center gap-1 rounded-t-lg pr-1">
+    <div className="bg-muted/50 flex flex-wrap items-center gap-1 rounded-t-lg pr-1">
       <h2 id={titleId} className="min-w-0 flex-1 text-base font-semibold">
         <button
           type="button"
           aria-expanded={open}
           aria-controls={controlsId}
+          {...(rsvp ? { "aria-label": rsvp.accessibleName } : {})}
           onClick={onToggle}
           className="focus-visible:ring-ring flex min-h-11 w-full items-center gap-2 rounded-md px-3 text-left focus-visible:ring-2 focus-visible:outline-none"
         >
@@ -129,6 +139,22 @@ export function GroupHeader({
       </h2>
       {actions.length > 0 ? (
         <ActionMenu title={name} triggerLabel={`Azioni del gruppo ${name}`} actions={actions} />
+      ) : null}
+      {rsvp ? (
+        <div className="flex w-full items-center justify-between gap-2 pr-2 pb-2 pl-10">
+          <p className="text-muted-foreground min-w-0 text-sm">{rsvp.line}</p>
+          {rsvp.onSend ? (
+            <Button
+              type="button"
+              variant="outline"
+              className="min-h-11 shrink-0"
+              aria-label={`Invia il link di ${name}`}
+              onClick={rsvp.onSend}
+            >
+              Invia
+            </Button>
+          ) : null}
+        </div>
       ) : null}
     </div>
   );

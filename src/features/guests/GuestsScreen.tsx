@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   CheckSquare,
   History,
+  Link2,
   Plus,
   TriangleAlert,
   Upload,
@@ -29,13 +30,32 @@ import {
   overSummary,
   type GuestFilters,
 } from "@/domain/guests";
+import { CreateAllDialog } from "@/features/rsvp/CreateAllDialog";
+import { GroupModeDialog } from "@/features/rsvp/GroupModeDialog";
+import { LinkSheet } from "@/features/rsvp/LinkSheet";
+import {
+  createAllTargets,
+  linkOf,
+  linkState,
+  linkStateText,
+  resendNames,
+  type Recipient,
+  type RsvpSnapshot,
+} from "@/features/rsvp/view";
 import { PanelContent } from "@/features/timeline/PanelContent";
 import type { GroupView, GuestView, GuestsSnapshot, TableView } from "./data";
 import { FamilySheet } from "./FamilySheet";
 import { FilterChips, FiltersSheet } from "./FiltersSheet";
 import { ActionMenu, type MenuAction } from "./GroupHeader";
-import { FlatList, GroupedList, type ListHandlers, type ListState } from "./GuestList";
-import { GuestSheet } from "./GuestSheet";
+import { buildRsvpModel } from "./rsvp-model";
+import {
+  FlatList,
+  GroupedList,
+  type ListHandlers,
+  type ListState,
+  type RsvpListView,
+} from "./GuestList";
+import { GuestSheet, type GuestSheetRsvp } from "./GuestSheet";
 import { RecentlyDeleted, ConfirmDialog, type ConfirmRequest } from "./RecentlyDeleted";
 import { RenameGroupSheet } from "./RenameGroupSheet";
 import { SelectionBar } from "./SelectionBar";
@@ -65,7 +85,21 @@ type Sheet_ =
   | { kind: "deleted" }
   | { kind: "table"; table: TableView | null }
   | { kind: "import" }
+  | { kind: "link"; recipient: { kind: "group" | "guest"; id: string } }
+  | { kind: "mode"; groupId: string }
+  | { kind: "createAll" }
   | null;
+
+/** What the couple-side RSVP needs from the page; absent while the schema is not migrated. */
+export interface RsvpProps {
+  snapshot: RsvpSnapshot;
+  /** ISO instant of the request: one `now` for server and client (no hydration drift). */
+  now: string;
+  /** The partners' first names (those that exist), for the WhatsApp message. */
+  couple: string[];
+  /** `guests/write`: without it states stay visible and the actions are hidden. */
+  canWrite: boolean;
+}
 
 /**
  * Persone (design §2.1): header with "Aiuto", summary and "Per lato", search, filters with chips,
@@ -79,8 +113,10 @@ export function GuestsScreen({
   importNames,
   menuActions = [],
   emptyExtra,
+  rsvp,
 }: {
   snapshot: GuestsSnapshot;
+  rsvp?: RsvpProps;
   partners: PartnerNames;
   /** Real first names (`null` = not set) for the `lato` column of the import and export. */
   importNames?: { a: string | null; b: string | null };
@@ -144,6 +180,13 @@ export function GuestsScreen({
     guests.filter((g) => g.deletedAt).length +
     groups.filter((g) => g.deletedAt).length +
     tables.filter((t) => t.deletedAt).length;
+  const rsvpNow = useMemo(() => (rsvp ? new Date(rsvp.now) : null), [rsvp]);
+  const model = useMemo(
+    () => (rsvp && rsvpNow ? buildRsvpModel(live, groups, rsvp.snapshot, rsvpNow) : null),
+    [rsvp, rsvpNow, live, groups],
+  );
+  const createAll =
+    rsvp && rsvpNow && model ? createAllTargets(model.recipients, rsvp.snapshot, rsvpNow) : null;
   const liveIds = useMemo(() => new Set(live.map((g) => g.id)), [live]);
   const selectedIds = [...selected].filter((id) => liveIds.has(id));
 
@@ -167,6 +210,12 @@ export function GuestsScreen({
     [],
   );
 
+  const onSend = useCallback((recipient: Recipient) => setSheet({ kind: "link", recipient }), []);
+  const onMode = useCallback(
+    (group: GroupView) => setSheet({ kind: "mode", groupId: group.id }),
+    [],
+  );
+
   async function run<T>(work: () => Promise<T>): Promise<T> {
     setBusy(true);
     try {
@@ -176,7 +225,13 @@ export function GuestsScreen({
     }
   }
 
+  const rsvpView: RsvpListView | undefined =
+    rsvp && model
+      ? { canWrite: rsvp.canWrite, guests: model.guests, groups: model.groups, onSend, onMode }
+      : undefined;
+
   const handlers: ListHandlers = {
+    ...(rsvpView ? { rsvp: rsvpView } : {}),
     selecting,
     selected,
     tableLabels,
@@ -235,8 +290,102 @@ export function GuestsScreen({
       onSelect: () => setSheet({ kind: "import" }),
     },
     exportMenuAction(live, groups, names),
+    ...(rsvp?.canWrite && createAll
+      ? [
+          {
+            label: `Crea link per tutti (${createAll.recipients.length})`,
+            icon: <Link2 aria-hidden />,
+            disabled: createAll.disabled || createAll.recipients.length === 0,
+            ...(createAll.disabled
+              ? { description: "I link sono scaduti: sposta la data per riattivarli." }
+              : createAll.recipients.length === 0
+                ? { description: "Tutti hanno già un link." }
+                : {}),
+            onSelect: () => setSheet({ kind: "createAll" }),
+          },
+        ]
+      : []),
     ...menuActions,
   ];
+
+  function guestSheetRsvp(guest: GuestView | null): GuestSheetRsvp | undefined {
+    const entry = guest ? model?.guests.get(guest.id) : undefined;
+    if (!guest || !rsvp || !entry) return undefined;
+    const group = guest.groupId ? model?.groups.get(guest.groupId) : undefined;
+    const groupName = groups.find((g) => g.id === guest.groupId)?.name;
+    const open = (r: Recipient) => () => setSheet({ kind: "link", recipient: r });
+    let invite: GuestSheetRsvp["invite"] = null;
+    if (entry.link) {
+      invite = {
+        text: `Invito: link personale, ${linkStateText(entry.link.state).toLowerCase()}`,
+        onOpen: open(entry.link.recipient),
+      };
+    } else if (group?.recipient && groupName) {
+      invite = {
+        text: `Invito: risponde con il gruppo ${groupName}`,
+        onOpen: open(group.recipient),
+      };
+    }
+    return {
+      presence: entry.presence,
+      response: rsvp.snapshot.responses.find((r) => r.guestId === guest.id) ?? null,
+      invite,
+    };
+  }
+
+  const linkTarget = sheet?.kind === "link" ? sheet.recipient : null;
+  const linkRecipient = linkTarget
+    ? model?.recipients.find((r) => r.kind === linkTarget.kind && r.id === linkTarget.id)
+    : undefined;
+  const modeGroup = sheet?.kind === "mode" ? groups.find((g) => g.id === sheet.groupId) : undefined;
+
+  // Props of the link sheet and of the mode dialog (the state is computed once, here).
+  const linkSheet =
+    rsvp && rsvpNow && linkRecipient
+      ? (() => {
+          const { snapshot } = rsvp;
+          const state = linkState(linkRecipient, snapshot, rsvpNow);
+          return {
+            recipient: linkRecipient,
+            link: linkOf(linkRecipient, snapshot.links),
+            hadLink: snapshot.links.some(
+              (l) =>
+                l.revokedAt !== null &&
+                (linkRecipient.kind === "group"
+                  ? l.groupId === linkRecipient.id
+                  : l.guestId === linkRecipient.id),
+            ),
+            state,
+            expiresOn: snapshot.expiresOn,
+            dateChosen: snapshot.expiresOn !== null,
+            firstNames: live
+              .filter((g) => linkRecipient.memberIds.includes(g.id))
+              .map((g) => g.firstName),
+            couple: rsvp.couple,
+            resendNames: state.kind === "resend" ? resendNames(state.guestIds, live) : [],
+            canWrite: rsvp.canWrite,
+          };
+        })()
+      : null;
+  const modeDialog =
+    rsvp && modeGroup
+      ? {
+          groupId: modeGroup.id,
+          groupName: modeGroup.name,
+          version: modeGroup.version,
+          mode: modeGroup.rsvpMode ?? ("together" as const),
+          people: live.filter((g) => g.groupId === modeGroup.id).length,
+          personalLinks: rsvp.snapshot.links.filter(
+            (l) =>
+              l.revokedAt === null &&
+              l.guestId !== null &&
+              live.some((g) => g.id === l.guestId && g.groupId === modeGroup.id),
+          ).length,
+          groupLink: rsvp.snapshot.links.some(
+            (l) => l.revokedAt === null && l.groupId === modeGroup.id,
+          ),
+        }
+      : null;
 
   const closeSheet = (open: boolean) => {
     if (!open) setSheet(null);
@@ -330,6 +479,9 @@ export function GuestsScreen({
                   ) : null
                 }
               />
+              {rsvp && !rsvp.canWrite ? (
+                <p className="text-muted-foreground text-base">Serve il permesso di modifica.</p>
+              ) : null}
               <div className="flex items-center gap-2">
                 <div role="search" className="min-w-0 flex-1">
                   <Label htmlFor="guest-search" className="sr-only">
@@ -508,6 +660,7 @@ export function GuestsScreen({
           tables={liveTables}
           guests={live}
           partners={partners}
+          rsvp={guestSheetRsvp(sheet.guest)}
           onStale={stale}
           onDelete={(guest) => {
             setSheet(null);
@@ -551,6 +704,19 @@ export function GuestsScreen({
           groups={groups}
           guests={live}
           onStale={stale}
+        />
+      ) : null}
+      {linkSheet ? (
+        <LinkSheet key={linkSheet.recipient.id} {...linkSheet} onOpenChange={closeSheet} />
+      ) : null}
+      {modeDialog && modeGroup ? (
+        <GroupModeDialog key={modeGroup.id} {...modeDialog} onOpenChange={closeSheet} />
+      ) : null}
+      {rsvp && createAll && sheet?.kind === "createAll" ? (
+        <CreateAllDialog
+          recipients={createAll.recipients}
+          dateChosen={rsvp.snapshot.expiresOn !== null}
+          onOpenChange={closeSheet}
         />
       ) : null}
       <RecentlyDeleted

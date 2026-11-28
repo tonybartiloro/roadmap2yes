@@ -63,6 +63,13 @@ describe("guard: lib/supabase/admin.ts import scopes", () => {
     "src/features/accounts/other.ts",
     "src/lib/email/index.ts",
     "src/proxy.ts",
+    // R-04: only public-rpc.ts is the fifth scope, not the rest of features/rsvp (ADR-0003).
+    "src/features/rsvp/actions.ts",
+    "src/features/rsvp/data.ts",
+    "src/features/rsvp/public-actions.ts",
+    "src/features/rsvp/public/RsvpForm.tsx",
+    "src/features/rsvp/limiter.ts",
+    "src/app/(public)/rsvp/[token]/page.tsx",
   ];
   const allowed = [
     "src/features/auth/login.ts",
@@ -71,6 +78,7 @@ describe("guard: lib/supabase/admin.ts import scopes", () => {
     "src/features/jobs/run-daily-job.ts",
     "src/features/jobs/nested/deeper.ts",
     "src/app/(public)/email/disattiva/actions.ts",
+    "src/features/rsvp/public-rpc.ts",
   ];
 
   it.each([
@@ -97,8 +105,14 @@ describe("guard: lib/supabase/admin.ts import scopes", () => {
     expect(await ruleIds("admin-import-dynamic", "src/features/jobs/x.ts")).toEqual([]);
   });
 
+  it("rejects the dynamic form in the rest of features/rsvp (only public-rpc.ts is allowed)", async () => {
+    expect(await ruleIds("admin-import-dynamic", "src/features/rsvp/actions.ts")).toContain(
+      "r2y/no-admin-dynamic-import",
+    );
+  });
+
   it.each(["admin-import-alias", "admin-import-relative"])(
-    "accepts %s in the 4 allowed scopes",
+    "accepts %s in the 5 allowed scopes",
     async (name) => {
       for (const path of allowed) {
         expect(await ruleIds(name, path), `${name} in ${path}`).toEqual([]);

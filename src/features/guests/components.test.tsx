@@ -32,6 +32,21 @@ const actions = vi.hoisted(() => ({
 vi.mock("./actions", () => actions);
 const tableActions = vi.hoisted(() => ({ addTableAction: vi.fn(), updateTableAction: vi.fn() }));
 vi.mock("./tables-actions", () => tableActions);
+const rsvpActions = vi.hoisted(() => ({
+  createLinksAction: vi.fn(),
+  getLinkUrlAction: vi.fn(),
+  rotateLinkAction: vi.fn(),
+  revokeLinkAction: vi.fn(),
+  markSharedAction: vi.fn(),
+  unmarkSharedAction: vi.fn(),
+  setGroupModeAction: vi.fn(),
+}));
+vi.mock("@/features/rsvp/actions", () => rsvpActions);
+const importActions = vi.hoisted(() => ({
+  importGuestsAction: vi.fn(),
+  undoGuestImportAction: vi.fn(),
+}));
+vi.mock("./import-actions", () => importActions);
 
 vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
 vi.stubGlobal(
@@ -57,8 +72,9 @@ vi.stubGlobal("matchMedia", (query: string) => ({
 
 import { toast, Toaster } from "sonner";
 import { LoadError } from "@/app/(app)/invitati/LoadError";
+import type { RsvpLink, RsvpSnapshot } from "@/features/rsvp/view";
 import type { GroupView, GuestView, GuestsSnapshot, TableView } from "./data";
-import { GuestsScreen } from "./GuestsScreen";
+import { GuestsScreen, type RsvpProps } from "./GuestsScreen";
 import { SelectionBar } from "./SelectionBar";
 import { SELECTION_TOO_LARGE } from "./schemas";
 
@@ -953,5 +969,206 @@ describe("tables (AC14-AC16)", () => {
       }),
     );
     expect(actions.purgeEntityAction).toHaveBeenCalledWith({ kind: "table", id: "t1" });
+  });
+});
+
+describe("RSVP in the list (AC1, AC8, AC9)", () => {
+  const NOW = "2027-01-10T10:00:00Z";
+  const link = (extra: Partial<RsvpLink>): RsvpLink => ({
+    id: "l1",
+    groupId: null,
+    guestId: null,
+    working: true,
+    revokedAt: null,
+    sharedAt: null,
+    createdAt: "2027-01-01T00:00:00Z",
+    ...extra,
+  });
+  const snap = (extra: Partial<RsvpSnapshot> = {}): RsvpSnapshot => ({
+    expiresOn: "2027-10-03",
+    links: [],
+    resendGuestIds: [],
+    responses: [],
+    ...extra,
+  });
+  const answer = (guestId: string, status: "yes" | "no") => ({
+    guestId,
+    status,
+    diet: status === "yes" ? ["vegan"] : [],
+    dietNote: null,
+    answeredAt: "2027-01-05T10:00:00Z",
+  });
+  /** Famiglia Rossi (together: Mario, Luca), Amici (separate: Anna, Paolo), Sara alone. */
+  function fixture() {
+    const mario = guest({ firstName: "Mario", groupId: "g1" });
+    const luca = guest({ firstName: "Luca", groupId: "g1" });
+    const anna = guest({ firstName: "Anna", groupId: "g2" });
+    const paolo = guest({ firstName: "Paolo", groupId: "g2" });
+    const sara = guest({ firstName: "Sara", lastName: "Bianchi" });
+    return {
+      mario,
+      luca,
+      anna,
+      paolo,
+      sara,
+      guests: [mario, luca, anna, paolo, sara],
+      groups: [
+        group("g1", "Famiglia Rossi"),
+        { ...group("g2", "Amici"), rsvpMode: "separate" as const },
+      ],
+    };
+  }
+  function renderRsvp(f: ReturnType<typeof fixture>, rsvp?: Partial<RsvpProps>) {
+    return render(
+      <>
+        <GuestsScreen
+          snapshot={{ guests: f.guests, groups: f.groups, tables: [] }}
+          partners={PARTNERS}
+          {...(rsvp === undefined
+            ? {}
+            : {
+                rsvp: {
+                  snapshot: snap(),
+                  now: NOW,
+                  couple: ["Tony", "Jessica"],
+                  canWrite: true,
+                  ...rsvp,
+                },
+              })}
+        />
+        <Toaster />
+      </>,
+    );
+  }
+
+  it("shows the group summary, its link state and 'Invia'; opens the link sheet", async () => {
+    const f = fixture();
+    rsvpActions.getLinkUrlAction.mockResolvedValue(ok({ url: "https://example.test/rsvp/x" }));
+    renderRsvp(f, {
+      snapshot: snap({
+        links: [link({ groupId: "g1", sharedAt: "2027-01-08T10:00:00Z" })],
+        responses: [answer(f.mario.id, "yes")],
+      }),
+    });
+    const toggle = screen.getByRole("button", { name: /^Famiglia Rossi, / });
+    expect(toggle.textContent).toContain("1 sì · 1 in attesa");
+    expect(toggle.getAttribute("aria-label")).toBe(
+      "Famiglia Rossi, 2 adulti, 1 sì, 1 in attesa, link condiviso il 8 gennaio",
+    );
+    expect(screen.getByText("Condiviso il 8 gennaio")).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: "Invia il link di Famiglia Rossi" }));
+    expect(await screen.findByText("Link di Famiglia Rossi")).toBeTruthy();
+    expect(rsvpActions.getLinkUrlAction).toHaveBeenCalledWith({ linkId: "l1" });
+  });
+
+  it("shows presence as text on every person and the link line of a person on their own (DES-27)", async () => {
+    const f = fixture();
+    renderRsvp(f, { snapshot: snap({ responses: [answer(f.anna.id, "yes")] }) });
+    expect(
+      within(screen.getByRole("button", { name: /^Anna Rossi/ })).getByText("Sì"),
+    ).toBeTruthy();
+    expect(
+      within(screen.getByRole("button", { name: /^Paolo Rossi/ })).getByText("In attesa"),
+    ).toBeTruthy();
+    const sara = screen.getByRole("button", { name: /^Sara Bianchi/ });
+    expect(within(sara).getByText("Nessun link")).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: "Invia il link di Sara Bianchi" }));
+    expect(await screen.findByText("Link di Sara Bianchi")).toBeTruthy();
+  });
+
+  it("a 'ognuno per sé' group has no link on its title, and 'Come rispondono' opens its dialog", async () => {
+    const f = fixture();
+    renderRsvp(f, { snapshot: snap({ links: [link({ groupId: "g1" })] }) });
+    expect(screen.getByText("Risponde ognuno per sé")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Invia il link di Amici" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Invia il link di Anna Rossi" })).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: "Azioni del gruppo Famiglia Rossi" }));
+    await userEvent.click(screen.getByRole("button", { name: "Come rispondono" }));
+    expect(await screen.findByText(/servono 2 link nuovi/)).toBeTruthy();
+    // Closing it puts the focus back on the group menu button (DES-51).
+    await userEvent.click(screen.getByRole("button", { name: "Annulla" }));
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByRole("button", { name: "Azioni del gruppo Famiglia Rossi" }),
+      ),
+    );
+  });
+
+  it("'Crea link per tutti (N)' counts the recipients without a link, confirms and says so", async () => {
+    const f = fixture();
+    rsvpActions.createLinksAction.mockResolvedValue(ok({ created: 4 }));
+    renderRsvp(f, { snapshot: snap({ expiresOn: null }) });
+    await userEvent.click(screen.getByRole("button", { name: "Altro" }));
+    // Famiglia Rossi + Anna + Paolo + Sara
+    await userEvent.click(screen.getByRole("button", { name: "Crea link per tutti (4)" }));
+    const dialog = screen.getByRole("alertdialog");
+    expect(within(dialog).getByText(/Creo 4 link nuovi\?/)).toBeTruthy();
+    expect(within(dialog).getByText(/Data da confermare/)).toBeTruthy();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Crea link" }));
+    expect(rsvpActions.createLinksAction).toHaveBeenCalledWith({
+      targets: [
+        { groupId: "g1" },
+        { guestId: f.anna.id },
+        { guestId: f.paolo.id },
+        { guestId: f.sara.id },
+      ],
+    });
+    await waitFor(() => expect(toast).toHaveBeenCalledWith("Ho creato 4 link."));
+    const last = vi.mocked(toast).mock.calls.at(-1)!;
+    expect(last[1]).toBeUndefined(); // no Annulla
+  });
+
+  it("'Crea link per tutti' is off after the expiry, with the reason", async () => {
+    renderRsvp(fixture(), { snapshot: snap({ expiresOn: "2026-12-31" }) });
+    await userEvent.click(screen.getByRole("button", { name: "Altro" }));
+    const button = screen.getByRole("button", { name: /^Crea link per tutti/ });
+    expect((button as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText(/I link sono scaduti/)).toBeTruthy();
+  });
+
+  it("without permission the states stay and the actions are hidden", async () => {
+    renderRsvp(fixture(), { canWrite: false });
+    expect(screen.getByText("Serve il permesso di modifica.")).toBeTruthy();
+    expect(screen.getByText("Risponde ognuno per sé")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /^Invia il link/ })).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Azioni del gruppo Famiglia Rossi" }));
+    expect(screen.queryByRole("button", { name: "Come rispondono" })).toBeNull();
+  });
+
+  it("without the RSVP data the list is the old one (schema not migrated)", () => {
+    renderRsvp(fixture());
+    expect(screen.queryByText("In attesa")).toBeNull();
+    expect(screen.queryByText("Risponde ognuno per sé")).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Invia il link/ })).toBeNull();
+  });
+
+  it("the person sheet shows the presence read only, with preferences only for a yes", async () => {
+    const f = fixture();
+    renderRsvp(f, { snapshot: snap({ responses: [answer(f.mario.id, "yes")] }) });
+    await userEvent.click(screen.getByRole("button", { name: /^Mario Rossi/ }));
+    const section = screen.getByRole("region", { name: "Presenza" });
+    expect(within(section).getByText("Preferenze: Vegano")).toBeTruthy();
+    expect(within(section).getByText(/Ultima risposta: 5 gennaio, dall'invitato/)).toBeTruthy();
+    expect(within(section).getByText("Invito: risponde con il gruppo Famiglia Rossi")).toBeTruthy();
+    expect(within(section).getByRole("button", { name: "Apri link" })).toBeTruthy();
+  });
+
+  it("'Annulla importazione' says how many people stay (DES-28)", async () => {
+    importActions.importGuestsAction.mockResolvedValue(ok({ batchId: "b1", guests: 3, groups: 0 }));
+    importActions.undoGuestImportAction.mockResolvedValue(ok({ guests: 1, groups: 0, skipped: 2 }));
+    renderScreen({ guests: [guest()] });
+    await userEvent.click(screen.getByRole("button", { name: "Altro" }));
+    await userEvent.click(screen.getByRole("button", { name: "Importa" }));
+    await userEvent.click(screen.getByRole("textbox", { name: "Una persona per riga" }));
+    await userEvent.paste("Mario Bianchi\nLuca Bianchi\nSara Verdi");
+    await userEvent.click(screen.getByRole("button", { name: "Vedi l'anteprima" }));
+    await userEvent.click(screen.getByRole("button", { name: "Importa 3 invitati" }));
+    await waitFor(() => expect(importActions.importGuestsAction).toHaveBeenCalled());
+    await userEvent.click(await screen.findByRole("button", { name: "Annulla importazione" }));
+    await waitFor(() =>
+      expect(toast).toHaveBeenCalledWith(
+        "Ho annullato 1 persona; 2 restano perché hanno già risposto o hanno un link.",
+      ),
+    );
   });
 });

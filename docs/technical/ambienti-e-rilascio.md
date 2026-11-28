@@ -101,7 +101,7 @@ Nomi, dove servono e a cosa servono. I valori non sono in questo documento.
 |---|---|---|---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | `http://127.0.0.1:54421` | URL del progetto **staging** | URL del progetto **produzione** | Pubblica per design, ma per ambiente |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Chiave locale (`db:env`) | Chiave pubblicabile di staging | Chiave pubblicabile di produzione | Pubblica per design |
-| `SUPABASE_SECRET_KEY` | Chiave locale (`db:env`) | Chiave segreta di staging. **Sensitive** | Chiave segreta di produzione. **Sensitive** | Bypassa la RLS. Solo i quattro ambiti server-only |
+| `SUPABASE_SECRET_KEY` | Chiave locale (`db:env`) | Chiave segreta di staging. **Sensitive** | Chiave segreta di produzione. **Sensitive** | Bypassa la RLS. Solo i cinque ambiti server-only |
 | `NEXT_PUBLIC_SITE_URL` | `http://localhost:3000` | Facoltativa: senza, l'app usa l'URL della branch | URL pubblico. Facoltativa: senza, usa l'URL di produzione del progetto | Serve per link nelle email e per il cookie `secure` |
 | `R2Y_BOOTSTRAP_EMAIL` | Email `@example.test` | Email di smoke `@example.test` | Email del primo partner. **Sensitive** | Vedi [Primo utente](#primo-utente-bootstrap) |
 | `R2Y_BOOTSTRAP_ACCESS_CODE` | Codice finto | Codice finto | Codice iniziale. **Sensitive** | Da togliere dopo il primo accesso |
@@ -118,6 +118,7 @@ Nomi, dove servono e a cosa servono. I valori non sono in questo documento.
 | `EMAIL_MONTHLY_CAP` | Facoltativa (1500) | Facoltativa (1500) | Facoltativa (1500) | Tetto di email al mese, solo app |
 | `CRON_SECRET` | Finto | Casuale. **Sensitive** | Casuale. **Sensitive** | Vercel Cron lo invia da solo come `Authorization: Bearer` |
 | `EMAIL_LINK_SECRET` | Finto (almeno 32 caratteri) | Casuale, almeno 32 caratteri. **Sensitive** | Casuale, almeno 32 caratteri. **Sensitive** | Firma i link di disattivazione. Generazione: `openssl rand -base64 32` |
+| `RSVP_LINK_SECRET` | Finto, solo locale (almeno 32 caratteri); in `.env.example` e in CI come valore finto | Casuale, almeno 32 caratteri, diverso da Production. **Sensitive** | Casuale, almeno 32 caratteri, diverso da Preview. **Sensitive** | Firma i token dei link RSVP (ADR-0003). Lo legge solo il foglio della coppia. Generazione: `openssl rand -base64 48`. Vedi [Link RSVP](#link-rsvp-segreto-e-revoca-totale) |
 | `E2E_CLOCK` | `1` solo per gli e2e | **Mai** | **Mai** | Abilita il cookie `r2y-test-now`. Con `VERCEL` definita è ignorata, ma non va mai impostata su Vercel |
 | `E2E_PORT`, `E2E_DEGRADED_PORT`, `E2E_EMAIL_OFF_PORT`, `E2E_DEGRADED_SUPABASE_URL`, `E2E_ALL_SERVERS`, `E2E_AXE_MATRIX`, `HEADERS_REQUIRED`, `KEEPALIVE_MODE` | Solo strumenti | Mai | Mai | Strumenti di test e di controllo. Predefiniti in `playwright.config.ts` e negli script |
 
@@ -127,7 +128,7 @@ Regole:
 
 - Le variabili che contengono segreti si marcano **Sensitive** in Vercel.
 - Un segreto mancante fa fallire in modo chiuso: per esempio senza `CRON_SECRET` la route del cron rifiuta tutto. Nessun valore finisce nei messaggi di errore.
-- Il prefisso `NEXT_PUBLIC_` è solo per valori pubblici. `SUPABASE_SECRET_KEY`, `R2Y_BOOTSTRAP_*`, `CRON_SECRET`, `EMAIL_LINK_SECRET` e `RESEND_API_KEY` non lo hanno mai.
+- Il prefisso `NEXT_PUBLIC_` è solo per valori pubblici. `SUPABASE_SECRET_KEY`, `R2Y_BOOTSTRAP_*`, `CRON_SECRET`, `EMAIL_LINK_SECRET`, `RSVP_LINK_SECRET` e `RESEND_API_KEY` non lo hanno mai.
 
 ## Segreti su GitHub
 
@@ -280,6 +281,48 @@ Controlli specifici di FEAT-2026-003 (Invitati), dopo il job `migrate` verde:
 18. Nel pannello Supabase, l'ultima riga di `audit_log` per `guests` non contiene nome, telefono, email o note.
 19. Se `/invitati` mostra "Non riesco a caricare gli invitati" per qualche minuto dopo il merge, è la finestra in cui il codice nuovo gira sullo schema vecchio: "Riprova" dopo il job `migrate`. Se persiste, il rollback è l'Instant Rollback di Vercel, non lo schema.
 
+### Rilascio R-04 (conferme di presenza)
+
+Checklist di FEAT-2026-004. Nessun feature flag: finché la coppia non crea un link, la superficie pubblica non dà nulla.
+
+**Prima del merge**
+
+- [ ] Lo sviluppatore crea `RSVP_LINK_SECRET` in Vercel, **Sensitive**, per Production e per Preview, con **due valori diversi** generati in locale (`openssl rand -base64 48`). Mai in chat, nei file o nei log.
+- [ ] Il release manager controlla **solo che il nome esista** nei due ambienti (mai il valore) prima di proporre il Gate C.
+- [ ] CI verde e preview provata. La preview non ha le migrazioni di R-04 (decisione D-A, vedi [Punti da confermare](#punti-da-confermare)): il foglio dei link si prova in locale.
+
+**Al merge** (Vercel e `migrate.yml` partono in parallelo)
+
+1. Parte il deploy di produzione di Vercel.
+2. `migrate.yml` applica le due migrazioni di R-04 nell'environment `production`, con l'approvazione del reviewer.
+3. Per qualche minuto la lista Invitati è senza stati RSVP e la pagina pubblica dà la risposta neutra (nessun link esiste ancora). È atteso.
+
+**Controlli post-deploy**, con un invitato finto (nome ed email `@example.test`) da cancellare alla fine:
+
+20. Il job `migrate` è verde sulle due migrazioni di R-04.
+21. Creare il link per l'invitato finto, aprirlo in una finestra in incognito e da WhatsApp sul telefono, rispondere: la lista mostra lo stato.
+22. **Revoca link**: il link apre la pagina neutra (404).
+23. `curl -I` sul link: presenti `X-Robots-Tag`, `Referrer-Policy` e `Cache-Control`.
+24. Nel pannello Supabase, l'ultima riga di `audit_log` per `rsvp_responses` non contiene `status` né `diet`.
+25. Opzioni > Esporta: il JSON non contiene `token_hash`.
+26. **Elimina definitivamente** l'invitato finto: risposta e link spariti. Poi nessun dato di prova resta in produzione.
+
+**Il seed non gira mai in remoto (QA-17).** `supabase/seeds/05_rsvp.sql` (account e invitati finti) è raggiunto solo da `supabase db reset` locale. Verifica del 2026-11-28:
+
+- `supabase/config.toml:28-31`: i seed (`./seeds/*.sql`) sono attivi, ma `config.toml` vale solo per locale e CI.
+- `package.json:72`: `db:reset` è `supabase db reset` senza `--linked`, quindi locale.
+- `.github/workflows/migrate.yml:59` e `:65`: l'unico comando verso il remoto è `db push --remote` (dry-run e applicazione), senza `--include-seed`. I commenti a `:6-10` e `:63` vietano seed e `reset --linked`.
+- Nessun workflow fa `db reset` o `--linked` verso un database remoto. `.github/workflows/ci.yml` esegue `npm run db:reset` solo sullo stack locale del runner, senza `--linked` né `supabase link`: il seed gira lì e basta.
+- `supabase/seeds/05_rsvp.sql:2-3` dichiara che è solo locale e CI.
+
+Resta fuori dal codice: un comando manuale `supabase db reset --linked` dal portatile. Il runbook lo vieta (regole in cima).
+
+### Rollback di R-04
+
+- **Codice**: Instant Rollback di Vercel. Lo schema additivo resta compatibile con il codice precedente.
+- **Schema**: si corregge con una migrazione nuova, mai cancellando quella applicata.
+- **Fuga del segreto**: runbook in [Link RSVP](#link-rsvp-segreto-e-revoca-totale), poi **Crea link per tutti**.
+
 ## Rollback
 
 - **Codice**: Instant Rollback di Vercel alla deploy precedente. Le migrazioni sono additive, quindi il codice precedente gira sullo schema nuovo.
@@ -296,6 +339,20 @@ Controlli specifici di FEAT-2026-003 (Invitati), dopo il job `migrate` verde:
 | `CRON_SECRET` | Vercel Cron usa il nuovo valore dal run successivo | Vercel |
 | `R2Y_BOOTSTRAP_ACCESS_CODE` | Nessun effetto sugli account esistenti (il bootstrap è create-only) | Togliere da Vercel dopo il primo accesso |
 | `RESEND_API_KEY` | Le email smettono di partire fino all'aggiornamento | Resend, Vercel Production |
+| `RSVP_LINK_SECRET` | Ruotarlo **non** invalida i link già condivisi: il database confronta lo sha256 del token, che non cambia. Fallisce solo la copia dei link, e il foglio chiede "Nuovo link". Per invalidare i link serve la revoca (sotto) | Vercel, Production e Preview separati |
+
+## Link RSVP: segreto e revoca totale
+
+Il segreto `RSVP_LINK_SECRET` firma i token dei link personali (ADR-0003). Il database conserva solo lo sha256 dei token.
+
+- **Se manca o è sbagliato**, il foglio dei link mostra un errore leggibile e non crea né copia link. La pagina pubblica degli invitati continua a funzionare sui link esistenti.
+- **Ruotare il segreto** non ferma i link già mandati. Serve per impedire di ricopiare i link, non per revocarli.
+- **Fuga del segreto, runbook:**
+  1. Generare il nuovo valore sul proprio computer (`openssl rand -base64 48`), senza incollarlo in chat o nei file. Impostarlo in Vercel per Production e per Preview, con valori diversi, marcato *Sensitive*. Vercel applica la variabile dai deploy successivi: serve un nuovo deploy. Aggiornare `.env.local` in locale.
+  2. Revocare i link attivi, uno per destinatario: nel foglio "Link di {nome}" tocca **Revoca link**. I destinatari risultano "Da rimandare".
+  3. Creare i link nuovi con **Altro > Crea link per tutti (N)**. Non funziona con la scadenza passata.
+  4. Rimandare i link nuovi agli invitati e segnare "Condiviso il" al tocco.
+- Le risposte già date restano in tutti i casi: la revoca tocca solo i link.
 
 ## Punti da confermare
 
@@ -306,6 +363,7 @@ Controlli specifici di FEAT-2026-003 (Invitati), dopo il job `migrate` verde:
 - **Pulsante di ripristino** di un progetto in pausa: il nome esatto nel pannello va verificato.
 - **Ripristinabilità** di un progetto fermo da più di 90 giorni: da verificare.
 - **Staging con le email**: decidere se accenderle anche sul progetto di staging, con dati finti.
+- **Revoca di massa dei link RSVP**: oggi la revoca è un link alla volta dal foglio. Con molti destinatari il runbook sopra è lento. Da confermare se serve un'azione di massa, e in quale feature.
 
 ## Storico delle modifiche
 
@@ -314,3 +372,5 @@ Controlli specifici di FEAT-2026-003 (Invitati), dopo il job `migrate` verde:
 | 2026-11-24 | FEAT-2026-001 | Prima stesura del runbook: setup locale, primo utente, variabili, segreti GitHub con regola dei branch, checklist Auth, migrazioni, keep-alive, pausa, reset dal pannello, Resend, rilascio, rollback (F4, T18) |
 | 2026-11-25 | FEAT-2026-002 | "Altro" diventa "Opzioni" nei percorsi del runbook; controllo della Guida in Preview e post-deploy |
 | 2026-11-25 | FEAT-2026-003 | Controlli post-deploy di Invitati (13-19); decisione D-A sulla preview |
+| 2026-11-28 | FEAT-2026-004 | `RSVP_LINK_SECRET` tra le variabili e i segreti da ruotare; ruotare non revoca; runbook di revoca totale |
+| 2026-11-28 | FEAT-2026-004 | Checklist di rilascio R-04 (controlli 20-26), prova QA-17 che il seed non gira in remoto, rollback |

@@ -303,8 +303,8 @@ select is(
 select is(
   (select array_agg(a.attname::text order by a.attname::text) from pg_attribute a
    where a.attrelid = 'public.guest_groups'::regclass and a.attnum > 0 and not a.attisdropped and a.attname::text <> 'name'),
-  array['created_at', 'created_by', 'deleted_at', 'deleted_by', 'id', 'import_batch_id', 'updated_at', 'updated_by',
-        'version', 'wedding_id']::text[],
+  array['created_at', 'created_by', 'deleted_at', 'deleted_by', 'id', 'import_batch_id', 'rsvp_mode', 'updated_at',
+        'updated_by', 'version', 'wedding_id']::text[],
   'guest_groups: the non-excluded columns are exactly the structural allowlist');
 select is(
   (select array_agg(a.attname::text order by a.attname::text) from pg_attribute a

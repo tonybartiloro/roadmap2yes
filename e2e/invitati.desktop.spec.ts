@@ -95,7 +95,7 @@ test("conflict: 'Annulla' keeps the partner's version and shows it; the Home of 
   await b.context.close();
 });
 
-test("desktop columns: 5 columns at 768 px keep the name readable and the rows short; no sideways scroll and axe clean at 1100 px, also while selecting (DES-03)", async ({
+test("desktop columns: 6 columns at 768 px keep the name readable and the rows short; no sideways scroll and axe clean at 1100 px, also while selecting (DES-03)", async ({
   page,
 }) => {
   const w = await seedWedding({ templateTasks: false, names: { a: "Tony", b: "Jessica" } });
@@ -114,7 +114,7 @@ test("desktop columns: 5 columns at 768 px keep the name readable and the rows s
   await loginAs(page, w.wedding.founder, uniqueIp());
   await page.setViewportSize({ width: 768, height: 900 });
   await page.goto("/invitati");
-  // a search makes the list flat: name, type, side, group and table = 5 columns
+  // a search makes the list flat: name, type, side, group, table and presence = 6 columns
   await page.getByRole("searchbox", { name: "Cerca per nome" }).fill("Esempio");
   await expect(page.getByTestId("guest-row")).toHaveCount(4);
   await expect(page.locator('[aria-hidden="true"].md\\:grid')).toHaveCount(1); // one header per list
@@ -124,7 +124,7 @@ test("desktop columns: 5 columns at 768 px keep the name readable and the rows s
     const grid = row.locator("button > span").first();
     const name = grid.locator("> span").first();
     const tracks = await grid.evaluate((el) => getComputedStyle(el).gridTemplateColumns.split(" ").length);
-    expect(tracks, "5 columns").toBe(5);
+    expect(tracks, "6 columns").toBe(6);
     const nameBox = (await name.boundingBox())!;
     const rowBox = (await row.boundingBox())!;
     const rem = await page.evaluate(() => parseFloat(getComputedStyle(document.documentElement).fontSize));
@@ -249,8 +249,11 @@ test.describe.serial("scale: 500, then 1200 guests in one wedding", () => {
 
     // a search matching many: 100 at a time, with the remainder stated ("Prova1" matches 111 people)
     await search.fill("Prova11");
-    const matches = Number((/^(\d+) di 1200/.exec((await page.getByTestId("guests-count").textContent()) ?? "") ?? [])[1]);
-    expect(matches).toBeGreaterThan(100);
+    const matchesNow = async () =>
+      Number((/^(\d+) di 1200/.exec((await page.getByTestId("guests-count").textContent()) ?? "") ?? [])[1]);
+    // the count follows the deferred query: wait for it instead of reading it once
+    await expect.poll(matchesNow).toBeGreaterThan(100);
+    const matches = await matchesNow();
     await expect(page.getByTestId("guest-row")).toHaveCount(100);
     await page.getByRole("button", { name: new RegExp(`^Mostra altre ${Math.min(100, matches - 100)} \\(ne restano ${matches - 100}\\)`) }).click();
     await expect(page.getByTestId("guest-row")).toHaveCount(Math.min(200, matches));

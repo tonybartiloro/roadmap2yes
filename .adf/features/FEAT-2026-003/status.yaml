@@ -3,7 +3,7 @@ id: FEAT-2026-003
 title: "Invitati: anagrafica, gruppi/famiglie, tavoli facoltativi"
 type: feature
 size: L
-phase: F5
+phase: done
 branch: feature/FEAT-2026-003-invitati
 ticket: ""
 roadmap: R-03
@@ -12,10 +12,10 @@ updated: 2026-11-26
 gates:
   a_requirements: "approved 2026-11-25 via roadmap R-03"
   b_plan: "approved 2026-11-25 by tonybartiloro"
-  c_production: pending      # pending | approved <date> by <name> | not-needed
+  c_production: "approved 2026-11-26 by tonybartiloro"
 environments:
   staging: pending           # pending | deployed <date> | not-applicable
-  production: pending
+  production: "deployed 2026-11-26"
 links:
   pr: "https://github.com/tonybartiloro/roadmap2yes/pull/5"
   brief: ""

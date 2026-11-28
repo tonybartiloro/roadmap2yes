@@ -136,6 +136,26 @@ Dove stanno i test del modulo, per livello:
 - **E2E**: `e2e/invitati.mobile.spec.ts` (persone e azioni di massa), `invitati.desktop.spec.ts` (conflitto e scala), `invitati.tavoli.mobile.spec.ts` (tavoli) e `invitati.nav.spec.ts` (barra e Aiuto). I dati si preparano con gli helper `seedGuests`, `addFamilyMember` e quelli dei tavoli in `e2e/support/seed.ts`, mai dalla UI.
 - Gli e2e girano sulla build: dopo ogni modifica lanciate `npm run build`, poi `E2E_PORT=3300 npm run e2e` come nel resto del documento.
 
+## Conferme di presenza (FEAT-2026-004)
+
+- **Seed**: `supabase/seeds/05_rsvp.sql` (applicato da `npm run db:reset`) riusa il matrimonio di prova: un gruppo "insieme", un gruppo "separato", una persona senza gruppo e un link di prova. Il segreto e il token del seed sono **finti e valgono solo in locale**: i valori stanno nel file, non in questo documento. Il seed non gira mai su staging o produzione (vedi [Ambienti e rilascio](ambienti-e-rilascio.md#link-rsvp-segreto-e-revoca-totale)).
+- **pgTAP**: `rsvp_model.test.sql` (vincoli, audit senza `status`/`diet`/`token_hash`), `rsvp_rls.test.sql` (dinieghi per `anon`, altro matrimonio, family/planner), `rsvp_lifecycle.test.sql` (matrice del ciclo di vita dei link) e `rsvp_public.test.sql` (insieme esatto delle chiavi, neutre, scadenza, limiti, invii). Richiedono `npm run db:reset`.
+- **Unit** (`npm test`): `token.ts` con vettori fissi e forme scartate senza database; `limiter.ts` (IPv6 /64, IP assente); `view.ts` (stati dei link, riepilogo, saluto WhatsApp); configurazione del segreto; orologio; pagine neutra e 429 (byte identici); componenti della pagina pubblica e del foglio link.
+- **Integration** (`npm run test:integration`): `tests/integration/rsvp.actions.test.ts` (azioni della coppia ed esportazione), `tests/integration/rsvp.logs.test.ts` (nessun token, hash o nota nei log, con una spia su `console`) e il caso RSVP di `tests/integration/home.data.test.ts` (Novità senza righe `rsvp_*`). Richiedono lo stack locale.
+- **Acceptance** (`npm run test:integration`): `tests/acceptance/rsvp.test.ts` (bordo HTTP contro `next start`: 404 neutra identica, 429, intestazioni, tema, nessun accesso PostgREST) e `tests/acceptance/rsvp.concurrency.test.ts` (invii paralleli: venti scritture al massimo). Il file HTTP richiede `npm run build`: senza `.next/BUILD_ID` il blocco è saltato e il report lo dice. Con `HEADERS_REQUIRED=1` l'assenza della build fa fallire il test invece di saltarlo. Usa la porta 3311 (`RSVP_QA_PORT`), che non deve essere occupata. In CI gira dopo la build.
+- **Helper**: `tests/acceptance/support/rsvp.ts` genera token con il segreto di prova, IP sintetici (`x-forwarded-for`) e la pulizia di `rsvp_attempts`. **Solo i test di acceptance puliscono `rsvp_attempts`**, e solo le chiavi che hanno creato loro.
+- **E2E** (`npm run e2e`, dopo `npm run build`; porta da `E2E_PORT`, per esempio `E2E_PORT=3300`): `e2e/rsvp.public.spec.ts` (pagina a 320 px e senza JavaScript, invio parziale, conferma, revoca durante la compilazione, offline), `e2e/rsvp.invitati.spec.ts` (lato coppia: crea, copia, WhatsApp, revoca, Annulla importazione), `e2e/rsvp.time.spec.ts` (scadenza con l'orologio di test, progetto `time`, seriale). `e2e/a11y.spec.ts` ha il blocco axe della pagina pubblica (modulo, riepilogo, neutra, 429) e `e2e/cross-browser.spec.ts` due test RSVP nel progetto `webkit-smoke`.
+- **Server e output**: `playwright.config.ts` copia l'output del server principale in un file temporaneo (`E2E_SERVER_LOG`, con `tee`). `rsvp.public.spec.ts` verifica che il token di prova non compaia in quel file. Lo scrive solo un server avviato da Playwright, non uno riusato.
+- **Link morti e IP**: i test dei link morti mandano un proprio `x-forwarded-for`. `next start` dà a tutte le richieste locali lo stesso indirizzo se nessuno lo indica, e il limite per IP si accumulerebbe tra un test e l'altro. Gli e2e non puliscono `rsvp_attempts`: le righe restano alla pulizia del limitatore.
+- **WebKit smoke**: i due test RSVP di `cross-browser.spec.ts` girano in CI solo nel job `e2e-full` (push su main, notturno o PR con l'etichetta `e2e-full`).
+- **Limiti in locale**: `x-forwarded-for` non è affidabile fuori da Vercel, quindi i test che provano i limiti usano un IP sintetico. Solo i test di acceptance puliscono `rsvp_attempts`. Un link aperto da WhatsApp su iPhone e Android, e Condividi da iPhone, si provano solo su dispositivo vero (Gate C); WebKit in locale non lo sostituisce.
+
+## Prima di una prova completa
+
+- Prima di un `npm run test:integration` completo lanciate `npm run db:reset`. Su un database locale sporco, `jobs.test.ts` esegue il job giornaliero su tutti i matrimoni rimasti e rallenta. La CI parte sempre da zero.
+- La prova e2e locale completa richiede `E2E_PORT=3300 E2E_ALL_SERVERS=1 npm run e2e`. Senza `E2E_ALL_SERVERS=1` i progetti `degraded` ed `email-off` non hanno il loro server.
+- WebKit richiede `npm run e2e:install` una volta sola.
+
 ## Stato al termine di F3
 
 Riferimento dal log della feature, non un contratto: unit circa 850, integration circa 740, pgTAP circa 950, e2e 209 su 210 con un test di avvio a freddo poi reso deterministico. I numeri cambiano con il codice.
@@ -150,6 +170,7 @@ Riferimento dal log della feature, non un contratto: unit circa 850, integration
 
 | Data | Feature | Modifica |
 |---|---|---|
+| 2026-11-28 | FEAT-2026-004 | Conferme di presenza: seed `05_rsvp.sql`, pgTAP, unit, integration ed e2e del modulo, limiti locali (IP sintetico) |
 | 2026-11-24 | FEAT-2026-001 | Prima stesura: suite, progetti e2e, matrice dei temi, limiti noti (F4, T18) |
 | 2026-11-25 | FEAT-2026-002 | Test dei documenti della Guida; porta e2e locale (`E2E_PORT=3300`) |
 | 2026-11-25 | FEAT-2026-003 | Test del modulo invitati per livello, seed finto e helper e2e |

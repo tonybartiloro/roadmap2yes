@@ -196,6 +196,8 @@ export function buildExportJson(input: ExportInput, now: Date): string {
     guests: input.guests,
     guestGroups: input.guestGroups,
     guestTables: input.guestTables,
+    rsvpResponses: input.rsvpResponses ?? [],
+    rsvpLinks: input.rsvpLinks ?? [],
   };
   return JSON.stringify(sanitize(doc), null, 2);
 }

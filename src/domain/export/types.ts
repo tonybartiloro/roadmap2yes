@@ -65,6 +65,26 @@ export interface ExportGuestTable {
   readonly deletedAt: string | null;
 }
 
+/** The answer of one guest (RSVP). Never carries a token or a hash. */
+export interface ExportRsvpResponse {
+  readonly guestId: string;
+  readonly status: string;
+  readonly diet: readonly string[];
+  readonly dietNote: string | null;
+  readonly source: string;
+  readonly answeredAt: string;
+}
+
+/** A personal link of a group or a guest: state only (the token is never stored nor exported). */
+export interface ExportRsvpLink {
+  readonly id: string;
+  readonly groupId: string | null;
+  readonly guestId: string | null;
+  readonly createdAt: string;
+  readonly revokedAt: string | null;
+  readonly sharedAt: string | null;
+}
+
 /**
  * Everything the export needs, already read through RLS by the client (plan §10). Rows that are
  * exported as they are (`Row`) are sanitised: secrets and birth dates never get out.
@@ -85,4 +105,7 @@ export interface ExportInput {
   readonly guests: readonly ExportGuest[];
   readonly guestGroups: readonly ExportGuestGroup[];
   readonly guestTables: readonly ExportGuestTable[];
+  /** Empty or absent when the RSVP tables do not exist yet. */
+  readonly rsvpResponses?: readonly ExportRsvpResponse[];
+  readonly rsvpLinks?: readonly ExportRsvpLink[];
 }

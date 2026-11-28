@@ -50,8 +50,11 @@ const importSchema = z.object({
 
 /** `groups` = the new groups the import created. */
 export type ImportResult = { batchId: string; guests: number; groups: number };
-/** What the undo removed, for good (not into "Eliminati di recente"). */
-export type UndoImportResult = { guests: number; groups: number };
+/**
+ * What the undo removed, for good (not into "Eliminati di recente"). `skipped` = people it left
+ * because they answered or have a link (DES-28: "N restano"); 0 on a database without RSVP.
+ */
+export type UndoImportResult = { guests: number; groups: number; skipped: number };
 
 async function session(): Promise<{ db: Db } | null> {
   const db = (await createClient()) as unknown as Db;
@@ -131,11 +134,18 @@ export async function undoGuestImportAction(
   const ctx = await session();
   if (!ctx) return { ok: false, code: "session", message: SESSION_EXPIRED };
   const result = await ctx.db.rpc("undo_guest_import", { p_batch_id: parsed.data.batchId });
-  const body = result.data as { guests?: unknown; groups?: unknown } | null;
+  const body = result.data as { guests?: unknown; groups?: unknown; skipped?: unknown } | null;
   if (result.error || !body || typeof body.guests !== "number" || typeof body.groups !== "number") {
     return failure(result.error, UNDO_FAILED);
   }
   revalidatePath("/invitati");
   revalidatePath("/altro/impostazioni");
-  return { ok: true, data: { guests: body.guests, groups: body.groups } };
+  return {
+    ok: true,
+    data: {
+      guests: body.guests,
+      groups: body.groups,
+      skipped: typeof body.skipped === "number" ? body.skipped : 0,
+    },
+  };
 }

@@ -173,7 +173,7 @@ test("a family in one save, then 'Aggiungi persona' from the group; the group sh
   await expect(page.getByText("Famiglia aggiunta: 3 persone.")).toBeVisible();
 
   await expect(
-    page.getByRole("heading", { level: 2, name: /Famiglia Verdi · 2 adulti, 1 bambino/ }),
+    page.getByRole("heading", { level: 2, name: /^Famiglia Verdi, 2 adulti, 1 bambino/ }),
   ).toBeVisible();
   const group = (
     await db().from("guest_groups").select("id").eq("wedding_id", w.weddingId).eq("name", "Famiglia Verdi")
@@ -193,7 +193,7 @@ test("a family in one save, then 'Aggiungi persona' from the group; the group sh
   await add.getByLabel("Nome", { exact: true }).fill("Nonna");
   await add.getByRole("button", { name: "Salva", exact: true }).click();
   await expect(
-    page.getByRole("heading", { level: 2, name: /Famiglia Verdi · 3 adulti, 1 bambino/ }),
+    page.getByRole("heading", { level: 2, name: /^Famiglia Verdi, 3 adulti, 1 bambino/ }),
   ).toBeVisible();
 });
 
@@ -218,7 +218,7 @@ test("summary, 'Per lato', search and filters: infants counted, deleted never, '
   await expect(summary).toContainText("5 adulti · 1 bambino · 1 neonato");
   await expect(page.getByText("Cancellato")).toHaveCount(0);
   await expect(
-    page.getByRole("heading", { level: 2, name: /Famiglia Rossi · 2 adulti, 1 bambino/ }),
+    page.getByRole("heading", { level: 2, name: /^Famiglia Rossi, 2 adulti, 1 bambino/ }),
   ).toBeVisible();
   await expect(page.getByRole("heading", { level: 2, name: /Senza gruppo/ })).toBeVisible();
 
@@ -381,7 +381,7 @@ test("delete a group: the members stay 'Senza gruppo', come back when it is rest
   await sheet(page).getByRole("button", { name: "Ripristina Famiglia Rossi" }).click();
   await page.keyboard.press("Escape");
   await expect(
-    page.getByRole("heading", { level: 2, name: /Famiglia Rossi · 2 adulti/ }),
+    page.getByRole("heading", { level: 2, name: /^Famiglia Rossi, 2 adulti/ }),
   ).toBeVisible();
 
   // delete again, then remove for good: the members live on, with no group at all
@@ -503,7 +503,7 @@ test("at 390 px the visible separator has spaces around it: 'Bambino · Tony' (R
   const details = row(page, "Luca Rossi").locator("button > span").first();
   const text = await details.evaluate((el) => (el as HTMLElement).innerText);
   // what is drawn, with the whitespace the browser really renders
-  expect(text.replace(/\s+/g, " ").trim()).toBe("Luca Rossi Bambino · Tony");
+  expect(text.replace(/\s+/g, " ").trim()).toBe("Luca Rossi Bambino · Tony · In attesa Nessun link");
   // and the pixels: the gap between "Bambino" and the dot, and between the dot and "Tony"
   const gaps = await details.evaluate((el) => {
     const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);

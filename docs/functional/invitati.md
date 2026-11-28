@@ -43,6 +43,14 @@ Un gruppo è solo un'etichetta: non ha un capofamiglia e puoi cambiarne il nome 
 
 In Persone la lista è divisa per gruppo, con un titolo come "Famiglia Rossi · 2 adulti, 1 bambino". Le persone senza gruppo stanno in fondo, sotto "Senza gruppo". Se un gruppo è vuoto, la sezione dice "Nessuno qui: aggiungi persone".
 
+## Presenze e link
+
+Ogni persona mostra la sua risposta: **In attesa**, **Sì** o **No**, in testo e con un'icona. Un gruppo riassume le sue risposte, per esempio "2 sì · 1 in attesa".
+
+Ogni gruppo "insieme" e ogni persona senza gruppo ha una riga per il link, con lo stato (per esempio "Da condividere" o "Condiviso il 12 marzo"). Il pulsante **Invia** apre il foglio con il link. Per creare i link mancanti in una volta sola usa **Altro > Crea link per tutti (N)**. Il funzionamento dei link, gli stati e la scadenza sono in [Conferme di presenza](conferme-di-presenza.md).
+
+Il foglio di una persona mostra presenza, preferenze e data dell'ultima risposta, in sola lettura.
+
 ## Liste lunghe
 
 Con più di 100 righe la lista ne mostra 100 alla volta, con **Mostra altre 100 (ne restano 740)**. I gruppi con molte persone sono chiusi di default: tocca il titolo per aprirli. Non c'è nessun tetto al numero di invitati e nessuna persona sparisce in silenzio: i conteggi restano sempre sul totale.
@@ -70,14 +78,14 @@ Per uscire tocca **Fine**.
 - **Eliminare un gruppo** chiede prima una conferma che dice quante persone restano, per esempio "Le 4 persone restano, senza gruppo". Le persone non spariscono: passano in "Senza gruppo".
 - Le persone eliminate vanno in **Eliminati di recente**, dal menu **Altro**. Qui trovi le sezioni **Persone**, **Gruppi** e **Tavoli** (le sezioni vuote sono nascoste). Un gruppo eliminato dice quanti membri ha: "4 persone, rientrano se lo ripristini".
 - **Ripristina** riporta la persona o il gruppo com'era. Ripristinando un gruppo tornano dentro anche i suoi membri.
-- **Elimina definitivamente** cancella i dati della persona o del gruppo. Prima chiede conferma con il numero, per esempio "Elimini definitivamente 3 persone? Non si può annullare." Eliminare definitivamente un gruppo non cancella le sue persone: restano senza gruppo.
+- **Elimina definitivamente** cancella i dati della persona o del gruppo, comprese le sue risposte e i suoi link. Prima chiede conferma con il numero, per esempio "Elimini definitivamente 3 persone? Non si può annullare." Eliminare definitivamente un gruppo non cancella le sue persone: restano senza gruppo.
 - **Svuota** fa la stessa cosa per tutti gli elementi di una sezione, o per tutti insieme, con la stessa conferma.
 
 Gli eliminati non hanno scadenza: restano in **Eliminati di recente** finché non li ripristini o li elimini definitivamente tu.
 
 ## Privacy
 
-I dati degli invitati (nomi, telefoni, email e note) non entrano nella cronologia dell'app: né in **Novità** né nello storico delle modifiche. Restano solo nella lista degli invitati.
+I dati degli invitati (nomi, telefoni, email e note) e le risposte alla presenza non entrano nella cronologia dell'app: né in **Novità** né nello storico delle modifiche. Restano solo nella lista degli invitati.
 
 ## Tavoli
 
@@ -109,7 +117,7 @@ I tavoli sono facoltativi. La scheda **Tavoli**, accanto a Persone, è sempre vi
    - **Torna indietro** conserva il testo.
 3. **Importa.** Il pulsante dice quante persone importi, per esempio **Importa 38 invitati**. Le righe con errore vengono saltate, e restano elencate con il motivo. Con **Copia le righe saltate** le copi, le correggi e le riprovi.
 
-Subito dopo compare il messaggio "38 invitati importati" con **Annulla importazione** per almeno 8 secondi. Annulla importazione rimuove le persone importate che non hai ancora modificato né messo a un tavolo, e i gruppi che l'importazione ha creato (un gruppo già esistente, o che qualcuno ha riempito nel frattempo, resta). Dopo quegli 8 secondi, per togliere le persone importate usa Elimina e poi Elimina definitivamente.
+Subito dopo compare il messaggio "38 invitati importati" con **Annulla importazione** per almeno 8 secondi. Annulla importazione rimuove le persone importate che non hai ancora modificato né messo a un tavolo, e i gruppi che l'importazione ha creato (un gruppo già esistente, o che qualcuno ha riempito nel frattempo, resta). Non rimuove chi ha già risposto o ha un link personale: il messaggio dice quante persone restano per questo motivo. Dopo quegli 8 secondi, per togliere le persone importate usa Elimina e poi Elimina definitivamente.
 
 **Attenzione al lato.** L'esportazione scrive il nome del partner nella colonna lato. Se cambi il nome di un partner dopo un'esportazione, le righe con il vecchio nome non si reimportano: correggi la colonna con il nuovo nome, con `A`, `B` o `entrambi`.
 
@@ -130,3 +138,4 @@ Il file scaricato resta sul tuo dispositivo anche se poi elimini gli invitati de
 |---|---|---|
 | 2026-11-25 | FEAT-2026-003 | Prima stesura della parte Persone (S1): aggiunta, famiglie, filtri, azioni di massa, eliminazione e ripristino |
 | 2026-11-25 | FEAT-2026-003 | Tavoli, importazione ed esportazione CSV (S2 e S3), con la sezione Tavoli in Eliminati di recente |
+| 2026-11-28 | FEAT-2026-004 | Presenze e link per persona e gruppo; Annulla importazione non tocca chi ha risposto o ha un link; Elimina definitivamente cancella risposte e link |

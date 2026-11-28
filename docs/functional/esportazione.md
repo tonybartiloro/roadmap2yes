@@ -8,7 +8,7 @@ In **Opzioni > Esporta** trovate quattro pulsanti. Ognuno scarica un file separa
 
 | File | Contenuto |
 |---|---|
-| Tutto in un file (JSON) | Tutto: profili, impostazioni, scelte e storico, Percorso, budget, scenari di data, con la location collegata a ogni data, e gli invitati con i loro gruppi e tavoli. |
+| Tutto in un file (JSON) | Tutto: profili, impostazioni, scelte e storico, Percorso, budget, scenari di data, con la location collegata a ogni data, e gli invitati con i loro gruppi, tavoli, risposte alla presenza e stato dei link (mai il link stesso). |
 | Compiti (CSV) | I compiti del Percorso, uno per riga. |
 | Budget (CSV) | Categorie, voci e pagamenti. |
 | Invitati (CSV) | Tutti gli invitati vivi, con le colonne dell'importazione. |
@@ -23,7 +23,7 @@ Il file **Invitati (CSV)** contiene **tutti** gli invitati vivi, anche se in Inv
 
 Nel CSV gli eliminati non ci sono mai. Nel JSON completo, invece, gli eliminati di recente ci sono, marcati con `deleted: true`. Quando li elimini definitivamente, spariscono da ogni esportazione successiva.
 
-Nel JSON completo gli invitati stanno nelle voci `guests`, con i gruppi in `guestGroups` e i tavoli in `guestTables`.
+Nel JSON completo gli invitati stanno nelle voci `guests`, con i gruppi in `guestGroups` e i tavoli in `guestTables`. Le risposte alla presenza sono in `rsvpResponses` e lo stato dei link in `rsvpLinks`: vedi [Conferme di presenza](conferme-di-presenza.md). Nel file non c'è mai il link.
 
 Il CSV degli invitati usa le stesse colonne dell'importazione: reimportandolo in Invitati ottieni gli stessi dati. Vedi [Invitati](invitati.md).
 
@@ -44,3 +44,4 @@ Su Safari il file si salva dal foglio di condivisione o dai download, come per o
 | 2026-11-24 | FEAT-2026-001 | Prima stesura (F4, T18) |
 | 2026-11-25 | FEAT-2026-002 | "Altro" diventa "Opzioni" |
 | 2026-11-25 | FEAT-2026-003 | Invitati (CSV) e invitati, gruppi e tavoli nel JSON completo; quattro pulsanti |
+| 2026-11-28 | FEAT-2026-004 | JSON completo con `rsvpResponses` e `rsvpLinks` (senza link); il CSV degli invitati non cambia |

@@ -126,9 +126,16 @@ export function ImportSheet({
   async function undo(batchId: string) {
     const result = await undoGuestImportAction({ batchId });
     if (result.ok) {
-      toast(
-        `Importazione annullata: ${plural(result.data.guests, "persona rimossa", "persone rimosse")}.`,
-      );
+      const { guests, skipped } = result.data;
+      // Who already answered or has a link stays (DES-28): say so, or the count looks wrong.
+      if (skipped > 0) {
+        const verb = skipped === 1 ? "ha" : "hanno";
+        toast(
+          `Ho annullato ${plural(guests, "persona", "persone")}; ${skipped === 1 ? "1 resta" : `${skipped} restano`} perché ${verb} già risposto o ${verb} un link.`,
+        );
+      } else {
+        toast(`Importazione annullata: ${plural(guests, "persona rimossa", "persone rimosse")}.`);
+      }
     } else {
       toast.error(result.message);
       onStale();

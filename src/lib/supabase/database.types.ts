@@ -223,14 +223,14 @@ isOneToOne: false
                   ]
                 },"guest_groups": {
                   Row: {
-                    "created_at": string,"created_by": string | null,"deleted_at": string | null,"deleted_by": string | null,"id": string,"import_batch_id": string | null,"name": string,"updated_at": string,"updated_by": string | null,"version": number,"wedding_id": string
+                    "created_at": string,"created_by": string | null,"deleted_at": string | null,"deleted_by": string | null,"id": string,"import_batch_id": string | null,"name": string,"rsvp_mode": string,"updated_at": string,"updated_by": string | null,"version": number,"wedding_id": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "created_at"?: string,"created_by"?: string | null,"deleted_at"?: string | null,"deleted_by"?: string | null,"id"?: string,"import_batch_id"?: string | null,"name": string,"updated_at"?: string,"updated_by"?: string | null,"version"?: number,"wedding_id": string
+                    "created_at"?: string,"created_by"?: string | null,"deleted_at"?: string | null,"deleted_by"?: string | null,"id"?: string,"import_batch_id"?: string | null,"name": string,"rsvp_mode"?: string,"updated_at"?: string,"updated_by"?: string | null,"version"?: number,"wedding_id": string
                   }
                   Update: {
-                    "created_at"?: string,"created_by"?: string | null,"deleted_at"?: string | null,"deleted_by"?: string | null,"id"?: string,"import_batch_id"?: string | null,"name"?: string,"updated_at"?: string,"updated_by"?: string | null,"version"?: number,"wedding_id"?: string
+                    "created_at"?: string,"created_by"?: string | null,"deleted_at"?: string | null,"deleted_by"?: string | null,"id"?: string,"import_batch_id"?: string | null,"name"?: string,"rsvp_mode"?: string,"updated_at"?: string,"updated_by"?: string | null,"version"?: number,"wedding_id"?: string
                   }
                   Relationships: [
                     {
@@ -433,6 +433,96 @@ isOneToOne: false
       referencedColumns: ["id","wedding_id"]
     },{
       foreignKeyName: "payments_wedding_id_fkey"
+      columns: ["wedding_id"]
+isOneToOne: false
+      referencedRelation: "weddings"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"rsvp_link_people": {
+                  Row: {
+                    "guest_id": string,"link_id": string,"wedding_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "guest_id": string,"link_id": string,"wedding_id": string
+                  }
+                  Update: {
+                    "guest_id"?: string,"link_id"?: string,"wedding_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "rsvp_link_people_guest_id_wedding_id_fkey"
+      columns: ["guest_id","wedding_id"]
+isOneToOne: false
+      referencedRelation: "guests"
+      referencedColumns: ["id","wedding_id"]
+    },{
+      foreignKeyName: "rsvp_link_people_link_id_wedding_id_fkey"
+      columns: ["link_id","wedding_id"]
+isOneToOne: false
+      referencedRelation: "rsvp_links"
+      referencedColumns: ["id","wedding_id"]
+    },{
+      foreignKeyName: "rsvp_link_people_wedding_id_fkey"
+      columns: ["wedding_id"]
+isOneToOne: false
+      referencedRelation: "weddings"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"rsvp_links": {
+                  Row: {
+                    "created_at": string,"created_by": string | null,"group_id": string | null,"guest_id": string | null,"id": string,"revoked_at": string | null,"revoked_by": string | null,"shared_at": string | null,"shared_by": string | null,"token_hash": string,"updated_at": string,"updated_by": string | null,"version": number,"wedding_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"created_by"?: string | null,"group_id"?: string | null,"guest_id"?: string | null,"id": string,"revoked_at"?: string | null,"revoked_by"?: string | null,"shared_at"?: string | null,"shared_by"?: string | null,"token_hash": string,"updated_at"?: string,"updated_by"?: string | null,"version"?: number,"wedding_id": string
+                  }
+                  Update: {
+                    "created_at"?: string,"created_by"?: string | null,"group_id"?: string | null,"guest_id"?: string | null,"id"?: string,"revoked_at"?: string | null,"revoked_by"?: string | null,"shared_at"?: string | null,"shared_by"?: string | null,"token_hash"?: string,"updated_at"?: string,"updated_by"?: string | null,"version"?: number,"wedding_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "rsvp_links_group_id_wedding_id_fkey"
+      columns: ["group_id","wedding_id"]
+isOneToOne: false
+      referencedRelation: "guest_groups"
+      referencedColumns: ["id","wedding_id"]
+    },{
+      foreignKeyName: "rsvp_links_guest_id_wedding_id_fkey"
+      columns: ["guest_id","wedding_id"]
+isOneToOne: false
+      referencedRelation: "guests"
+      referencedColumns: ["id","wedding_id"]
+    },{
+      foreignKeyName: "rsvp_links_wedding_id_fkey"
+      columns: ["wedding_id"]
+isOneToOne: false
+      referencedRelation: "weddings"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"rsvp_responses": {
+                  Row: {
+                    "answered_at": string,"created_at": string,"created_by": string | null,"diet": (string)[],"diet_note": string | null,"id": string,"source": string,"status": string,"updated_at": string,"updated_by": string | null,"version": number,"wedding_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "answered_at"?: string,"created_at"?: string,"created_by"?: string | null,"diet"?: (string)[],"diet_note"?: string | null,"id": string,"source"?: string,"status": string,"updated_at"?: string,"updated_by"?: string | null,"version"?: number,"wedding_id": string
+                  }
+                  Update: {
+                    "answered_at"?: string,"created_at"?: string,"created_by"?: string | null,"diet"?: (string)[],"diet_note"?: string | null,"id"?: string,"source"?: string,"status"?: string,"updated_at"?: string,"updated_by"?: string | null,"version"?: number,"wedding_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "rsvp_responses_id_wedding_id_fkey"
+      columns: ["id","wedding_id"]
+isOneToOne: false
+      referencedRelation: "guests"
+      referencedColumns: ["id","wedding_id"]
+    },{
+      foreignKeyName: "rsvp_responses_wedding_id_fkey"
       columns: ["wedding_id"]
 isOneToOne: false
       referencedRelation: "weddings"
@@ -648,6 +738,36 @@ isOneToOne: false
                            },
 "rotate_invitation":
 { Args: { "p_invitation_id": string,"p_token_hash": string }; Returns: Json
+                           },
+"rsvp_create_links":
+{ Args: { "p_items": Json,"p_now"?: string }; Returns: Json
+                           },
+"rsvp_gate":
+{ Args: { "p_ip_key"?: string,"p_now"?: string,"p_token_hash": string }; Returns: Json
+                           },
+"rsvp_link_matches":
+{ Args: { "p_hash": string,"p_link_id": string }; Returns: boolean
+                           },
+"rsvp_mark_shared":
+{ Args: { "p_link_id": string,"p_now"?: string }; Returns: Json
+                           },
+"rsvp_page":
+{ Args: { "p_ip_key"?: string,"p_now"?: string,"p_token_hash": string }; Returns: Json
+                           },
+"rsvp_revoke_link":
+{ Args: { "p_link_id": string }; Returns: Json
+                           },
+"rsvp_rotate_link":
+{ Args: { "p_link_id": string,"p_new_hash": string,"p_new_id": string,"p_now"?: string }; Returns: Json
+                           },
+"rsvp_status":
+{ Args: { "p_now"?: string }; Returns: Json
+                           },
+"rsvp_submit":
+{ Args: { "p_answers": Json,"p_ip_key": string,"p_now"?: string,"p_token_hash": string }; Returns: Json
+                           },
+"rsvp_unmark_shared":
+{ Args: { "p_link_id": string,"p_previous": Json }; Returns: Json
                            },
 "set_reference_scenario":
 { Args: { "p_option_id"?: string }; Returns: Json
