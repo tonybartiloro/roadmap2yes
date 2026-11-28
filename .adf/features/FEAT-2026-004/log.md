@@ -75,4 +75,5 @@
 - Reviews: code-7 REV-24..37 (6 should) → fixed, approved round 2 (+ notes 36/37 fixed in round 3); code-8 security REV-123 should (stale URL after rotate) → fixed, approved; design-2 DES-45 **blocking** (toast Annulla unreachable under the modal sheet, tap fell through to WhatsApp) → inline Annulla in the sheet; DES-59 blocking (lost dialog name) and DES-60 found in round 2 → fixed, approved round 3 (axe 0 at 320/1280). Fixes 069f9fc, f55e76f.
 - Coordinator decisions: REV-124 diet data stays in the list payload (same access as RLS) → residual; REV-29 degrade + fixed-code log, no on-page notice; REV-31 `hasGuestsPermission` refactor out of scope.
 - Carry-overs: T11 keeps the `<script>` note case (REV-127) and the singular "1 link personale" copy; T12 `sicurezza.md` residuals REV-124/125/126 and `getLinkUrlAction` without rate limit/audit; follow-up DES-54 (24 px toast Annulla in shared `ui/sonner.tsx`, also R-03) and R-03 `ConfirmDialog` focus return.
-- Tests: unit 1521/1521, typecheck, lint 0 errors; no DB change in S4.
+- Tests: unit 1521/1521, typecheck, lint 0 errors; no DB change in S4. `adf verify` pass on 7d7b460 (lint, typecheck, unit, build).
+- Next: S5 (T10 QA acceptance/integration, T11 e2e, T12 docs, T13 release checklist).
