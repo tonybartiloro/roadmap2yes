@@ -16,7 +16,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { createLinksAction } from "./actions";
 import { RSVP_STALE_CODES } from "./constants";
-import { useFocusReturn } from "./use-focus-return";
+import { useFocusReturn } from "@/lib/hooks/use-focus-return";
 import type { Recipient } from "./view";
 
 const FAILURE = "Non sono riuscito a crearli tutti.";
@@ -38,7 +38,7 @@ export function CreateAllDialog({
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [failed, setFailed] = useState<{ text: string; retry: boolean } | null>(null);
-  const returnFocus = useFocusReturn("Altro");
+  const returnFocus = useFocusReturn(true, ["Altro"]);
   const count = recipients.length;
 
   async function create() {

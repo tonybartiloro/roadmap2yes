@@ -254,6 +254,9 @@ export function GuestsScreen({
             ? "Il gruppo è vuoto. Lo ritrovi in Eliminati di recente."
             : `${n === 1 ? "La persona resta" : `Le ${n} persone restano`}, senza gruppo. Se ripristini il gruppo, rientrano.`,
         confirmLabel: "Elimina gruppo",
+        // The menu sheet that opened it is closed by then: back to its "…" button, or to the
+        // toolbar "Altro" when the group (and its header) was just deleted.
+        returnFocusTo: [`Azioni del gruppo ${group.name}`, "Altro"],
         onConfirm: () =>
           void actions.remove(
             { kind: "group", id: group.id, version: group.version },

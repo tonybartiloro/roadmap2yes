@@ -42,7 +42,7 @@ import {
   type Recipient,
   type RsvpLink,
 } from "./view";
-import { useFocusReturn } from "./use-focus-return";
+import { useFocusReturn } from "@/lib/hooks/use-focus-return";
 
 type UrlResult = {
   linkId: string;
@@ -100,7 +100,7 @@ export function LinkSheet({
   onOpenChange: (open: boolean) => void;
 }) {
   const router = useRouter();
-  const returnFocus = useFocusReturn(`Invia il link di ${recipient.name}`, "Altro");
+  const returnFocus = useFocusReturn(true, [`Invia il link di ${recipient.name}`, "Altro"]);
   const confirmOpener = useRef<Element | null>(null);
   const [fetched, setFetched] = useState<UrlResult | null>(null);
   const [busy, setBusy] = useState(false);
