@@ -78,3 +78,14 @@
 - Tests: unit 1521/1521, typecheck, lint 0 errors; no DB change in S4. `adf verify` pass on 7d7b460 (lint, typecheck, unit, build).
 - Next: S5 (T10 QA acceptance/integration, T11 e2e, T12 docs, T13 release checklist).
 - Developer: "Nuova sessione" → S5 continues in a new session with `/adf:resume FEAT-2026-004`. Follow-up DES-54 + `ConfirmDialog` focus started as a separate session on its own branch.
+
+## F3 step S5 progress — 2026-11-28
+- Resumed with `/adf:resume` (new session). T10 (qa-engineer), T11 (qa-engineer) and T12 (technical-writer) started in parallel (disjoint files); T13 after T12.
+- The local Supabase stack is shared with the DES-54 worktree (based on `main`, no RSVP schema): a reset there drops `rsvp_*`; briefs say to restore with `npm run db:reset` from this checkout.
+- T12 (a18ca78) docs; T13 (5de6f5e) release checklist, QA-17 evidence: only `db push --remote` in `migrate.yml`, no seeds remotely. T10 (72412d6) 43 tests; QA-A (broken escape on `/rsvp` → 307 `/accesso`) fixed in `guards.ts` (34e862d); QA-B `retry_after_seconds` 901 under lock wait → to the security round. T11 (5dd715e) e2e green on Chromium (67 + `--repeat-each=2`), WebKit smoke left to CI; "sola lettura" not testable (no read-only role exists); WhatsApp greeting order with equal surnames (cosmetic).
+- Repo-wide `npm run lint` fails on the DES-54 worktree under `.claude/worktrees/` (ESLint does not ignore `.claude/**`): fix with the review round.
+- Writer questions: bulk revoke → follow-up (R-07); test file names in `sviluppo-locale-e-test.md` after T10/T11.
+- S5 review: code-9 (general) and code-10 (security) on `95cbc6c..HEAD`.
+- code-9 REV-38..46 (4 should: AC10 OG test, test docs, Guide "8 s", fixed 2027 dates in e2e); code-10 REV-128..133 (2 should: `rsvp.test.ts` skipped in CI, missing residuals REV-104/105/106). QA-A fix verified with curl; QA-B (901 s) accepted, value never shown.
+- Coordinator decisions: REV-41 relative dates in non-time e2e; `ci.yml` and `eslint.config.mjs` (`.claude/**` ignore) added to T10's files; the release-manager puts the `e2e-full` label on the PR so the WebKit smoke runs before merge.
+- Fixes 19091b6 (docs), 73e1a00 (e2e), 34771d5 (acceptance, `ci.yml`, ESLint ignore). code-9 and code-10 approved round 2, all items closed. Leftover note: "Limiti in locale" bullet in `sviluppo-locale-e-test.md` still says tests clean `rsvp_attempts` (F4).
