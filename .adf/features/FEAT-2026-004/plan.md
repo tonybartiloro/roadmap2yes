@@ -5,69 +5,34 @@
 | brief.md (approved 2026-11-26) | design.md (finalizzato dal designer in F2: qui solo rimandi alle sezioni) | L | draft |
 
 ## Current state
-- **Invitati (R-03).**
-  - Tabelle `guests`, `guest_groups`, `guest_tables` (`supabase/migrations/20261202100000_guests.sql:35-104`); eliminazione logica, "senza gruppo" calcolato dall'app (`:9-10`); cancellazione fisica solo di righe eliminate (`:240-241`).
-  - Audit senza colonne personali; l'allowlist obbliga a classificare ogni colonna nuova (`guests.sql:14-16,197-203`; `supabase/tests/guests_model.test.sql:294-314`).
-  - Conflitti con `version` + `versionedUpdate` (`src/features/guests/data.ts:383-410`); `loadGuests` (`data.ts:176`) in `src/app/(app)/invitati/page.tsx:47-55`.
-- **Annulla importazione.** `undo_guest_import` cancella fisicamente gli importati con `version = 1`, senza finestra temporale (`20261202200000_guests_import.sql:164-166`). Con le risposte in una tabella separata, cancellerebbe anche chi ha già risposto.
-- **Link pubblici esistenti.**
-  - `/invito/[token]`: token casuale, solo sha256 nel DB, RPC solo-chiave `invitation_by_token` (`core.sql:1012-1042`, grant a `service_role` a `core.sql:1403-1409`). La pagina usa `connection()` e `await params` (`src/app/(public)/invito/[token]/page.tsx:28-33`).
-  - Link firmati con HMAC: `src/lib/email/unsubscribe-token.ts` (segreto di almeno 32 caratteri, contesto fisso).
-- **Proxy e guardie.**
-  - `src/proxy.ts`: `getClaims`, poi `evaluateGuards`, poi `decorate` con `no-store` e `Referrer-Policy` (`proxy.ts:26,41-46`).
-  - Percorsi pubblici in `src/features/auth/guards.ts:46-55`. Con backend giù riscrive a `/servizio` (`guards.ts:108-110`).
-  - Il proxy gira su Node (`node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/proxy.md:255-257`) e può rispondere direttamente con un `Response` e uno stato (`proxy.md:591-614`).
-  - `X-Robots-Tag` è globale (`next.config.ts:46`).
-- **Chiave segreta.** `src/lib/supabase/admin.ts` è importabile solo da 4 ambiti (`eslint.config.mjs:100-151`).
-- **Limitatore di login.** `private.login_attempts` + `register_login_failure` (`core.sql:253-259,1272-1295`). La pulizia di `login_record` cancella *ogni* riga con la finestra del login (`core.sql:1324-1329`). Chiavi HMAC e `clientIp` in `src/features/auth/limiter-keys.ts`.
-- **Tema.** Sessione → cookie → predefinito (`src/themes/server.ts:59-78`); selettori `[data-theme][data-mode]` sullo stesso elemento (`src/app/themes.css:3,28`).
-- **Next 16.** `notFound()` dà 404 solo se avviene prima dello streaming; con `loading.tsx`/`Suspense` lo stato resta 200 (`.../04-functions/not-found.md:193-195`). Una server action non può impostare lo stato HTTP.
-- **Dati della pagina.**
-  - Data e location scelte: `decisions` (`key` `date`/`location`, `status`, `chosen_option_id`), `decision_options.title/comune`, `date_scenarios.date_from` (`20261201200000_decisions_timeline.sql:36-113`). `choose_option` rende fissa la data scelta (`:874-899`).
-  - Nomi della coppia in `wedding_partners.first_name`, tema in `weddings.theme_id` (`core.sql:116,135-140`).
-- **Esportazione e Guida.**
-  - Il JSON completo legge gli invitati da `gatherGuests` (`src/features/export/data.ts:80-123`).
-  - La Guida legge `docs/functional` e ogni pagina deve stare nella tabella di `README.md` (`src/features/guide/source.ts:39-49`).
-  - "Novità" usa una whitelist che non include le tabelle invitati (`src/features/home/data.ts:356`).
+Prima di R-04 (F2); le parti già sostituite dall'implementazione sono nella Solution.
+- **Invitati (R-03).** `guests`, `guest_groups`, `guest_tables` con eliminazione logica e "senza gruppo" calcolato dall'app (`20261202100000_guests.sql:9-10,35-104`); audit senza colonne personali, allowlist che obbliga a classificare ogni colonna nuova (`guests.sql:14-16,197-203`; `guests_model.test.sql:294-314`); conflitti con `version` + `versionedUpdate` (`src/features/guests/data.ts:383-410`); `undo_guest_import` in `20261202200000_guests_import.sql:164-166`.
+- **Link pubblici.** `/invito/[token]`: token casuale, solo sha256 nel DB, RPC `invitation_by_token` solo `service_role` (`core.sql:1012-1042,1403-1409`). HMAC con segreto ≥ 32 caratteri in `src/lib/email/unsubscribe-token.ts`.
+- **Proxy.** `getClaims` → `evaluateGuards` → `decorate` (`no-store`, `Referrer-Policy`; `proxy.ts:26,41-46`); pubblici in `guards.ts:46-55`, backend giù → `/servizio` (`:108-110`). Su Node, può rispondere con un `Response` e uno stato (`proxy.md:255-257,591-614`). `X-Robots-Tag` globale (`next.config.ts:46`).
+- **Chiave segreta.** `admin.ts` importabile da 4 ambiti (`eslint.config.mjs:100-151`).
+- **Limitatore di login.** `private.login_attempts` + `register_login_failure` (`core.sql:253-259,1272-1295`); la pulizia cancella ogni riga con la finestra del login (`:1324-1329`); chiavi HMAC e `clientIp` in `limiter-keys.ts`.
+- **Tema.** Sessione → cookie → predefinito (`src/themes/server.ts:59-78`); `[data-theme][data-mode]` sullo stesso elemento (`themes.css:3,28`).
+- **Next 16.** Con `loading.tsx`/`Suspense` un `notFound()` resta 200 (`not-found.md:193-195`); una server action non imposta lo stato HTTP.
+- **Dati della pagina.** Data e location scelte da `decisions`, `decision_options.title/comune`, `date_scenarios.date_from` (`20261201200000_decisions_timeline.sql:36-113`; `choose_option` fissa la data, `:874-899`); nomi in `wedding_partners.first_name`, tema in `weddings.theme_id` (`core.sql:116,135-140`).
+- **Esportazione, Guida, Novità.** JSON da `gatherGuests` (`export/data.ts:80-123`); Guida da `docs/functional` + tabella di `README.md` (`guide/source.ts:39-49`); whitelist di "Novità" senza tabelle invitati (`home/data.ts:356`).
 
 ## Solution
-Tutto nelle forme già in uso: SQL con RLS, RPC con codici stabili, server action, componenti shadcn, proxy unico. Sicurezza e token sono in **ADR-0003** (`docs/adr/0003-link-rsvp-token-derivato-accesso-pubblico.md`, proposto). Qui solo i contratti.
+Nelle forme già in uso: SQL con RLS, RPC con codici stabili, server action, shadcn, proxy unico. Sicurezza e token in **ADR-0003**; qui solo i contratti.
 
 ### Dati (migrazione additiva)
-- **`guest_groups.rsvp_mode`** `text not null default 'together' check in ('together','separate')`.
-  - Strutturale: va nell'allowlist dell'audit.
-  - Si aggiorna con versione e grant di colonna, dal menu del gruppo (BR1, BR3).
-- **`rsvp_links`**:
-  - colonne: `id` uuid (dal server), `wedding_id`, `group_id` *oppure* `guest_id` (`check` esattamente uno), `token_hash bytea` unico di 32 byte, `created_at/by`, `revoked_at/by`, `shared_at/by`, `version`;
-  - FK composte `(…, wedding_id)` **on delete cascade** (BR5);
-  - indici unici parziali: un link non revocato per gruppo e uno per persona (AC7);
-  - audit `audit_row('token_hash')`;
-  - RLS: select con `guests/read`, grant di select **senza** `token_hash`; scritture solo tramite RPC.
-- **`rsvp_link_people`** `(link_id, guest_id)`, cascade su entrambi:
-  - fotografia delle persone coperte al momento di "Condiviso". Serve per "Da rimandare" (BR3);
-  - RLS: select `guests/read`; nessun dato personale, senza audit.
-- **`rsvp_responses`**, 1:1 con l'invitato:
-  - colonne: `id` = id dell'invitato (FK composta → `guests`, cascade), `wedding_id`, `status` (`yes`/`no`), `diet text[]` ⊆ {`vegetarian`,`vegan`,`gluten_free`,`lactose_free`}, `diet_note` fino a 200, `source` (`guest`/`couple`, deciso da un trigger su `auth.uid()`), `answered_at`, `version`;
-  - `check (status = 'yes' or (diet = '{}' and diet_note is null))` (BR11);
-  - nessuna riga = "In attesa";
-  - audit con `status`, `diet` e `diet_note` **esclusi** (AC14);
-  - RLS: select `guests/read`; nessun insert/update per `authenticated` (la risposta a mano arriva con R-07).
+- **`guest_groups.rsvp_mode`** `text not null default 'together' check in ('together','separate')`: strutturale (allowlist dell'audit), aggiornata con versione e grant di colonna dal menu del gruppo (BR1, BR3).
+- **`rsvp_links`**: `id` uuid (dal server), `wedding_id`, `group_id` *oppure* `guest_id` (`check` esattamente uno), `token_hash bytea` unico di 32 byte, `created_at/by`, `revoked_at/by`, `shared_at/by`, `version`. FK composte `(…, wedding_id)` **on delete cascade** (BR5); indici unici parziali: un link non revocato per gruppo e uno per persona (AC7); audit `audit_row('token_hash')`; RLS select con `guests/read`, grant di select **senza** `token_hash`; scritture solo tramite RPC.
+- **`rsvp_link_people`** `(link_id, guest_id)`, cascade su entrambi: fotografia delle persone coperte a "Condiviso", per "Da rimandare" (BR3); RLS select `guests/read`; nessun dato personale, senza audit.
+- **`rsvp_responses`**, 1:1 con l'invitato: `id` = id dell'invitato (FK composta → `guests`, cascade), `wedding_id`, `status` (`yes`/`no`), `diet text[]` ⊆ {`vegetarian`,`vegan`,`gluten_free`,`lactose_free`}, `diet_note` ≤ 200, `source` (`guest`/`couple`, da trigger su `auth.uid()`), `answered_at`, `version`. `check (status = 'yes' or (diet = '{}' and diet_note is null))` (BR11); nessuna riga = "In attesa"; audit con `status`, `diet`, `diet_note` **esclusi** (AC14); RLS select `guests/read`, nessun insert/update per `authenticated` (risposta a mano in R-07).
 - **`private.rsvp_attempts`**: stessa forma di `login_attempts`, con pulizia propria (ARC-2).
-- **`undo_guest_import`** sostituita (`create or replace`, stessa firma):
-  - salta **solo** chi ha una risposta, un link personale non revocato o compare nella fotografia di un link condiviso (PO-2): la sola copertura del link del gruppo non basta;
-  - restituisce anche `skipped`, così il toast dice quante persone restano (DES-28).
+- **`undo_guest_import`** sostituita (stessa firma): prima cancellava ogni importato con `version = 1`; ora salta **solo** chi ha una risposta, un link personale non revocato o compare nella fotografia di un link condiviso (PO-2; la sola copertura del link del gruppo non basta) e restituisce `skipped` per il toast (DES-28).
 
 ### Regole in SQL (unica fonte)
 - `private.rsvp_expires_on(wedding) → date | null`: data scelta + 30 giorni (BR7).
 - `private.rsvp_link_people(link, now) → setof guest`: le persone vive che il link copre *ora*. Vuoto se il link è revocato o scaduto o se il bersaglio non è un destinatario (BR1-BR4). Un link funziona se l'insieme non è vuoto.
-- `public.rsvp_status(p_now default null) → jsonb` (INVOKER, `guests/read`), letto dalla lista:
-  - `{expires_on, links:[{id, group_id, guest_id, working, revoked_at, shared_at, created_at}], resend_guest_ids:[…]}`;
+- `public.rsvp_status(p_now default null) → jsonb` (DEFINER con controllo `guests/read`, Change log), letto dalla lista: `{expires_on, links:[{id, group_id, guest_id, working, revoked_at, shared_at, created_at}], resend_guest_ids:[…]}`;
   - `resend_guest_ids` = persone nella fotografia di un link condiviso (revocato o no) che ora non le copre, e il cui destinatario attuale non ha un link funzionante.
-- Con un TypeScript puro (`view.ts`), la lista ricava i destinatari (stessa regola di "senza gruppo" di R-03) e lo stato mostrato. Precedenza:
-  1. Scaduto;
-  2. Condiviso il / Da condividere, se c'è un link funzionante;
-  3. Da rimandare;
-  4. Nessun link.
+- `view.ts` (TS puro) ricava i destinatari (regola "senza gruppo" di R-03) e lo stato mostrato, con precedenza: Scaduto → Condiviso il / Da condividere (link funzionante) → Da rimandare → Nessun link.
 
 ### RPC per la coppia (`authenticated`, codici P0001 stabili, 42501)
 | RPC | Contratto |
@@ -78,9 +43,9 @@ Tutto nelle forme già in uso: SQL con RLS, RPC con codici stabili, server actio
 | `rsvp_mark_shared(p_link_id) → {previous}` / `rsvp_unmark_shared(p_link_id, p_previous)` | "Condiviso il" + fotografia; Annulla (AC8, D11) |
 
 ### RPC pubbliche (solo `service_role`, DEFINER, `p_now` facoltativo)
-- `p_now` arriva **solo** dal server, da `resolveNow()` (`src/lib/clock.ts`), e vale per proxy, pagina, `submitRsvp` e `loadRsvp`. Mai da parametri o corpo della richiesta (QA-1).
-- `p_ip_key` null (IP assente) = nessun limite per IP; il limite per link resta (QA-Q4, come R27(b)).
-- Un payload non valido su un link che funziona dà il codice `invalid_answers` (P0001), distinto dalla neutra e mai un 500 (QA-8).
+- `p_now` **solo** dal server, da `resolveNow()` (`src/lib/clock.ts`), per proxy, pagina, `submitRsvp` e `loadRsvp`; mai dalla richiesta (QA-1).
+- `p_ip_key` null (IP assente) = nessun limite per IP; resta quello per link (P5).
+- Payload non valido su un link che funziona → `invalid_answers` (P0001), distinto dalla neutra, mai un 500 (QA-8).
 
 | RPC | Contratto |
 |---|---|
@@ -93,56 +58,54 @@ Tutto nelle forme già in uso: SQL con RLS, RPC con codici stabili, server actio
 - **`src/features/rsvp/public-rpc.ts`** (server-only, quinto ambito di `admin.ts`): solo `gate`, `page` e `submit`; restituisce codici, mai messaggi Postgres.
 - **`src/features/rsvp/limiter.ts`**: `rsvpIpKey(secret, ip)` con contesto `r2y-rsvp:ip:`; IPv6 ridotto al /64; riusa `clientIp`.
 - **`src/proxy.ts`** su `/rsvp/{token}`, solo se la forma è valida e il backend risponde:
-  - chiama `gate` con tempo limitato; se scade lascia passare;
-  - bloccato → `429` con `Retry-After`, `X-Robots-Tag` e una pagina HTML minima (schema di `src/app/(public)/email/disattiva/html.ts`), con `lang="it"`, viewport, `color-scheme` e CSS inline chiaro/scuro, h1 e testo a 18 px (DES-29);
+  - `gate` con timeout di 3 s, fail-open;
+  - bloccato → `429` con `Retry-After`, `X-Robots-Tag` e HTML minimo (schema di `email/disattiva/html.ts`): `lang="it"`, viewport, `color-scheme`, CSS inline chiaro/scuro, h1 e testo a 18 px (DES-29);
   - forma non valida o link che non funziona → 404 neutra in HTML (Arbitrato S3);
-  - altrimenti imposta l'intestazione di richiesta `x-r2y-theme`. Il proxy la toglie sempre dalle richieste del client, come `x-r2y-backend`;
-  - aggiunge `/rsvp` a `NO_REFERRER_PREFIXES`.
+  - altrimenti imposta l'intestazione di richiesta `x-r2y-theme` (sempre tolta da quelle del client, come `x-r2y-backend`);
+  - `/rsvp` in `NO_REFERRER_PREFIXES`; pagina del modulo `same-origin` (D15, Change log).
 - **`guards.ts`**: `/rsvp` in `PUBLIC_PREFIXES`. **`themes/server.ts`**: `x-r2y-theme`, se presente e approvato, vince su tutto.
 - **Pagina `src/app/(public)/rsvp/[token]/page.tsx`**:
-  - `connection()`; la neutra all'apertura (404) la risponde il proxy; nella pagina `neutral` → `LinkUnavailable` in 200 (Arbitrato S3); **niente `loading.tsx`** nel segmento;
-  - `metadata` statico: noindex, titolo e anteprima "Conferma la tua presenza" / "Ci vuole un minuto", nessuna immagine;
-  - modulo client con `useActionState` su `submitRsvp` (legata al token): funziona senza JS; con JS aggiunge "Vengono tutti", preferenze che compaiono e contatore (design §1.1);
+  - `connection()`; neutra all'apertura (404) dal proxy, nella pagina `neutral` → `LinkUnavailable` in 200 (Arbitrato S3); **niente `loading.tsx`**;
+  - `metadata` statico: noindex, "Conferma la tua presenza" / "Ci vuole un minuto", nessuna immagine;
+  - modulo con `useActionState` su `submitRsvp` (legata al token); con JS aggiunge "Vengono tutti", preferenze che compaiono e contatore (design §1.1);
   - **senza JS** (DES-24, DES-34): riepilogo e modulo in un `<details>` dal server, "Modifica" = `summary`; preferenze sempre visibili; "zero scelte" controllato sul server;
-  - **campi controllati** dall'ultimo stato inviato: le scelte restano dopo un errore (DES-26); errore di rete preso da un wrapper client (`try/catch`) in `role="alert"`;
-  - `ok:false` durante la compilazione → `{state:"unavailable"}`: `LinkUnavailable` al posto di **tutto** il contenuto (DES-25), 200, uguale per ogni causa (Q-P2);
+  - **campi controllati** dall'ultimo stato inviato (DES-26); errore di rete da un wrapper `try/catch` in `role="alert"`;
+  - `ok:false` durante la compilazione → `unavailable`: `LinkUnavailable` al posto di **tutto** il contenuto (DES-25), 200, uguale per ogni causa (Q-P2);
   - nessuna bozza nel dispositivo (AC11).
 - **Lato coppia `src/features/rsvp/actions.ts`**: `createLinks`, `getLinkUrl` (sola lettura: RLS + `guests/write`, ricalcolo e controllo dell'hash), `rotateLink`, `revokeLink`, `markShared`/`unmarkShared`, `setGroupMode` (versionata).
-  - Il foglio carica l'URL all'apertura: Copia, Condividi e WhatsApp (`<a href="https://wa.me/?text=…">`) lo usano con un solo tocco, anche su iOS (AC1). "Crea link" è un'azione separata.
-  - "Condiviso il" solo dopo una copia riuscita o una condivisione completata (`AbortError` o permesso negato no, QA-12).
-  - "Crea link per tutti (N)" (DES-31, PO-7): N = destinatari senza link funzionante, "Da rimandare" compresi; conferma con N e avviso "data non scelta"; toast "Ho creato N link", senza Annulla; dopo la scadenza disattivato, con spiegazione.
+  - Il foglio carica l'URL all'apertura: Copia, Condividi e WhatsApp (`<a href="https://wa.me/?text=…">`) con un solo tocco, anche su iOS (AC1); "Crea link" è un'azione separata.
+  - "Condiviso il" solo dopo copia riuscita o condivisione completata (non con `AbortError` o permesso negato, QA-12).
+  - "Crea link per tutti (N)" (DES-31, PO-7): N = destinatari senza link funzionante, "Da rimandare" compresi; conferma con N e avviso "data non scelta"; toast "Ho creato N link" senza Annulla; disattivato dopo la scadenza, con spiegazione.
 - **Esportazione** (AC13): `gatherGuests` aggiunge `rsvpResponses` e `rsvpLinks` (mai `token_hash`: la colonna non è leggibile).
 
 ## Alternatives considered
 | Option | Pros | Cons | Why not |
 |---|---|---|---|
-| Colonne RSVP su `guests` (ARC-6 in F1) | Una riga, un conflitto | Ogni risposta dell'invitato incrementa `guests.version`: dialogo di conflitto spurio nel modulo R-03, con `updated_by` nullo | La risposta a mano è passata a R-07 (D1); la tabella separata non tocca R-03 |
-| Destinatario salvato e aggiornato da trigger | Lettura semplice | Trigger su sposta, importa, elimina, ripristina, modalità; facile da sbagliare | Il calcolo è a costo zero sui volumi di R-03 (500) |
-| Stato dei link calcolato solo in TS | Niente RPC | Due implementazioni (pagina pubblica in SQL, lista in TS) che possono divergere | Una sola regola SQL, letta da entrambe |
-| Pagina pubblica come Route Handler HTML | Stato HTTP pieno anche sugli invii | Niente componenti, temi e Tailwind dell'app; più codice | 429 dal proxy sul GET, messaggio nel modulo per l'invio (Q-P2) |
-| Tema con `div[data-theme]` annidato | Niente proxy | I selettori del tema richiedono `data-mode` sullo stesso elemento: si cambierebbe il CSS dei 12 temi | Intestazione dal proxy, nessun lampeggio |
+| Colonne RSVP su `guests` (ARC-6 in F1) | Una riga, un conflitto | Ogni risposta incrementa `guests.version`: conflitto spurio nel modulo R-03, `updated_by` nullo | Risposta a mano in R-07 (D1); la tabella separata non tocca R-03 |
+| Destinatario salvato da trigger | Lettura semplice | Trigger su sposta, importa, elimina, ripristina, modalità: facile sbagliare | Calcolo a costo zero sui volumi di R-03 (500) |
+| Stato dei link solo in TS | Niente RPC | Due implementazioni (SQL e TS) che possono divergere | Una sola regola SQL |
+| Pagina pubblica come Route Handler HTML | Stato HTTP pieno anche sugli invii | Niente componenti, temi e Tailwind; più codice | 429 dal proxy sul GET, messaggio nel modulo all'invio (Q-P2) |
+| Tema con `div[data-theme]` annidato | Niente proxy | `data-mode` deve stare sullo stesso elemento: cambierebbe il CSS dei 12 temi | Intestazione dal proxy, nessun lampeggio |
 
 ## Impacts
 - **Dati e migrazioni.** Due additive: `20261203100000_rsvp.sql` (schema, RLS, RPC coppia, `undo_guest_import`), `20261203200000_rsvp_public.sql` (limitatore, RPC pubbliche). Nessuna colonna rimossa: il codice precedente gira sul nuovo schema (Instant Rollback); indietro solo con una migrazione nuova.
 - **Contratti.** Nuove RPC (sopra); `GroupView.rsvpMode`; due chiavi nel JSON di esportazione, CSV invariato (D13).
 - **Prestazioni.** Pagina pubblica: 2 RPC per apertura (gate + pagina, o gate + `rsvp_page` nel proxy per un link morto), nessuna libreria di terzi. Invitati: + `rsvp_status` e `rsvp_responses` paginate (≤ 500), < 1 s.
-- **Sicurezza.** Quinto ambito della chiave segreta (ADR-0003); superficie pubblica nuova: round di sicurezza in F3; dati sanitari fuori da audit, log e "Novità".
-- **Dipendenze.** Nessuna.
-- **Configurazione.**
-  - **`RSVP_LINK_SECRET`** (almeno 32 caratteri): Vercel Production e Preview con valori diversi, `.env.local`, valore finto in `ci.yml` e `.env.example` (D4).
-  - Nessun nuovo servizio.
+- **Sicurezza.** Quinto ambito della chiave segreta (ADR-0003); round di sicurezza in F3; dati sanitari fuori da audit, log e "Novità".
+- **Dipendenze e servizi.** Nessuno.
+- **Configurazione.** `RSVP_LINK_SECRET` (≥ 32 caratteri): Vercel Production e Preview con valori diversi, `.env.local`, valore finto in `ci.yml` e `.env.example` (D4).
 
 ## Risks
 | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|
-| Esposizione di dati (altre persone, altro matrimonio) dalla funzione pubblica | M | H | Insieme di chiavi chiuso con test pgTAP; casi su più matrimoni; id ricontrollati in `rsvp_submit`; round di sicurezza |
-| Regola del destinatario sbagliata in un caso limite (BR1-BR4) | M | M | Una sola funzione SQL; matrice pgTAP su sposta, modalità, elimina, ripristina, elimina definitivamente, importa |
-| Il 404 diventa 200 per lo streaming, o il 429 si perde | M | M | Niente `loading.tsx` nel segmento; test d'accettazione sugli stati HTTP |
-| Copia/Condividi/WhatsApp falliscono su iOS | M | M | URL caricato all'apertura del foglio; `<a href>` per WhatsApp; smoke WebKit + prova su un iPhone vero al Gate C |
+| Esposizione di dati (altre persone, altro matrimonio) dalla funzione pubblica | M | H | Insieme di chiavi chiuso in pgTAP; casi su più matrimoni; id ricontrollati in `rsvp_submit`; round di sicurezza |
+| Regola del destinatario sbagliata in un caso limite (BR1-BR4) | M | M | Una sola funzione SQL; matrice pgTAP del ciclo di vita |
+| Il 404 diventa 200 per lo streaming, o il 429 si perde | M | M | Neutra e 429 dal proxy (Arbitrato S3); niente `loading.tsx`; test sugli stati HTTP |
+| Copia/Condividi/WhatsApp falliscono su iOS | M | M | URL caricato all'apertura del foglio; `<a href>` per WhatsApp; smoke WebKit + iPhone vero al Gate C |
 | "Annulla importazione" cancella chi ha risposto | M | H | `undo_guest_import` sostituita + pgTAP |
-| `RSVP_LINK_SECRET` mancante o ruotato | L | M | Errore leggibile nel foglio ("Non sono riuscito a creare il link"), pagina pubblica indipendente; controllo dell'hash al ricalcolo; runbook |
-| Finestra codice nuovo / schema vecchio dopo il merge | H (pochi minuti) | L | `rsvp_status` non trovato → la lista si apre senza stati RSVP (schema `not_migrated` dell'export); la pagina pubblica dà la neutra |
-| Gate nel proxy rallenta o fallisce | L | L | Timeout di 3 s come le altre chiamate del proxy, fail-open; la pagina decide comunque |
+| `RSVP_LINK_SECRET` mancante o ruotato | L | M | Errore leggibile nel foglio, pagina pubblica indipendente; controllo dell'hash al ricalcolo; runbook |
+| Finestra codice nuovo / schema vecchio dopo il merge | H (minuti) | L | Lista senza stati RSVP (schema `not_migrated` dell'export); pagina pubblica neutra |
+| Gate nel proxy rallenta o fallisce | L | L | Timeout di 3 s, fail-open; la pagina decide comunque |
 
 ## Steps
 | Step | Tasks | What the developer can see or check at the end |
@@ -195,11 +158,11 @@ Tutto nelle forme già in uso: SQL con RLS, RPC con codici stabili, server actio
 | Functional | `docs/functional/conferme-di-presenza.md` (nuova, + riga in `README.md`) | Cosa vede l'invitato; creare e condividere i link; WhatsApp e nota privacy (DES-36); stati del link; modalità del gruppo ("ognuno per sé" = un foglio per persona, DES-35); Da rimandare; **solo** scadenza dei link (data + 30, PO-7); privacy |
 | Functional | `invitati.md`, `esportazione.md`, `servizio-in-pausa.md` | Stati nella lista; Annulla importazione lascia chi ha risposto o ha un link; elimina definitivamente un gruppo = via link e fotografia (P6); chiavi del JSON; testo per gli invitati |
 | Technical | `modello-dati.md` | Tabelle `rsvp_*`, `rsvp_mode`, RPC, matrice delle scritture, allowlist |
-| Technical | `sicurezza.md` | Sezione "Pagina pubblica RSVP": token derivato, quinto ambito della chiave segreta, limiti (IP affidabile solo dietro Vercel, falsificabile in locale e nei test, QA-2), 404/429, residuo dei log (rimando ad ADR-0003) |
-| Technical | `architettura.md`, `sviluppo-locale-e-test.md` | Passo RSVP nel proxy e intestazione del tema; link di prova del seed, segreto di test, orologio |
-| Technical | `ambienti-e-rilascio.md` | `RSVP_LINK_SECRET` (tabella variabili e rotazione: rotazione ≠ invalidazione, runbook di revoca totale), controlli post-deploy (T13) |
-| ADR | `docs/adr/0003-link-rsvp-token-derivato-accesso-pubblico.md` | Bozza scritta in F2 (proposed) → accepted al Gate B |
-| ADR | `docs/adr/0002-dati-personali-invitati.md` | Una riga in "Follow-up": "R-04: vedi ADR-0003 (token derivato, accesso pubblico)" |
+| Technical | `sicurezza.md` | "Pagina pubblica RSVP": token derivato, quinto ambito della chiave segreta, limiti (IP affidabile solo dietro Vercel, falsificabile in locale e nei test, QA-2), 404/429, residuo dei log e REV-104 (rimando ad ADR-0003) |
+| Technical | `architettura.md`, `sviluppo-locale-e-test.md` | Passo RSVP nel proxy, intestazione del tema; link di prova del seed, segreto di test, orologio |
+| Technical | `ambienti-e-rilascio.md` | `RSVP_LINK_SECRET` (rotazione ≠ invalidazione, runbook di revoca totale), controlli post-deploy (T13) |
+| ADR | `0003-link-rsvp-token-derivato-accesso-pubblico.md` | Proposed (F2) → accepted al Gate B; riga referrer (D15) |
+| ADR | `0002-dati-personali-invitati.md` | In "Follow-up": "R-04: vedi ADR-0003 (token derivato, accesso pubblico)" |
 
 ## Release plan
 - **Percorso**: PR → preview Vercel (staging, senza le migrazioni di R-04, come D-A di R-03) → merge su main = **produzione** (`merge_deploys_production: true`).
@@ -234,32 +197,31 @@ Tutto nelle forme già in uso: SQL con RLS, RPC con codici stabili, server actio
 AC3 (id opaco e categoria per persona), AC6 (all'apertura sempre 404; all'invio neutra in 200), AC10 (429 all'apertura, messaggio nel modulo all'invio), AC12 (testi della scadenza, nessuna creazione dopo, link che tornano a funzionare): approvate al Gate B, testo in `brief.md`. QA-Q3 e QA-Q4 sono P6 e P5.
 
 ### Arbitrato S3: 404 senza JS (architect, 2026-11-27)
-- **Causa.** Il confine di `not-found.tsx` è un error boundary client (`next/dist/client/components/http-access-fallback/error-boundary.js:18,36`), che React non esegue in SSR: il `notFound()` della pagina rompe la shell, Next mette 404 e invia `<html id="__next_error__">` col `<body>` vuoto (`next/dist/server/app-render/app-render.js:2507-2510,1324-1330`). Non è config né layout (`next.config.ts:58-65`; nessun layout in `(public)`). Riprodotto (build, `next start` :3300): `/rsvp/AAAA…` → 404 `__next_error__`, solo `<title>`; `/rsvp/a/b` (senza rotta) → 404 col corpo. `/invito` non usa `notFound()`; `global-not-found` vale solo senza rotta (`not-found.md:51`). Idem, per costruzione (non riprodotto), dopo un invio senza JS su link morto: la pagina si rifà dopo l'azione.
-- **Decisione: la neutra all'apertura la risponde il proxy**, come il 429 (`proxy.ts:189-210`):
+- **Causa.** `not-found.tsx` è un error boundary client, non eseguito in SSR: `notFound()` dà 404 con `<html id="__next_error__">` e `<body>` vuoto (`error-boundary.js:18,36`; `app-render.js:2507-2510,1324-1330`; riprodotto con `next start`). Stesso effetto dopo un invio senza JS su link morto.
+- **Decisione: la neutra all'apertura la risponde il proxy**, come il 429:
   - forma non valida o escape rotto → 404 neutra, senza DB;
-  - gate non bloccato e `themeId === null` (link morto: `weddings.theme_id` è `not null`, `core.sql:116`) → `rsvpLoadPage` (conta l'errore, BR9) → `neutral` → 404 neutra; `ok`, `retry` o gate `null` → pagina;
-  - `neutralHtml()` in `src/features/rsvp/neutral-html.ts` (schema di `blocked-html.ts`, senza script): stringa costante, byte identici per ogni causa; intestazioni del 429 senza `Retry-After`; esporta i testi che `LinkUnavailable` importa;
-  - la pagina non chiama più `notFound()`: `neutral` → `RsvpShell` + `LinkUnavailable` in 200 (gate scaduto o invio senza JS; AC6: all'invio 200).
-- **Residuo.** Gate scaduto (3 s) ma pagina viva: link morto in 200 con la neutra (corpo prima dello stato; `noindex` resta). Aspetto = 429 (DES-29), non il tema React: lo verifica il designer in S3.
-- **Scartata.** Rewrite a URL senza rotta + `app/not-found.tsx` radice guidato da un'intestazione: cambia il 404 dell'app ed è spedito con ogni rotta (`not-found.md:138`).
+  - gate non bloccato e `themeId === null` (link morto; `weddings.theme_id` è `not null`) → `rsvpLoadPage` (conta l'errore, BR9) → `neutral` → 404 neutra; `ok`, `retry` o gate `null` → pagina;
+  - `neutralHtml()` in `neutral-html.ts` (schema di `blocked-html.ts`, senza script): stringa costante, byte identici per ogni causa, intestazioni del 429 senza `Retry-After`; esporta i testi usati da `LinkUnavailable`;
+  - la pagina non chiama più `notFound()`: `neutral` → `RsvpShell` + `LinkUnavailable` in 200 (gate scaduto o invio senza JS; AC6).
+- **Residuo.** Gate scaduto (3 s) e pagina viva: link morto in 200 con la neutra (`noindex` resta). Aspetto = 429 (DES-29).
+- **Scartata.** Rewrite a URL senza rotta + `app/not-found.tsx` radice: cambia il 404 dell'app (`not-found.md:138`).
 - **File.** T5: `src/proxy.ts`, `neutral-html.ts` + test (nuovi). Poi T7: `page.tsx`, `LinkUnavailable.tsx`, elimina `not-found.tsx`.
 - **Test.** T10: 5 cause + forma non valida → 404, corpo identico byte per byte, senza `<script>` né `__next_error__`; un incremento di `rsvp_attempts` per apertura. T11: senza JS, link morto e invio su link revocato mostrano il testo.
 
 ## Risposte alle obiezioni F2
-- **QA (17/17):** 1 `resolveNow()` → `p_now` (T5-T7, T11); 2 IP sintetico, pulizia, P5, `sicurezza.md`; 3 matrice; 4 neutra + POST; 5 scadenza con DST (data scelta fissa); 6 env T4/T11, seed e2e separato; 7 log; 8 `invalid_answers`; 9 concorrenza; 10 "Novità"; 11 `rsvp_gate` STABLE; 12 niente "Condiviso il" se fallisce; 13 e2e ridotti; 14 partner con sessione; 16 export; 17 seed mai remoto (T13). QA-15: una variante ben formata (es. maiuscole) è un token sconosciuto, va al DB e conta; senza DB si scartano solo le forme non valide; slash finale = redirect 308.
-- **Designer (13/13):** 24 `<details>`; 25 `unavailable`; 26 campi controllati + errore di rete; 27 `rowColumns` (T9); 28 `skipped` + toast; 29 429 accessibile; 30 AC12; 31 N e conferma; 32-33 design §2, §1.2; 34 senza JS; 35-36 Guida.
-- **PO (7/7):** 1 P7; 2 `undo_guest_import` stretta; 3-5 AC sopra (4: caso POST); 6 D4 nel brief; 7 documentazione + avviso in "Crea link per tutti".
+Tutte accolte (QA 17, designer 13, PO 7; riepilogo in `log.md`), integrate nelle sezioni sopra coi loro codici. QA-15: una variante ben formata (es. maiuscole) è un token sconosciuto, va al DB e conta; senza DB si scartano solo le forme non valide; slash finale = redirect 308.
 
 ## Change log
 | Date | Change | Why | Approved by |
 |---|---|---|---|
 | 2026-11-26 | Round 1 di F2: contratto di `rsvp_submit` (`seen_at`, `invalid_answers`), `undo_guest_import` più stretta, orologio, matrice, file aggiunti a T4/T6/T9/T10/T11 | Obiezioni QA, designer, PO | — (Gate B) |
-| 2026-11-26 | T1: `qa_cross_wedding.test.sql` e (se serve) `tests/acceptance/support/matrix.ts` aggiunti ai file di T1; `rsvp_lifecycle.test.sql` nuovo per la matrice; `rsvp_status` e RPC coppia DEFINER con controllo `guests/read`; `unique (id, wedding_id)` su `guests`; colonne `created_*/updated_*` sulle tabelle RSVP; `mark_shared` unisce la fotografia | Oracoli per-tabella esistenti; nessun USAGE su `private` per `authenticated`; FK composite; trigger di audit/versione | coordinatore (stesso perimetro del Gate B) |
-| 2026-11-26 | Revisione S1: `rsvp_create_links`/`rsvp_rotate_link` rifiutano dopo la scadenza (Q2); caso NUL spostato a `public-rpc.ts` + T10 (REV-2); nota vuota → null nella server action T7 (Q1); REV-104 residuo accettato, da documentare in `sicurezza.md` (T12) | Revisioni code-1, code-2 | coordinatore |
-| 2026-11-27 | T6: aggiunti `src/domain/export/types.ts`, `build.ts`, `export.test.ts` (chiavi `rsvpResponses`/`rsvpLinks` nel JSON) | `ExportInput` e `buildExportJson` elencano le chiavi in modo esplicito | coordinatore |
-| 2026-11-27 | Nuova RPC `rsvp_link_matches(p_link_id, p_hash)` (DEFINER, `guests/write`) nella migrazione di T1, fatta da T6; `GroupView.rsvpMode` facoltativo (T9 può renderlo obbligatorio) | `token_hash` non leggibile dal client: senza RPC il controllo "va rigenerato" del piano non si può fare | coordinatore |
-| 2026-11-27 | Arbitrato S3: neutra all'apertura dal proxy (`neutral-html.ts`, T5); pagina senza `notFound()` né `not-found.tsx` (T7); test T10/T11 | `notFound()` in Next 16.4.6 dà 404 col corpo vuoto senza JS (DES-24, DES-34) | architect (arbitrato) |
-| 2026-11-27 | T7: `retry` dell'invio = errore nel modulo con scelte conservate (non `unavailable`); input nativi invece di Radix; niente `aria-expanded` sul Sì; nota > 200 e NUL scartati in locale; titolo `absolute`. Revisione S3: T7 tocca anche `proxy.ts`, `neutral-html.ts`, `public-rpc.ts` (proiezione sulle chiavi AC3, REV-117) | `retry` è transitorio, non un link morto; Radix non invia senza JS; code-5 REV-23, code-6 | coordinatore |
-| 2026-11-27 | `Referrer-Policy: same-origin` sulla pagina del modulo (header del proxy e meta di `RsvpShell`); neutra e 429 restano `no-referrer`; T10 controlla l'header per tipo di pagina, T11 invia davvero senza JS; T12 aggiorna ADR-0003 (riga "Sempre: … no-referrer") | DES-37: con `no-referrer` l'invio senza JS dà 500 (`Origin: null`) | sviluppatore (brief D15) |
+| 2026-11-26 | T1: + `qa_cross_wedding.test.sql`, `rsvp_lifecycle.test.sql` (matrice), `tests/acceptance/support/matrix.ts` se serve; `rsvp_status` e RPC coppia DEFINER con controllo `guests/read`; `unique (id, wedding_id)` su `guests`; `created_*/updated_*` sulle tabelle RSVP; `mark_shared` unisce la fotografia | Oracoli per tabella; niente USAGE su `private`; FK composte; trigger audit/versione | coordinatore (perimetro Gate B) |
+| 2026-11-26 | Revisione S1: create/rotate rifiutano dopo la scadenza (Q2); NUL in `public-rpc.ts` + T10 (REV-2); nota vuota → null in T7 (Q1); REV-104 residuo accettato, in `sicurezza.md` (T12) | code-1, code-2 | coordinatore |
+| 2026-11-27 | T6: + `src/domain/export/types.ts`, `build.ts`, `export.test.ts` | `buildExportJson` elenca le chiavi in modo esplicito | coordinatore |
+| 2026-11-27 | RPC `rsvp_link_matches(p_link_id, p_hash)` (DEFINER, `guests/write`) nella migrazione di T1, fatta da T6; `GroupView.rsvpMode` facoltativo (T9 può renderlo obbligatorio) | `token_hash` non leggibile: serve per "va rigenerato" | coordinatore |
+| 2026-11-27 | Arbitrato S3 (sopra) | 404 col corpo vuoto senza JS (DES-24, DES-34) | architect (arbitrato) |
+| 2026-11-27 | T7: `retry` = errore nel modulo, scelte conservate (non `unavailable`); input nativi, non Radix; niente `aria-expanded` sul Sì; nota > 200 e NUL scartati in locale; titolo `absolute`. Revisione S3: T7 tocca anche `proxy.ts`, `neutral-html.ts`, `public-rpc.ts` (proiezione chiavi AC3, REV-117) | `retry` è transitorio; Radix non invia senza JS; REV-23, code-6 | coordinatore |
+| 2026-11-27 | `Referrer-Policy: same-origin` sulla pagina del modulo (proxy + meta di `RsvpShell`); neutra e 429 `no-referrer`; T10 controlla per tipo di pagina, T11 invia senza JS; T12 aggiorna ADR-0003 | DES-37: con `no-referrer` l'invio senza JS dà 500 (`Origin: null`) | sviluppatore (brief D15) |
+| 2026-11-28 | T8: "Copia link" copia solo l'URL (il messaggio va con Condividi/WhatsApp); modalità del gruppo = conferma del passaggio all'altra modalità, non scelta a due opzioni; il tocco su WhatsApp segna "Condiviso il". T9: + `src/features/guests/GuestList.tsx` (costruisce le props di `GuestRow`/`GroupHeader`) e `src/features/rsvp/CreateAllDialog.tsx`; avviso "data non scelta" solo sulla data (nessun segnale della location nello snapshot) | Etichetta "link"; testo delle conseguenze copre i due sensi; unico punto in cui nascono le props della lista | coordinatore |
 
 ## Outcome
