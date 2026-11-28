@@ -76,8 +76,11 @@ describe.skipIf(!APP_BUILT)("RSVP public edge (built app)", () => {
     secrets.push(link.token, link.hash.slice(2));
     return link;
   };
-  const open = (token: string, init: Parameters<typeof request>[2] = {}) =>
-    request(app.base, `/rsvp/${token}`, init);
+  const open = (token: string, init: Parameters<typeof request>[2] = {}) => {
+    // every token opened here must stay out of the server's output (REV-131)
+    if (token.length === 43 && !secrets.includes(token)) secrets.push(token);
+    return request(app.base, `/rsvp/${token}`, init);
+  };
 
   let themed: TestWedding;
   let live: TestLink;
@@ -145,6 +148,20 @@ describe.skipIf(!APP_BUILT)("RSVP public edge (built app)", () => {
       for (const name of liveNames) expect(r.text).toContain(name);
       expect(r.text).toContain('content="noindex, nofollow"');
       expect(ipAttempt(mine)).toBeNull();
+    });
+
+    it("the link preview is static: og:title and og:description, no image, no name in the <head> (AC10, REV-38)", async () => {
+      const r = await open(live.token, { ip: ip() });
+      const head = /<head[\s\S]*?<\/head>/.exec(r.text)?.[0] ?? "";
+      expect(head).not.toBe("");
+      const meta = (property: string) =>
+        new RegExp(`<meta[^>]+(?:property|name)="${property}"[^>]+content="([^"]*)"`).exec(
+          head,
+        )?.[1];
+      expect(meta("og:title")).toBe("Conferma la tua presenza");
+      expect(meta("og:description")).toBe("Ci vuole un minuto");
+      expect(head).not.toMatch(/og:image|twitter:image|rel="image_src"/);
+      for (const name of [...liveNames, "Famiglia QA", "Rossi"]) expect(head).not.toContain(name);
     });
 
     it("a client-sent x-r2y-theme never repaints the page or a neutral answer", async () => {
@@ -384,7 +401,52 @@ describe.skipIf(!APP_BUILT)("RSVP public edge (built app)", () => {
     // (`rsvp_public.test.sql`, IP null).
   });
 
-  describe("PostgREST gives the public no way to the RSVP internals (AC14, AC10)", () => {
+  describe("what the server says about itself", () => {
+    it("after a real submit with a note, its output holds no token, hash or note (QA-7)", async () => {
+      // A successful answer through HTTP first, so the note really crossed the server.
+      const w = await newWedding();
+      const g = await newGroup(w);
+      const p1 = await newPerson(w, "Ines", g);
+      const link = track(await newLink(w, { groupId: g }));
+      const mine = ip();
+      const page = await open(link.token, { ip: mine });
+      const form = new FormData();
+      for (const [name, value] of hiddenFields(page.text)) form.append(name, value);
+      form.set(`status:${p1}`, "yes");
+      form.set(`note:${p1}`, NOTE);
+      const posted = await request(app.base, `/rsvp/${link.token}`, {
+        method: "POST",
+        ip: mine,
+        body: form,
+        headers: { origin: app.base },
+      });
+      expect(posted.status).toBe(200);
+      const saved = await serviceClient().from("rsvp_responses").select("diet_note").eq("id", p1);
+      expect(saved.data).toEqual([{ diet_note: NOTE }]);
+
+      const output = app.output();
+      for (const secret of secrets) expect(output).not.toContain(secret);
+      expect(output).not.toContain(NOTE);
+      expect(output).not.toMatch(/\\x[0-9a-f]{64}/);
+    });
+  });
+});
+
+describe("PostgREST gives the public no way to the RSVP internals (AC14, AC10)", () => {
+  // Needs the database only, not the app: runs in the `db` job too (REV-128).
+  let themed: TestWedding;
+  let live: TestLink;
+  const linkIds: string[] = [];
+  beforeAll(async () => {
+    themed = await newWedding();
+    const group = await newGroup(themed);
+    await newPerson(themed, "Alba", group);
+    live = await newLink(themed, { groupId: group });
+    linkIds.push(live.linkId);
+  }, 60_000);
+  afterAll(() => cleanupAttempts([], linkIds));
+
+  {
     const args = () => ({ p_token_hash: live.hash, p_ip_key: undefined });
     const someone = async () =>
       (await themed.founderClient.from("guests").select("id").limit(1)).data![0]!.id;
@@ -395,7 +457,7 @@ describe.skipIf(!APP_BUILT)("RSVP public edge (built app)", () => {
         const user = await themed.founderClient.rpc(fn, args() as never);
         const anon = await anonClient().rpc(fn, args() as never);
         for (const r of [user, anon]) {
-          expect(r.error, fn).not.toBeNull();
+          expect(r.error?.code, fn).toBe("42501");
           expect(r.data, fn).toBeNull();
         }
       },
@@ -410,13 +472,10 @@ describe.skipIf(!APP_BUILT)("RSVP public edge (built app)", () => {
       };
       for (const client of [themed.founderClient, anonClient()]) {
         const r = await client.rpc("rsvp_submit", body as never);
-        expect(r.error).not.toBeNull();
+        expect(r.error?.code).toBe("42501");
         expect(r.data).toBeNull();
       }
-      const rows = await serviceClient()
-        .from("rsvp_responses")
-        .select("diet_note")
-        .eq("diet_note", NOTE);
+      const rows = await serviceClient().from("rsvp_responses").select("diet_note").eq("id", id);
       expect(rows.data).toEqual([]);
     });
 
@@ -441,16 +500,7 @@ describe.skipIf(!APP_BUILT)("RSVP public edge (built app)", () => {
       const row = await serviceClient().from("rsvp_responses").select("diet_note").eq("id", id);
       expect((row.data ?? []).every((x) => x.diet_note === null)).toBe(true);
     });
-  });
-
-  describe("what the server says about itself", () => {
-    it("its output holds no token, hash or note (QA-7)", async () => {
-      const output = app.output();
-      for (const secret of secrets) expect(output).not.toContain(secret);
-      expect(output).not.toContain(NOTE);
-      expect(output).not.toMatch(/\\x[0-9a-f]{64}/);
-    });
-  });
+  }
 });
 
 // Always-present marker so a skipped file shows its reason in the report.

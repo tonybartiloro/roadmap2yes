@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { inspect } from "node:util";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { deriveRsvpToken, hashRsvpToken } from "@/features/rsvp/token";
 import {
@@ -67,7 +68,10 @@ const spies = (["log", "info", "warn", "error", "debug"] as const).map((level) =
   vi.spyOn(console, level).mockImplementation(() => undefined),
 );
 const logged = () =>
-  JSON.stringify(spies.flatMap((s) => s.mock.calls.map((c) => String(c.map(String)))));
+  // `inspect` shows objects and errors (message, stack, fields), not `[object Object]` (REV-130)
+  spies
+    .flatMap((s) => s.mock.calls.map((c) => c.map((a) => inspect(a, { depth: 4 })).join(" ")))
+    .join("\n");
 
 describe("public RSVP code: logs and browser-facing results (QA-7, AC14)", () => {
   const personId = randomUUID();
@@ -195,13 +199,15 @@ describe("public RSVP code: logs and browser-facing results (QA-7, AC14)", () =>
       const result = await rsvpSubmit({
         token: link.token,
         ip: mine,
-        answers: [{ id, status: "yes", diet: [], diet_note: "ab\u0000cd", seen_at: null }],
+        answers: [
+          { id, status: "yes", diet: [], diet_note: "nota-nul-QA-8812\u0000fine", seen_at: null },
+        ],
         now,
       });
       expect(result).toEqual({ state: "retry" });
       expect(await rowNotes()).toEqual([]);
       const out = logged();
-      for (const s of [link.token, link.hash, link.hash.slice(2), "ab", id])
+      for (const s of [link.token, link.hash, link.hash.slice(2), "nota-nul-QA-8812", id])
         expect(out, s).not.toContain(s);
     });
 

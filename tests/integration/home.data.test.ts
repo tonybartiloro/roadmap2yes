@@ -444,7 +444,15 @@ describe("Home (T14) on the local stack", () => {
     expect(back.news.data.map((n) => n.text)).toEqual([
       "Tony ha aggiunto il compito «Compito di Tony»",
     ]);
-    for (const word of ["rsvp", "Famiglia Segreta", "Ada", "Bea", "senza-noci", "vegan", link.token]) {
+    for (const word of [
+      "rsvp",
+      "Famiglia Segreta",
+      "Ada",
+      "Bea",
+      "senza-noci",
+      "vegan",
+      link.token,
+    ]) {
       expect(shown.toLowerCase(), word).not.toContain(word.toLowerCase());
     }
 

@@ -165,6 +165,8 @@ export default defineConfig([
     "playwright-report/**",
     "test-results/**",
     "next-env.d.ts",
+    // Other git worktrees of this repo (Claude Code) hold their own builds and sources.
+    ".claude/**",
     // Deliberately-bad code used as input by tests/lint-fixtures/guards.test.ts.
     "tests/lint-fixtures/cases/**",
   ]),

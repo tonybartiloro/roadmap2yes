@@ -168,6 +168,11 @@ jobs:
         run: npx vitest run --project integration tests/acceptance/headers.test.ts
         env:
           HEADERS_REQUIRED: "1"
+      # Public RSVP edge on the built app (own `next start` on port 3311): a missing build fails.
+      - name: RSVP public edge of the built app
+        run: npx vitest run --project integration tests/acceptance/rsvp.test.ts
+        env:
+          HEADERS_REQUIRED: "1"
       - name: e2e (project mobile)
         run: npx playwright test --project=mobile
       - name: Report flaky tests (passed only on retry)
@@ -266,6 +271,10 @@ jobs:
       - run: npm run build
       - name: Headers of the built app
         run: npx vitest run --project integration tests/acceptance/headers.test.ts
+        env:
+          HEADERS_REQUIRED: "1"
+      - name: RSVP public edge of the built app
+        run: npx vitest run --project integration tests/acceptance/rsvp.test.ts
         env:
           HEADERS_REQUIRED: "1"
       - name: e2e (all projects)
