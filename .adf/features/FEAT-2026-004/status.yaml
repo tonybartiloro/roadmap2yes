@@ -3,12 +3,12 @@ id: FEAT-2026-004
 title: "RSVP: conferme di presenza con link personale"
 type: feature
 size: L
-phase: F3
+phase: F4
 branch: feature/FEAT-2026-004-rsvp
 ticket: ""
 roadmap: R-04
 created: 2026-11-26
-updated: 2026-11-27
+updated: 2026-11-28
 gates:
   a_requirements: "approved 2026-11-26 via roadmap R-04"
   b_plan: "approved 2026-11-26 by tonybartiloro"
@@ -20,5 +20,5 @@ links:
   pr: ""
   brief: ""
   plan: ""
-  docs_functional: ""
-  docs_technical: ""
+  docs_functional: docs/functional/conferme-di-presenza.md
+  docs_technical: docs/technical/sicurezza.md

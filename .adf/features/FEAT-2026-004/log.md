@@ -99,3 +99,8 @@
 - cb33812: tighter name leading, 0.5 rem gap, narrower Type track, 64 px "Invia" at md+ → row 77 px; 34/34 e2e. design-3 APPROVED (32 combinations, axe 0); notes DES-61 (rule ≤ 80 px without link line, ≤ 100 px with one, in design.md §1.2), DES-62 optional padding, DES-63 long group/table names break mid-word at 768 px (pre-existing R-03, follow-up).
 - QA-25 (full `test:integration` hang) next, on a fresh `db:reset`.
 - QA-25 not reproduced: full integration 46 files, 952 pass, 2 skip, twice (fresh 116 s, dirty 178 s); no locks or leftover servers. Likely cause: `jobs.test.ts` runs the daily job over every wedding of a dirty local DB; CI starts fresh. Closed as environment; tip in `sviluppo-locale-e-test.md` (F4).
+
+## F3 exit and F4 — 2026-11-28
+- `E2E_PORT=3300 E2E_ALL_SERVERS=1 adf verify --with-e2e` pass on 36ca369 (content 63170e5888b7): lint, typecheck, unit 1523, build, e2e 364 pass / 1 skip (WebKit smoke included). pgTAP 1785, integration 952. Reviews code-9/10, qa-1 (QA-24 open for the developer), design-3 closed.
+- F4: docs by T12/T13 (links: `docs/functional/conferme-di-presenza.md`, `docs/technical/sicurezza.md`); last tips QA-24/QA-25 in `sviluppo-locale-e-test.md`.
+- Open for the developer: QA-24 (verify e2e command in `.adf/project.md` → `E2E_ALL_SERVERS=1`, needs approval). Follow-ups: bulk revoke (R-07), DES-63 long group/table names at 768 px (R-03), WhatsApp greeting order with equal surnames, DES-62 padding.
