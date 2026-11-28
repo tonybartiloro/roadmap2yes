@@ -104,3 +104,9 @@
 - `E2E_PORT=3300 E2E_ALL_SERVERS=1 adf verify --with-e2e` pass on 36ca369 (content 63170e5888b7): lint, typecheck, unit 1523, build, e2e 364 pass / 1 skip (WebKit smoke included). pgTAP 1785, integration 952. Reviews code-9/10, qa-1 (QA-24 open for the developer), design-3 closed.
 - F4: docs by T12/T13 (links: `docs/functional/conferme-di-presenza.md`, `docs/technical/sicurezza.md`); last tips QA-24/QA-25 in `sviluppo-locale-e-test.md`.
 - Open for the developer: QA-24 (verify e2e command in `.adf/project.md` → `E2E_ALL_SERVERS=1`, needs approval). Follow-ups: bulk revoke (R-07), DES-63 long group/table names at 768 px (R-03), WhatsApp greeting order with equal surnames, DES-62 padding.
+- Ready-to-release stop: developer "Rilascia".
+
+## F5 delivery — 2026-11-28
+- PR #6 opened with label `e2e-full`; CI fixes: gitleaks allowlist for the documented fake local token, empty commit to rerun checks after the label. CI 7/7 green.
+- `RSVP_LINK_SECRET` created by the developer in Vercel (Production and Preview, Sensitive); checked by name only.
+- Gate C: developer "Approvo" → `adf gate c`. Merge = production; `migrate.yml` runs the 2 additive migrations with its approval; post-deploy checks per `plan.md → Release plan`.

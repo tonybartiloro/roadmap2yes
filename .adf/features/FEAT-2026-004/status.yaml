@@ -12,7 +12,7 @@ updated: 2026-11-28
 gates:
   a_requirements: "approved 2026-11-26 via roadmap R-04"
   b_plan: "approved 2026-11-26 by tonybartiloro"
-  c_production: pending      # pending | approved <date> by <name> | not-needed
+  c_production: "approved 2026-11-28 by tonybartiloro"
 environments:
   staging: pending           # pending | deployed <date> | not-applicable
   production: pending
