@@ -1,6 +1,8 @@
+import { randomBytes, randomUUID } from "node:crypto";
 import { DEFAULT_BUDGET_CATEGORIES } from "@/content/budget-categories";
 import { getMilestone, type Rite } from "@/content/milestones";
 import { generateTasks } from "@/domain/timeline";
+import { deriveRsvpToken, hashRsvpToken } from "@/features/rsvp/token";
 import {
   addPartnerB,
   createUser,
@@ -283,6 +285,156 @@ export async function addFamilyMember(w: SeededWedding): Promise<TestFamilyMembe
     .insert({ wedding_id: w.weddingId, user_id: user.id, role: "family" });
   if (error) throw new Error(`seed: family membership: ${error.message}`);
   return { user, client: await signInAs(user) };
+}
+
+// ------------------------------------------------------------------------------------------ RSVP
+
+/**
+ * Same secret as the e2e server (`playwright.config.ts`). The links are made ONLY through
+ * `token.ts` and the RPC `rsvp_create_links`, never with the token of `supabase/seeds/05_rsvp.sql`
+ * (QA-6: that one is a public constant). Fake data only.
+ */
+export const RSVP_SECRET =
+  process.env["RSVP_LINK_SECRET"] ?? "local-fake-rsvp-secret-0123456789abcdef";
+
+export type SeededLink = { linkId: string; token: string; path: string };
+export type RsvpTarget = { groupId: string } | { guestId: string };
+export type RsvpSeedAnswer = {
+  id: string;
+  status: "yes" | "no" | null;
+  diet?: string[];
+  diet_note?: string | null;
+  seen_at?: string | null;
+};
+
+/** The link of a group or of a person, as "Crea link" makes it. `shared` = "Condiviso il" today. */
+export async function addRsvpLink(
+  w: SeededWedding,
+  target: RsvpTarget,
+  options: { shared?: boolean } = {},
+): Promise<SeededLink> {
+  const linkId = randomUUID();
+  const token = deriveRsvpToken(RSVP_SECRET, linkId);
+  const created = await w.wedding.founderClient.rpc("rsvp_create_links", {
+    p_items: [
+      {
+        link_id: linkId,
+        token_hash: hashRsvpToken(token),
+        ...("groupId" in target ? { group_id: target.groupId } : { guest_id: target.guestId }),
+      },
+    ] as never,
+  });
+  const body = created.data as { created?: unknown } | null;
+  if (created.error || !Array.isArray(body?.created) || !body.created.includes(linkId)) {
+    throw new Error(`seed: rsvp link: ${created.error?.message ?? "not created"}`);
+  }
+  if (options.shared) {
+    const marked = await w.wedding.founderClient.rpc("rsvp_mark_shared", { p_link_id: linkId });
+    if (marked.error) throw new Error(`seed: rsvp shared: ${marked.error.message}`);
+  }
+  return { linkId, token, path: `/rsvp/${token}` };
+}
+
+/** The link as the UI would copy it, from its id (the token is derived, never stored). */
+export function rsvpLinkOf(linkId: string): SeededLink {
+  const token = deriveRsvpToken(RSVP_SECRET, linkId);
+  return { linkId, token, path: `/rsvp/${token}` };
+}
+
+/** The non-revoked link of a group or person (it was made through the UI), or `null`. */
+export async function currentRsvpLink(
+  w: SeededWedding,
+  target: RsvpTarget,
+): Promise<SeededLink | null> {
+  const query = serviceClient()
+    .from("rsvp_links")
+    .select("id")
+    .eq("wedding_id", w.weddingId)
+    .is("revoked_at", null);
+  const rows = await ("groupId" in target
+    ? query.eq("group_id", target.groupId)
+    : query.eq("guest_id", target.guestId));
+  if (rows.error) throw new Error(`seed: current link: ${rows.error.message}`);
+  const id = rows.data[0]?.id;
+  return id ? rsvpLinkOf(id) : null;
+}
+
+export async function revokeRsvpLink(w: SeededWedding, linkId: string): Promise<void> {
+  const revoked = await w.wedding.founderClient.rpc("rsvp_revoke_link", { p_link_id: linkId });
+  if (revoked.error) throw new Error(`seed: revoke link: ${revoked.error.message}`);
+}
+
+/** A guest answer as the public page would save it (the secret-key RPC, no IP key). */
+export async function submitRsvp(link: SeededLink, answers: RsvpSeedAnswer[]): Promise<void> {
+  const result = await serviceClient().rpc("rsvp_submit", {
+    p_token_hash: hashRsvpToken(link.token),
+    p_ip_key: null as never,
+    p_answers: answers as never,
+  });
+  const body = result.data as { ok?: unknown } | null;
+  if (result.error || body?.ok !== true) {
+    throw new Error(`seed: rsvp submit: ${result.error?.message ?? "not saved"}`);
+  }
+}
+
+/**
+ * Locks an IP out of the public RSVP page (BR9: 10 dead links in 15 minutes): the server reads the
+ * address from `x-forwarded-for`, so a distinct fake `ip` per test never touches another test.
+ */
+export async function blockRsvpIp(baseURL: string, ip: string): Promise<void> {
+  for (let n = 0; n < 11; n += 1) {
+    const token = randomBytes(32).toString("base64url");
+    const response = await fetch(new URL(`/rsvp/${token}`, baseURL), {
+      headers: { "x-forwarded-for": ip },
+      redirect: "manual",
+    });
+    await response.arrayBuffer();
+    if (response.status === 429) return;
+  }
+  throw new Error("seed: the IP was not locked after 11 dead links");
+}
+
+/**
+ * Takes the date decision: on its only scenario, or on the one that starts on `dateFrom` when the
+ * wedding has several (the page and the expiry then know the date).
+ */
+export async function chooseDate(w: SeededWedding, dateFrom?: string): Promise<void> {
+  const decision = await decisionId(w, "date");
+  const scenarios = w.wedding.founderClient
+    .from("date_scenarios")
+    .select("option_id")
+    .eq("wedding_id", w.weddingId);
+  const option = await (dateFrom ? scenarios.eq("date_from", dateFrom) : scenarios).single();
+  if (option.error) throw new Error(`seed: date option: ${option.error.message}`);
+  const chosen = await w.wedding.founderClient.rpc("choose_option", {
+    p_decision_id: decision,
+    p_option_id: option.data.option_id,
+  });
+  if (chosen.error) throw new Error(`seed: choose date: ${chosen.error.message}`);
+}
+
+/** "Se sposti la data": the decision is reopened and taken again on another scenario. */
+export async function moveDate(w: SeededWedding, dateFrom: string): Promise<void> {
+  const reopened = await w.wedding.founderClient.rpc("reopen_decision", {
+    p_decision_id: await decisionId(w, "date"),
+    p_reason: "Prova",
+  });
+  if (reopened.error) throw new Error(`seed: reopen date: ${reopened.error.message}`);
+  await chooseDate(w, dateFrom);
+}
+
+/** A candidate location, taken as the chosen one. */
+export async function chooseLocation(
+  w: SeededWedding,
+  title: string,
+  comune?: string,
+): Promise<void> {
+  const option = await addLocation(w, title, comune ? { comune } : {});
+  const chosen = await w.wedding.founderClient.rpc("choose_option", {
+    p_decision_id: await decisionId(w, "location"),
+    p_option_id: option,
+  });
+  if (chosen.error) throw new Error(`seed: choose location: ${chosen.error.message}`);
 }
 
 export async function seedWedding(
