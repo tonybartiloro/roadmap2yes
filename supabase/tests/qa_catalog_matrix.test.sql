@@ -61,11 +61,16 @@ insert into qa_tables (name, tenancy, sel_hidden, ins, upd, del) values
     '{digest_enabled,reminders_enabled,user_id,wedding_id}', '{digest_enabled,reminders_enabled}', false);
 -- FEAT-2026-003: the only tables with a hard DELETE on domain data, and only on soft-deleted rows.
 insert into qa_tables (name, tenancy, sel_hidden, ins, upd, del, del_soft) values
-  ('guest_groups', 'wedding', '{}', '{name,wedding_id}', '{deleted_at,name}', true, true),
+  ('guest_groups', 'wedding', '{}', '{name,wedding_id}', '{deleted_at,name,rsvp_mode}', true, true),
   ('guest_tables', 'wedding', '{}', '{capacity,name,pos_x,pos_y,shape,wedding_id}',
     '{capacity,deleted_at,name,pos_x,pos_y,shape}', true, true),
   ('guests', 'wedding', '{}', '{category,email,first_name,group_id,last_name,notes,phone,side,table_id,wedding_id}',
     '{category,deleted_at,email,first_name,group_id,last_name,notes,phone,side,table_id}', true, true);
+-- FEAT-2026-004: SELECT-only tables (every write goes through the RPCs); token_hash is never readable.
+insert into qa_tables (name, tenancy, sel_hidden, ins, upd, del) values
+  ('rsvp_links', 'wedding', '{token_hash}', '{}', '{}', false),
+  ('rsvp_link_people', 'wedding', '{}', '{}', '{}', false),
+  ('rsvp_responses', 'wedding', '{}', '{}', '{}', false);
 
 -- Oracle: functions in `public`. 'user' = EXECUTE for authenticated (plan 3.1 allowlist; the two
 -- marked * are not in the plan text but were added and accepted in the T2/T9 reviews:
@@ -84,6 +89,9 @@ insert into qa_functions (name, klass) values
   ('move_budget_items', 'user'),     -- *
   ('create_guest_family', 'user'), ('guests_bulk', 'user'), ('guests_bulk_undo', 'user'),  -- FEAT-2026-003
   ('import_guests', 'user'), ('undo_guest_import', 'user'),
+  ('rsvp_status', 'user'), ('rsvp_create_links', 'user'), ('rsvp_rotate_link', 'user'),  -- FEAT-2026-004
+  ('rsvp_revoke_link', 'user'), ('rsvp_mark_shared', 'user'), ('rsvp_unmark_shared', 'user'), ('rsvp_link_matches', 'user'),
+  ('rsvp_gate', 'service'), ('rsvp_page', 'service'), ('rsvp_submit', 'service'),  -- FEAT-2026-004 (public surface)
   ('record_heartbeat', 'service'), ('login_gate', 'service'), ('login_record', 'service'),
   ('auth_user_id_by_email', 'service'), ('invitation_by_token', 'service'), ('sync_timeline', 'service'),
   ('job_claim_notification', 'service'), ('job_fail_notification', 'service'),

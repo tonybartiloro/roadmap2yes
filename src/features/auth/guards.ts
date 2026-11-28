@@ -49,6 +49,7 @@ const PUBLIC_PREFIXES = [
   "/invito",
   "/su-invito",
   "/email",
+  "/rsvp",
   "/servizio",
   "/robots.txt",
   "/manifest.webmanifest",
@@ -65,11 +66,7 @@ const ACCOUNT_PATH = "/altro/account";
  * in the proxy; the guard does not rely on it.)
  */
 export function isPlainPath(pathname: string): boolean {
-  if (!pathname.startsWith("/")) return false;
-  if (/%(2e|2f|5c)/i.test(pathname) || pathname.includes("\\") || pathname.includes("//")) {
-    return false;
-  }
-  if (pathname.split("/").some((segment) => segment === "." || segment === "..")) return false;
+  if (!hasPlainShape(pathname)) return false;
   try {
     decodeURIComponent(pathname);
   } catch {
@@ -78,12 +75,23 @@ export function isPlainPath(pathname: string): boolean {
   return true;
 }
 
+function hasPlainShape(pathname: string): boolean {
+  if (!pathname.startsWith("/")) return false;
+  if (/%(2e|2f|5c)/i.test(pathname) || pathname.includes("\\") || pathname.includes("//")) {
+    return false;
+  }
+  return !pathname.split("/").some((segment) => segment === "." || segment === "..");
+}
+
 function under(pathname: string, prefix: string): boolean {
   return pathname === prefix || pathname.startsWith(`${prefix}/`);
 }
 
 function isPublic(pathname: string): boolean {
-  return isPlainPath(pathname) && PUBLIC_PREFIXES.some((prefix) => under(pathname, prefix));
+  // `/rsvp/{token}`: a broken percent escape is not a way to borrow the prefix (the shape checks
+  // still apply) and must reach the proxy, which answers the neutral 404 without DB (QA-A).
+  const plain = under(pathname, "/rsvp") ? hasPlainShape(pathname) : isPlainPath(pathname);
+  return plain && PUBLIC_PREFIXES.some((prefix) => under(pathname, prefix));
 }
 
 type MembershipLookup = "member" | "none" | DbErrorKind | "unknown";

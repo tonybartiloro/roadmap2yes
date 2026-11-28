@@ -194,6 +194,28 @@ export function readSiteUrl(env: Env = process.env): string {
   return "http://localhost:3000";
 }
 
+export const MIN_RSVP_LINK_SECRET_LENGTH = 32;
+/** The public fake secret of `.env.example`, CI, Vitest and the local seed: never valid in production. */
+export const FAKE_RSVP_LINK_SECRET = "local-fake-rsvp-secret-0123456789abcdef";
+
+/**
+ * Secret of the RSVP link tokens (ADR-0003). Throws a value-free error when missing, shorter than
+ * 32 characters, or the public fake value on any Vercel environment (the repo is public).
+ */
+export function readRsvpLinkSecret(env: Env = process.env): string {
+  const secret = clean(env["RSVP_LINK_SECRET"]);
+  if (!secret || secret.length < MIN_RSVP_LINK_SECRET_LENGTH) {
+    throw new Error(
+      `Missing or too short RSVP configuration: RSVP_LINK_SECRET (min ${MIN_RSVP_LINK_SECRET_LENGTH} chars)`,
+    );
+  }
+  // Any Vercel environment (production, preview): CI, e2e and local runs do not set VERCEL_ENV.
+  if (secret === FAKE_RSVP_LINK_SECRET && clean(env["VERCEL_ENV"]) !== undefined) {
+    throw new Error("Invalid RSVP configuration: RSVP_LINK_SECRET is the public fake value");
+  }
+  return secret;
+}
+
 /** Secrets for the cron route and email links: presence only is read here, never logged. */
 export function readJobSecrets(env: Env = process.env): {
   cronSecret: string | undefined;

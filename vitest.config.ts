@@ -11,6 +11,9 @@ const resolveFromRoot = (path: string) => fileURLToPath(new URL(path, import.met
  *   (`npm run db:start`). Run by `npm run test:integration` and the `db` CI job.
  *   Files run one at a time because they read/write global state (rate limits, heartbeats).
  */
+// Public fake value (same as .env.example, CI and the local seed): never a real secret.
+const env = { RSVP_LINK_SECRET: "local-fake-rsvp-secret-0123456789abcdef" };
+
 const shared = {
   resolve: {
     alias: {
@@ -31,6 +34,7 @@ export default defineConfig({
         test: {
           name: "unit",
           environment: "node",
+          env,
           include: [
             "src/**/*.test.{ts,tsx}",
             "scripts/**/*.test.ts",
@@ -44,6 +48,7 @@ export default defineConfig({
         test: {
           name: "integration",
           environment: "node",
+          env,
           include: ["tests/integration/**/*.test.ts", "tests/acceptance/**/*.test.ts"],
           fileParallelism: false,
           testTimeout: 30_000,

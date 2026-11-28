@@ -2,10 +2,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const cookieGet = vi.fn();
 const headerHas = vi.fn();
+const headerGet = vi.fn();
 let cookiesImpl: () => Promise<unknown>;
 vi.mock("next/headers", () => ({
   cookies: () => cookiesImpl(),
-  headers: async () => ({ has: headerHas }),
+  headers: async () => ({ has: headerHas, get: headerGet }),
 }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
 
@@ -14,6 +15,7 @@ const { getActiveThemeId, withTimeout, LOOKUP_TIMEOUT_MS } = await import("./ser
 beforeEach(() => {
   cookieGet.mockReset();
   headerHas.mockReset().mockReturnValue(false);
+  headerGet.mockReset().mockReturnValue(null);
   cookiesImpl = async () => ({ get: cookieGet });
   cookieGet.mockReturnValue(undefined);
   vi.useRealTimers();
@@ -67,6 +69,25 @@ describe("getActiveThemeId (DB, cookie, giardino)", () => {
     const pending = getActiveThemeId(() => new Promise<string | null>(() => {}));
     await vi.advanceTimersByTimeAsync(LOOKUP_TIMEOUT_MS + 1);
     expect(await pending).toBe("toscana");
+  });
+});
+
+describe("getActiveThemeId: x-r2y-theme (set by the proxy for an RSVP link)", () => {
+  it("wins over the database, the cookie and an outage flag, without any lookup", async () => {
+    headerGet.mockImplementation((name: string) => (name === "x-r2y-theme" ? "velluto" : null));
+    headerHas.mockReturnValue(true);
+    cookieGet.mockReturnValue({ value: "boho" });
+    const lookup = vi.fn(async () => "sera");
+    expect(await getActiveThemeId(lookup)).toBe("velluto");
+    expect(lookup).not.toHaveBeenCalled();
+  });
+
+  it("is ignored when it is not an approved theme id", async () => {
+    headerGet.mockReturnValue('"><script>');
+    cookieGet.mockReturnValue({ value: "boho" });
+    expect(await getActiveThemeId(async () => "sera")).toBe("sera");
+    headerGet.mockReturnValue("");
+    expect(await getActiveThemeId(async () => null)).toBe("boho");
   });
 });
 

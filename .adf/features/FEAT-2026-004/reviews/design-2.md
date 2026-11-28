@@ -1,0 +1,89 @@
+# FEAT-2026-004 — Design review 2 (F3, fine S4, T8-T9: lato coppia)
+
+Designer, 2026-11-28, su aed2ce6. App locale su :3300 (`next dev`, `RSVP_LINK_SECRET` finto), Supabase locale, utente seed demo (solo locale). Chromium (Playwright) a 320, 360, 390, 768, 1280 px, chiaro e scuro, temi Giardino e Velluto; axe-core del progetto (wcag2a/aa/21aa/22aa + best-practice) su lista, fogli, dialoghi e toast: **0 violazioni ovunque**; nessuno scorrimento orizzontale; bersagli >= 44 px tranne il toast (DES-54). Stato di prova costruito con SQL locale (data scelta, link con hash diverso, ruolo in sola lettura simulato) e con risposte vere dalla pagina pubblica; `db:reset` a fine prova, server fermato.
+
+Verdetto: **non approvato finché DES-45 non è chiuso**; DES-46..53 da correggere in S4/S5, il resto sono note.
+
+| ID | Sev. | Dove | Evidenza | Proposta |
+|---|---|---|---|---|
+| DES-45 | blocking | Toast "Link copiato / Link condiviso / Aperto in WhatsApp" con **Annulla**, mentre il foglio link è aperto | Il foglio è modale: `body` e il toaster hanno `pointer-events: none`. A 320 il toast appare **sopra** il pulsante WhatsApp e un tocco su "Annulla" cade su WhatsApp (apre l'app e segna "Condiviso" di nuovo); Tab non raggiunge il toast (focus intrappolato). A 1280 il clic cade sul velo. L'Annulla funziona solo dopo "Chiudi" (provato: il toast dura ~10 s, lo stato torna "Da condividere"). Il design chiede Annulla >= 8 s e raggiungibile da tastiera. | Mostrare l'Annulla **dentro il foglio** (riga sotto lo stato: "Condiviso il 28 novembre. Annulla" con aria-live), oppure far accettare al toaster i puntatori e il focus dal foglio (`pointer-events: auto`, fuori dal focus trap). Test e2e: dal foglio, Annulla con mouse e con Tab. |
+| DES-46 | should | Foglio link, focus iniziale | Con link pronto il focus parte da **"Nuovo link"** (il primo elemento attivo quando il foglio si apre, prima che l'URL sia caricato): Invio apre subito il dialogo di rigenerazione; titolo e "Copia link" saltati. Ordine Tab poi logico (Revoca, Chiudi, messaggio, Copia, WhatsApp, Nuovo link, Revoca, Chiudi). | `onOpenAutoFocus`: focus sul titolo (o sul contenitore); a link caricato, nessuno spostamento. |
+| DES-47 | should | Stato dopo "Revoca link" di un link già condiviso | Stato "Da rimandare" con il testo "Qualcuno è cambiato di gruppo: il link che avevi mandato non lo copre più (4 nomi)": **falso**, il link l'ha revocato la coppia. Dopo la revoca il pulsante è "Crea un nuovo link", alla riapertura torna "Crea link". | Distinguere la causa (revocato dalla coppia: "Hai revocato il link: chi l'ha ricevuto non può più rispondere. Creane uno nuovo e rimandalo.") dal cambio di gruppo; stessa etichetta del pulsante in entrambi i casi. |
+| DES-48 | should | Foglio link, stato Scaduto | Intestazione "Scaduto il 1 ottobre 2026. Scade il 1 ottobre 2026." (scadenza al presente, doppia) e sotto ripete "Scaduto il 1 ottobre 2026. Se sposti la data…". | Solo "Scaduto il 1 ottobre 2026." in testa; il paragrafo spiega "Se sposti la data, i link tornano a funzionare da soli." |
+| DES-49 | should | Riga di un destinatario individuale con nome lungo non spezzabile, 320 px ("Massimiliano-Bartolomeo-Alessandro Fitzgerald-Montefiascone-Castelvetro") | Il nome spinge **"Invia" fuori dalla carta** (bordo destro del bottone a 316 px, carta a 304; nessuno scorrimento di pagina). I nomi a capo normali vanno bene (gruppo di 63 caratteri: titolo e foglio a capo senza problemi, dialoghi corretti). | Colonna del nome `min-w-0` con `break-words`/`hyphens-auto`; "Invia" `shrink-0`. |
+| DES-50 | should | Colonna "Presenza" a 768 e 1280 | "In attesa" va a capo su due righe (colonna stretta, ~70 px), altezze di riga diverse; "Sì/No" e "In attesa" non sono allineati tra righe con e senza "Invia" (x 1085 contro 1170 a 1280). Con un nome lungo la colonna si allarga e il testo sta su una riga: larghezza instabile. | Larghezza fissa (circa 7 rem) con `whitespace-nowrap`; "Invia" in una colonna propria a destra. |
+| DES-51 | should | Focus dopo i dialoghi del foglio e del gruppo | Dopo Esc/Annulla su "Nuovo link"/"Revoca link", dopo la chiusura del foglio link e dopo "Come rispondono" (mobile e desktop) il focus va a `body`, non al pulsante che ha aperto. Chi usa la tastiera ricomincia dall'alto della pagina. Non confrontato con i dialoghi di R-03 (Elimina gruppo). | Riportare il focus al pulsante di origine ("Invia", "…" del gruppo, "Nuovo link"); se è un difetto comune di R-03, correggere nel componente condiviso. |
+| DES-52 | should | `GroupModeDialog`, "ognuno per sé" → "insieme" senza link personali | "Passando a "insieme" i 0 link personali smettono di funzionare: serve un solo link per il gruppo." (zero, plurale). Il caso con 4/5 link è chiaro. Singolare non provato. | Con 0: "Passando a "insieme" basta un solo link per il gruppo."; con 1: "il link personale smette". |
+| DES-53 | note | Foglio, "Questo link va rigenerato." | Accanto compare **Riprova**, che non può risolvere (l'hash non combacia); nessuna indicazione su cosa fare. | Testo "Crea un nuovo link qui sotto." e niente Riprova; sul fallimento di rete resta Riprova. |
+| DES-54 | note | Toast con Annulla | Il pulsante è alto 24 px (< 44) e largo 59: bersaglio piccolo su mobile (stile del toast di R-03). | Portare l'Annulla a 44 px nei toast con azione, o accettare come stile esistente. |
+| DES-55 | note | Errori di rete nel foglio | Offline, "Nuovo link" resta con i pulsanti disattivati per 9+ s senza messaggio (il banner "Sei offline" c'è). Come in R-03 (offline su "Elimina gruppo": errore di sviluppo). Il ramo "Non sono riuscito a creare il link" + Riprova non è raggiungibile in locale: **non verificato**. | `try/catch` nell'azione con il testo del design (come il modulo pubblico). |
+| DES-56 | note | Icone e testi | "Come rispondono" usa una freccia di risposta/annulla (si legge come "Annulla"). Foglio persona: "Presenza" mostra "Sì" senza icona (la lista ha icona). A 320 i destinatari individuali hanno il nome a capo su due righe ("Anna / Prova") perché presenza e "Invia" occupano la riga; titolo gruppo fino a 5 righe con le presenze. | Icona "persone"/"messaggio"; icona nel foglio; a 320 presenza sotto il nome nelle righe con "Invia". |
+| DES-57 | note | Campo "Messaggio" | "Copia link" copia solo l'URL (deviazione accettata) ma il campo contiene il messaggio: ambiguo. A 320 il campo mostra 5 righe e taglia l'URL. | Una riga di aiuto: "Copia link copia solo il link. Il messaggio parte con Condividi e WhatsApp." |
+| DES-58 | note | Dialoghi "Revoca"/"Come rispondono" | Il pulsante di conferma distruttivo è quello primario (verde/rosa) e sta sopra Annulla a 320, mentre il pulsante che lo apre è rosso. Focus su Annulla corretto in tutti. | Variante distruttiva per "Revoca" (stile di R-03 se esiste). |
+
+## Controlli eseguiti (§8, lato coppia)
+- **Lista** (320/360/390/768/1280, chiaro/scuro, Giardino e Velluto): presenza con icona e testo, "Sì/No/In attesa"; titolo gruppo "2 adulti, 1 bambino, 1 neonato · 2 sì · 1 no · 1 in attesa" con nome accessibile completo ("…, link condiviso il 28 novembre"); gruppo "ognuno per sé" ("Risponde ognuno per sé", "Invia" sulle persone); "Nessun link / Da condividere / Condiviso il 28 novembre / Scaduto il 1 ottobre 2026" in seconda riga per i destinatari individuali; "Invia" 44 px con nome "Invia il link di {nome}".
+- **Foglio link**: Nessun link→Crea link; link pronto (Copia, WhatsApp con testo modificabile e `href` aggiornato, Condividi presente solo con `navigator.share`); "Ciao a tutti!" con 4 persone, "Ciao Sara!" con 1, due nomi con 2; avviso data non scelta e sua assenza a data scelta ("Scade il 3 ottobre 2027"); copia rifiutata (URL in campo, "Non sono riuscito a copiare. Selezionalo e copialo da qui."); Condividi con `AbortError` non segna "Condiviso"; "Condiviso il" con Annulla (solo dopo la chiusura, DES-45); Nuovo link e Revoca con la conseguenza del §4 e focus su Annulla; "Questo link va rigenerato"; Scaduto senza Crea/Nuovo; "Da rimandare" con i nomi (solo dopo revoca, DES-47).
+- **"Come rispondono"** (insieme→ognuno per sé: "servono 4 link nuovi", numero reale), **Crea link per tutti (4)** con conferma, toast "Ho creato 4 link." e voce a (0) disattivata con testo; **Annulla importazione** con risposta: "Ho annullato 2 persone; 1 resta perché ha già risposto o ha un link."
+- **Foglio persona**: "Presenza" in sola lettura (stato, "Preferenze: Vegetariano", "Ultima risposta: 28 novembre, dall'invitato", "Invito: risponde con il gruppo…" / "link personale, condiviso il…", "Apri link").
+- **Sola lettura** (ruolo `planner` con solo `read`, simulato in locale: oggi nessun ruolo reale lo permette): stati e risposte visibili, nessun "Invia" né "Crea link per tutti", riga "Serve il permesso di modifica."; "Apri link" apre un foglio con solo stato e quella riga. I controlli di R-03 (Aggiungi, Importa, Elimina) restano visibili: fuori da questa feature.
+
+## Risposte dello sviluppatore (giro di correzioni 069f9fc)
+
+| ID | Esito |
+|---|---|
+| DES-45 | Corretto. L'Annulla di "Condiviso il" è una riga **dentro il foglio** (`role="status"`, "Link copiato · Condiviso il 28 novembre" + pulsante Annulla alto 44 px, raggiungibile da tastiera, finestra `UNDO_TOAST_MS`). Con il foglio aperto non compare nessun toast con Annulla; se il foglio si chiude entro la finestra, l'Annulla passa a un toast per il tempo rimasto. Da riprovare in e2e (mouse e Tab). |
+| DES-46 | Corretto. All'apertura il focus va sul titolo del foglio (test). |
+| DES-47 | Corretto. Una riga neutra: "Il link che avevi mandato non funziona più: mandane uno nuovo. Riguarda {nomi}." (non distingue la causa: lo stato "Da rimandare" nasce da revoca o cambio di gruppo con la stessa conseguenza). Pulsante "Crea un nuovo link" ogni volta che esiste un link revocato, anche alla riapertura. |
+| DES-48 | Corretto. Scaduto: solo "Scaduto il … Se sposti la data, i link tornano a funzionare da soli." |
+| DES-49 | Corretto nel codice (nome `min-w-0` con `overflow-wrap:anywhere`, "Invia" `shrink-0`); non rivisto in browser da me. |
+| DES-50 | Corretto nel codice: colonna Presenza 5,5 rem con `whitespace-nowrap`, "Invia" 5 rem con spazio riservato alle righe senza, intestazione allineata. Da riverificare a 768/1280. |
+| DES-51 | Corretto. Foglio link, dialoghi Nuovo/Revoca, "Come rispondono" e "Crea link per tutti" riportano il focus al pulsante di origine (se non esiste più: al pulsante del menu del gruppo o "Altro"; per Nuovo/Revoca al titolo). Causa: l'AlertDialog senza Trigger manda il focus a `body`. Difetto comune ai dialoghi di R-03 (es. Elimina gruppo): non toccato, fuori dai file di questo giro. |
+| DES-52 | Corretto. Con 0 link personali: "basta un solo link per il gruppo. Nessun link da disattivare."; con 1: "il link personale smette di funzionare". Verso "ognuno per sé" senza link di gruppo non nomina il link del gruppo. |
+| DES-53 | Corretto. "Questo link va rigenerato. Crea un nuovo link qui sotto." senza Riprova; Riprova solo per errori generici e di rete. |
+| DES-54 | Non fatto: lo stile del toast è quello condiviso di R-03 (`ui/sonner.tsx`, fuori dai file di questo giro); l'Annulla di "Condiviso" ora sta nel foglio a 44 px, il toast resta solo come passaggio alla chiusura. Proposta al coordinatore se vuole 44 px in tutti i toast. |
+| DES-55 | Corretto. Le azioni del foglio, "Crea link per tutti" e "Come rispondono" intercettano il rifiuto di rete e mostrano un testo leggibile (con Riprova dove serve) invece di restare bloccate. |
+| DES-56 | Corretto in parte: icona "persone" per "Come rispondono", icona nel foglio persona, presenza nel flusso sotto il nome a 320 px nelle righe con "Invia". Il titolo gruppo lungo a 5 righe resta. |
+| DES-57 | Corretto. Riga di aiuto sotto il messaggio: "Copia link copia solo il link. Il messaggio parte con Condividi e WhatsApp." (collegata con `aria-describedby`). |
+| DES-58 | Corretto. "Revoca" usa la variante distruttiva del pulsante. "Come rispondono" resta primario (non distruttivo). |
+
+## Ricontrollo su 069f9fc (2026-11-28, designer)
+Stessa prova (:3300, stack locale, 320/768/1280, chiaro/scuro; server fermato, `db:reset` fatto). Verdetto: **non approvato finché DES-59 non è chiuso** (nuovo, bloccante); il resto delle correzioni è confermato.
+
+| ID | Stato | Verifica |
+|---|---|---|
+| DES-45 | Closed | Riga "Link copiato · Condiviso il 28 novembre · Annulla" nel foglio (`role="status"`, 96x44 px): clic reale al centro a 320 non apre WhatsApp (0 popup) e annulla; Invio da tastiera annulla; Tab la raggiunge (dopo Chiudi). Nessun toast con foglio aperto; chiudendo il foglio entro la finestra compare il toast con Annulla e funziona. |
+| DES-46 | Closed | Focus sul titolo (H2) all'apertura. |
+| DES-47 | Closed | Riga neutra "Il link che avevi mandato non funziona più: mandane uno nuovo. Riguarda …"; "Crea un nuovo link" anche alla riapertura. Residuo: vedi DES-60. |
+| DES-48 | Closed | Scaduto: "Scaduto il 1 ottobre 2026. Se sposti la data, i link tornano a funzionare da soli." |
+| DES-49 | Closed | 320: il nome lungo va a capo, "Invia" resta a 291 px come le altre righe. |
+| DES-50 | Closed | 768 e 1280, chiaro/scuro: "In attesa" su una riga, colonna Presenza allineata con e senza "Invia", nome lungo a capo senza spostare nulla. |
+| DES-51 | Closed | Il focus torna a "Invia il link di…" (chiusura foglio), "Nuovo link" (Esc), "Azioni del gruppo …" (Come rispondono), "Altro" (Crea link per tutti: Esc e conferma). Dialoghi di R-03 non toccati. |
+| DES-52 | Closed | 2 link: "i 2 link personali smettono…"; 0 link: "basta un solo link per il gruppo. Nessun link da disattivare." Singolare non provato. |
+| DES-53 | Closed | "Questo link va rigenerato. Crea un nuovo link qui sotto." senza Riprova. |
+| DES-54 | Still open (nota) | Resta una nota: ora l'Annulla importante sta nel foglio a 44 px; il toast da 24 px compare solo se il foglio si chiude. Proposta: follow-up nello stile condiviso `ui/sonner.tsx` (tocca anche R-03), non per questa feature. |
+| DES-55 | Closed | Offline, "Nuovo link": `role="alert"` "Non sono riuscito a creare il link. Riprova." e pulsanti di nuovo attivi. Errore del server non raggiungibile in locale. |
+| DES-56 | Closed | Icona "persone" su "Come rispondono"; a 320 presenza sotto il nome nelle righe con "Invia". Titolo del gruppo lungo a 5 righe: accettato. |
+| DES-57 | Closed | Riga di aiuto sotto il messaggio presente. |
+| DES-58 | Closed | "Revoca" in rosso. |
+| DES-59 (nuovo) | **blocking, Still open** | `LinkSheet`: `aria-labelledby` punta a un id che non esiste (es. `radix-_r_1_` assente) dopo la correzione del focus sul titolo. axe: `aria-dialog-name` (serious) in ogni stato del foglio (pronto, scaduto, riaperto dopo revoca), 320 e 1280; il foglio non ha nome accessibile. Prima del giro era pulito. Proposta: dare al titolo (h2 focalizzabile) l'id usato da `aria-labelledby` (o `aria-label` sul contenuto); test axe sul foglio in e2e. |
+| DES-60 (nuovo) | should, Still open | Dopo "Revoca link" la riga "Link copiato · Condiviso il 28 novembre · Annulla" resta nel foglio: Annulla agirebbe su un link revocato. Proposta: toglierla alla revoca/rotazione. |
+
+### Risposte dello sviluppatore, giro 3
+
+- **DES-59**: corretto. Il bug era mio: avevo dato al titolo un `id` fisso, che sostituiva quello generato da Radix e a cui punta `aria-labelledby`. Ora il titolo tiene l'id di Radix (resta `tabIndex=-1`) e il focus iniziale lo trova per `data-slot` dentro il dialogo. Test: il dialogo ha il nome "Link di Famiglia Rossi" e `aria-labelledby` punta a un elemento che esiste (vitest non ha axe; il controllo axe resta all'e2e/designer).
+- **DES-60**: corretto. Dopo revoca o nuovo link con esito positivo la riga con Annulla sparisce e l'annullamento in sospeso viene scartato (neanche il toast di chiusura può comparire). Test per entrambi i casi: la riga non c'è più e `unmarkSharedAction` non viene chiamata.
+
+## Ricontrollo su f55e76f (2026-11-28, designer)
+Verdetto: **lato coppia (S4) approvato dal punto di vista del design**; nessun bloccante né should aperto. DES-54 resta una nota (follow-up su `ui/sonner.tsx`, a cura del coordinatore).
+
+| ID | Stato | Verifica |
+|---|---|---|
+| DES-59 | Closed | `aria-labelledby` risolve il titolo ("Link di Famiglia Esempio"); axe 0 violazioni a 320 e 1280 in pronto, condiviso con riga inline, revocato, ruotato; a 320 anche scaduto e "va rigenerato". Focus sul titolo all'apertura. |
+| DES-60 | Closed | Dopo Revoca e dopo Nuovo link la riga con Annulla sparisce (0 pulsanti Annulla, nessun toast con Annulla; restano "Link revocato." / "Ho creato un nuovo link."), a 320 e 1280. |
+| DES-54 | Still open (nota) | Invariato, accettato come nota. |
+
+Focus: alla chiusura (Chiudi o Esc) torna a "Invia il link di Famiglia Esempio" a 320 e 1280. `.next` ripristinato com'era; server fermato, `db:reset` fatto.
+
+## Non verificato
+Skeleton del foglio (locale troppo veloce); errore del server nel foglio (DES-55); "Da rimandare" per spostamento di gruppo (provato solo per revoca); altri 10 temi; lettore di schermo; iPhone reale, browser interno di WhatsApp e Safari/Firefox (Gate C); `row-columns.test.ts`.

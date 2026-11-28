@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { beforeAll, describe, expect, it } from "vitest";
 import { buildExportJson, type ExportInput } from "@/domain/export";
 import {
@@ -210,6 +210,32 @@ async function seed(w: TestWedding, label: string, invite: boolean): Promise<Ids
     wedding_id: w.weddingId,
     first_name: "Eliminato",
   });
+  // RSVP (FEAT-2026-004): a shared group link with its snapshot, and one answer (fake hash, fake values)
+  const rsvpLinkId = randomUUID();
+  const rsvpHash = `\\x${createHash("sha256").update(`qa-rls-rsvp-${label}-${rsvpLinkId}`).digest("hex")}`;
+  for (const [table, row] of [
+    [
+      "rsvp_links",
+      {
+        id: rsvpLinkId,
+        wedding_id: w.weddingId,
+        group_id: group,
+        shared_at: new Date().toISOString(),
+        token_hash: rsvpHash,
+      },
+    ],
+    [
+      "rsvp_link_people",
+      { link_id: rsvpLinkId, guest_id: guest, wedding_id: w.weddingId },
+    ],
+    [
+      "rsvp_responses",
+      { id: guest, wedding_id: w.weddingId, status: "yes", diet: ["vegan"], diet_note: "Nota finta" },
+    ],
+  ] as const) {
+    const result = await service.from(table).insert(row);
+    if (result.error) throw new Error(`seed ${table}: ${result.error.message}`);
+  }
   for (const [table, id] of [
     ["guest_groups", deletedGroup],
     ["guest_tables", deletedTable],

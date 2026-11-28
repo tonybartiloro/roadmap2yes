@@ -23,11 +23,11 @@ const COPY: Record<DbErrorKind, { title: string; stillTitle?: string; body: stri
   paused: {
     title: "L'app è in pausa.",
     stillTitle: "È ancora in pausa.",
-    body: "Il servizio gratuito che conserva i tuoi dati si ferma dopo qualche giorno senza uso e non riparte da solo. I dati non sono stati toccati: serve solo che chi gestisce l'app lo riattivi dal pannello.",
+    body: "Il servizio gratuito che conserva i dati si ferma dopo qualche giorno senza uso e non riparte da solo. I dati non sono stati toccati: serve solo che chi gestisce l'app lo riattivi. Se hai aperto un link per rispondere a un invito, riprova più tardi o scrivi a chi ti ha invitato.",
   },
   unreachable: {
     title: "Non riesco a raggiungere il servizio.",
-    body: "Controlla la connessione e riprova tra poco. Se continua, avvisa chi gestisce l'app.",
+    body: "Controlla la connessione e riprova tra poco. Se continua, avvisa chi gestisce l'app (o chi ti ha invitato, se hai aperto un link per rispondere).",
   },
 };
 

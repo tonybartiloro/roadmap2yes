@@ -1,7 +1,7 @@
 -- FEAT-2026-003 / T12: import_guests and undo_guest_import (AC19, AC20, P3, P4, ADR-0002). All data is FAKE.
 begin;
 \set su 'reset role; do $x$ begin perform set_config(''request.jwt.claims'','''',true); perform set_config(''request.jwt.claim.sub'','''',true); end $x$;'
-select plan(77);
+select plan(78);
 
 select * from tests.make_wedding('gi1') \gset w1_
 select * from tests.make_wedding('gi2') \gset w2_
@@ -162,6 +162,7 @@ select public.undo_guest_import((:'lot_r'::jsonb ->> 'batch_id')::uuid) as u \gs
 :su
 select is((:'lotu_u'::jsonb ->> 'guests')::int, 2, 'undo removes only the 2 people untouched since the import (the result counts what was removed)');
 select is((:'lotu_u'::jsonb ->> 'groups')::int, 1, 'and the batch group left without members, not the one that still has one');
+select is((:'lotu_u'::jsonb ->> 'skipped')::int, 0, 'FEAT-2026-004: skipped counts only the people the RSVP protects (none here; the R-03 stays are not "skipped")');
 select is((select count(*)::int from public.guests where first_name in ('Lot1', 'Lot5')), 0, 'the untouched people are gone');
 select is((select last_name from public.guests where first_name = 'Lot2'), 'Modificato', 'a person edited since the import stays');
 select isnt((select deleted_at from public.guests where first_name = 'Lot3'), null, 'a soft-deleted person stays (still in "Eliminati di recente")');

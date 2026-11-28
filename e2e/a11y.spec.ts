@@ -12,8 +12,20 @@
 import type { Page } from "@playwright/test";
 import { loginAs } from "./support/auth";
 import { axeFindings, bestPracticeFindings, describeFindings } from "./support/axe";
-import { expect, newFounder, test, uniqueIp } from "./support/fixtures";
-import { addLocation, addTask, romeDate, seedWedding } from "./support/seed";
+import { expect, newFounder, serviceClient, test, uniqueIp } from "./support/fixtures";
+import {
+  addGuest,
+  addGuestGroup,
+  addLocation,
+  addRsvpLink,
+  addTask,
+  blockRsvpIp,
+  chooseDate,
+  chooseLocation,
+  romeDate,
+  seedWedding,
+  submitRsvp,
+} from "./support/seed";
 
 test.describe.configure({ timeout: 90_000 });
 
@@ -149,6 +161,89 @@ test.describe("axe on the main screens (WCAG 2.2 AA)", () => {
     findings = await axeFindings(page);
     expect(findings, `task sheet\n${describeFindings(findings)}`).toEqual([]);
   });
+});
+
+/**
+ * FEAT-2026-004 T11, public RSVP page (AC2, AC6, AC10): form, summary, thanks, neutral and 429, each
+ * in light and dark; the form and the summary also in the default theme and in a second one
+ * ("velluto", the darkest of the catalogue). `themes.spec.ts` does not reach this page, so the
+ * 12-theme matrix is not repeated here: it would only repeat the app tokens it already checks.
+ */
+test.describe("axe on the public RSVP page (WCAG 2.2 AA)", () => {
+  for (const scheme of ["light", "dark"] as const) {
+    test(`${scheme}: form, summary, thanks (default theme and Velluto), neutral 404 and 429`, async ({
+      page,
+      baseURL,
+    }) => {
+      await page.emulateMedia({ colorScheme: scheme });
+      // a dead link counts against the address (shared by all local requests without this header)
+      await page.context().setExtraHTTPHeaders({ "x-forwarded-for": uniqueIp() });
+      const failures: string[] = [];
+      const check = async (label: string) => {
+        await page.waitForLoadState("networkidle");
+        await expect.poll(() => page.evaluate(() => document.getAnimations().length)).toBe(0);
+        const findings = await axeFindings(page);
+        if (findings.length) failures.push(`${scheme} / ${label}\n${describeFindings(findings)}`);
+      };
+      const hydrated = () => expect(page.getByText("Solo se vieni")).toHaveCount(0);
+
+      for (const theme of ["giardino", "velluto"]) {
+        const w = await seedWedding({
+          templateTasks: false,
+          names: { a: "Tony", b: "Jessica" },
+          scenarios: [{ kind: "fixed", date_from: romeDate(200) }],
+        });
+        await serviceClient().from("weddings").update({ theme_id: theme }).eq("id", w.weddingId);
+        await chooseDate(w);
+        await chooseLocation(w, "Villa Aurora", "Tivoli");
+        const group = await addGuestGroup(w, "Famiglia Rossi");
+        const anna = await addGuest(w, { firstName: "Anna", lastName: "Rossi", groupId: group });
+        await addGuest(w, { firstName: "Luca", lastName: "Rossi", groupId: group });
+        await addGuest(w, {
+          firstName: "Marta",
+          lastName: "Rossi",
+          category: "child",
+          groupId: group,
+        });
+        const link = await addRsvpLink(w, { groupId: group });
+
+        await page.goto(link.path);
+        await hydrated();
+        await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
+        await check(`${theme} / form`);
+        // the error line and the preferences that appear after "Sì"
+        await page.getByRole("button", { name: "Invia le risposte" }).click();
+        await expect(page.getByTestId("rsvp-error")).toBeVisible();
+        await page.getByRole("button", { name: "Vengono tutti" }).click();
+        await check(`${theme} / form with errors and preferences`);
+
+        await page.getByRole("button", { name: "Invia le risposte" }).click();
+        await expect(
+          page.getByRole("heading", { name: "Grazie! Abbiamo ricevuto le risposte" }),
+        ).toBeVisible();
+        await check(`${theme} / thanks`);
+        // the summary of a page that is opened again, with "Modifica" open
+        await submitRsvp(link, [{ id: anna, status: "no" }]);
+        await page.goto(link.path);
+        await hydrated();
+        await check(`${theme} / summary`);
+        await page.getByText("Modifica", { exact: true }).click();
+        await check(`${theme} / summary with Modifica open`);
+      }
+
+      // pages the proxy writes itself (script-free, default theme, no wedding data)
+      const dead = await page.goto(`/rsvp/${"a".repeat(43)}`); // well formed, unknown
+      expect(dead?.status()).toBe(404);
+      await check("neutral 404");
+      const ip = uniqueIp();
+      await blockRsvpIp(baseURL!, ip);
+      await page.context().setExtraHTTPHeaders({ "x-forwarded-for": ip });
+      const blocked = await page.goto(`/rsvp/${"b".repeat(43)}`);
+      expect(blocked?.status()).toBe(429);
+      await check("429");
+      expect(failures, failures.join("\n\n")).toEqual([]);
+    });
+  }
 });
 
 test.describe("reflow, zoom, keyboard, motion", () => {

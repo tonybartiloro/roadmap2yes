@@ -1,4 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
+import os from "node:os";
+import path from "node:path";
 
 /**
  * Playwright projects (plan §12). Specs are owned by QA (T17); the naming convention below is the
@@ -34,13 +36,40 @@ const SPECIAL = {
 };
 const standardIgnore = Object.values(SPECIAL);
 
-function server(port: number, env: Record<string, string>) {
+/**
+ * RSVP link secret of the e2e servers: the seed derives its tokens with the same value (`seed.ts`).
+ * The public fake of `.env.example`/CI; a value already in the environment wins on both sides.
+ * The literal MUST equal `FAKE_RSVP_LINK_SECRET` of `src/lib/app-config.ts` (the seed imports that).
+ */
+const RSVP_SECRET = process.env.RSVP_LINK_SECRET ?? "local-fake-rsvp-secret-0123456789abcdef";
+
+/**
+ * Output of the main server, copied to a file so `rsvp.public.spec.ts` can prove the test token never
+ * reaches it (plan T11). Not under `test-results/`: Playwright empties that folder at the start. Only
+ * a server started by Playwright writes it (a reused one keeps its own console).
+ */
+// The name carries an id made once per run (the runner sets it first, the workers inherit it): a
+// server that was reused never wrote this file, so an old log can never give a false green (REV-44).
+process.env.E2E_RUN_ID ??= String(Date.now());
+const SERVER_LOG = path.join(
+  os.tmpdir(),
+  `r2y-e2e-server-${process.env.E2E_PORT ?? 3000}-${process.env.E2E_RUN_ID}.log`,
+);
+process.env.E2E_SERVER_LOG = SERVER_LOG;
+
+function server(port: number, env: Record<string, string>, log?: string) {
+  const start = `npx next start -H ${host} -p ${port}`;
   return {
-    command: `npx next start -H ${host} -p ${port}`,
+    command: log ? `${start} 2>&1 | tee ${JSON.stringify(log)}` : start,
     url: url(port),
     reuseExistingServer: !CI,
     timeout: 120_000,
-    env: { E2E_CLOCK: "1", NEXT_PUBLIC_SITE_URL: url(port), ...env },
+    env: {
+      E2E_CLOCK: "1",
+      NEXT_PUBLIC_SITE_URL: url(port),
+      RSVP_LINK_SECRET: RSVP_SECRET,
+      ...env,
+    },
   };
 }
 
@@ -119,7 +148,7 @@ export default defineConfig({
   // Servers start on demand: the main one always, the other two only when their project is
   // selected (`--project=degraded` / `--project=email-off`) or E2E_ALL_SERVERS=1 (e2e-full).
   webServer: [
-    server(PORT_MAIN, {}),
+    server(PORT_MAIN, {}, SERVER_LOG),
     ...(process.env.E2E_ALL_SERVERS === "1" || process.argv.some((a) => a.includes("degraded"))
       ? [server(PORT_DEGRADED, { NEXT_PUBLIC_SUPABASE_URL: DEGRADED_BACKEND_URL })]
       : []),

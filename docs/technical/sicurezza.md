@@ -216,14 +216,12 @@ La Guida legge i file di `docs/functional` e li mostra nell'app. Le regole di si
 - **Contenuto pubblico.** I file sono nel repository pubblico: devono contenere solo testi funzionali, senza dati reali, segreti o indirizzi veri (regola già valida per tutto il repository).
 - **Accesso.** La Guida sta nell'area autenticata, con la stessa regola di default-deny delle altre pagine. Un utente anonimo viene portato all'accesso (e2e in `login.spec.ts`).
 
-## Storico delle modifiche
-
 ## Intestazioni
 
 - `noindex` su tutto, anche sul login.
 - `frame-ancestors 'none'` (niente iframe).
 - CSP di base. Una CSP con nonce è un passo successivo (vedi ADR, follow-up).
-- `Referrer-Policy: no-referrer` su `/invito/*`, `/auth/*` ed `/email/*`, perché il token sta nel percorso o nella query.
+- `Referrer-Policy: no-referrer` su `/invito/*`, `/auth/*` ed `/email/*`, perché il token sta nel percorso o nella query. Su `/rsvp/*` il `no-referrer` vale per la pagina neutra 404 e per il 429; la pagina con il modulo usa `same-origin` (ADR-0003, D15), perché con `no-referrer` l'invio senza JavaScript fallisce.
 - Le pagine autenticate sono dinamiche e non vengono messe in cache (una regola di lint vieta `use cache` nelle aree autenticate). Le risposte di uscita e quelle delle pagine con token sono `no-store`, così il pulsante Indietro non mostra dati dopo l'uscita.
 
 ## Dati personali degli invitati (ADR-0002)
@@ -242,11 +240,44 @@ Sono i primi dati di persone che non usano l'app: nomi, telefoni, email, note (a
   - I file CSV o JSON già scaricati dalla coppia restano sul loro dispositivo.
 - **Revisione.** Il round di sicurezza del reviewer ha riguardato la migrazione e le server action (code-2, REV-5..10). È un requisito del piano prima del merge.
 
+## Pagina pubblica RSVP (ADR-0003)
+
+La pagina `/rsvp/{token}` è l'unica area pubblica che legge e scrive dati di terzi. Le regole, con la motivazione, sono nell'[ADR-0003](../adr/0003-link-rsvp-token-derivato-accesso-pubblico.md). Qui c'è il quadro di sicurezza.
+
+- **Token derivato.** Il token è `HMAC-SHA256(RSVP_LINK_SECRET, "r2y-rsvp:v1:" + id del link)`. Il database conserva solo lo sha256 (`token_hash`), che non si legge né compare in audit. Il server ricalcola il link per la coppia e confronta l'hash: se non coincide, il foglio chiede di rigenerarlo.
+- **Accesso solo con la chiave segreta.** Le tre RPC pubbliche (`rsvp_gate`, `rsvp_page`, `rsvp_submit`) hanno `EXECUTE` solo per `service_role`, nessun grant per `anon`. `src/features/rsvp/public-rpc.ts` è il quinto ambito che importa `admin.ts`. Espone solo quelle tre funzioni e restituisce codici, mai messaggi di Postgres.
+- **Insiemi di chiavi chiusi.** Ogni RPC pubblica restituisce solo le chiavi previste. Il test pgTAP ne controlla l'insieme esatto: nessun altro invitato, contatto, nota, lato o tavolo.
+- **Tempo dal server.** La scadenza usa `resolveNow()`, mai un orario della richiesta. Il cookie di test `r2y-test-now` è ignorato senza `E2E_CLOCK` e su Vercel.
+- **Limiti (BR9).** Chiave IP = HMAC con contesto `r2y-rsvp:ip:` (IPv6 ridotto al /64). Link non validi: 10 per IP in 15 minuti, poi blocco di 15 minuti (429 in apertura). Invii: 20 per link in 15 minuti. Un token valido non è mai bloccato dal limite per IP. IP assente: nessun limite per IP, resta quello per link.
+- **Risposte.** Link che non funziona in apertura: 404 neutro dal proxy, byte identici per ogni causa. Invio su un link che non funziona: stessa pagina neutra con stato 200, perché una server action non cambia lo stato HTTP. Il messaggio di blocco compare nel modulo.
+- **Log.** Il codice non scrive token, hash, note, stato o id negli errori. Il browser riceve solo codici. Un test di integrazione spia `console`.
+- **Dati di salute.** Preferenze alimentari e nota sono fuori dall'audit, da "Novità" e dai log. Nessun invio da link genera un evento di analytics.
+- **Colonne esplicite.** Le letture di `rsvp_links` elencano sempre le colonne, mai `select('*')`: la colonna `token_hash` non è leggibile da `authenticated` e un `*` farebbe fallire la query invece di tacere (REV-105).
+- **Residui accettati.** Sono elencati in una tabella sotto: si accettano per il rischio e l'uso del link, e sono tracciati nella revisione di sicurezza di F3.
+
+| Residuo | Perché si accetta |
+|---|---|
+| Il token sta nel percorso: resta nei log delle richieste di Vercel (breve conservazione su Hobby, visibili solo al proprietario) e nella cronologia del browser (D5, ADR-0003 §8) | Residuo dichiarato. Il codice non lo scrive mai nei log |
+| Il blocco per IP blocca solo i token sbagliati e non limita le ricerche da un IP già bloccato verso link validi (REV-114) | Il limite non ferma il probing: lo ferma il token da 256 bit |
+| Fuori da Vercel `clientIp` si fida del primo valore di `x-forwarded-for`, quindi è falsificabile (REV-115). In locale e nei test l'IP è sintetico (QA-2) | Stessa regola del limitatore di login; su Vercel è affidabile |
+| Le anteprime dei messenger e i crawler leggono l'HTML completo di un link valido (REV-120) | L'anteprima è statica e senza nomi; `noindex` resta |
+| La CSP mantiene `script-src 'unsafe-inline'`. L'escaping di React è l'unica barriera contro XSS su una pagina con dati di salute; nessun punto di iniezione trovato | Vedi il follow-up della CSP con nonce |
+| L'id dell'invitato nella pagina è l'`id` reale di `guests` (REV-121) | È opaco per l'invitato e vale solo con il token e la RLS |
+| Payload malformati su un token valido non hanno un limite (REV-119b) | Il token valido non consuma il limite per IP; ogni chiamata fa solo una RPC |
+| Degradi: gate con timeout di 3 s e fail-open; un link morto può rispondere 200 con la neutra; worst case del proxy 9 s; possibile doppio conteggio se la chiamata scade dopo la scrittura (REV-122) | Solo con backend lento. Nessuna differenza di dati fra le cause |
+| Il token compare nel payload Flight della pagina, nel campo `$ACTION` e nel body del POST senza JavaScript | Stesso visualizzatore del link: nessuna esposizione in più |
+| Il Referer `same-origin` porta il percorso nei log delle richieste di asset del sito (log drain) | Stesso pubblico e durata del primo residuo |
+| Diete e note di tutti gli invitati stanno nel payload della lista per chi ha `guests/read` (REV-124) | Stesso accesso della RLS; la coppia le vede già in Invitati |
+| Il link esce dall'app solo con Copia link, Condividi e WhatsApp: il messaggio WhatsApp con l'URL passa dalla query di `wa.me` e può restare nella cronologia (REV-126). La tastiera può inviare il campo con l'URL a servizi cloud (REV-125) | Scelta della coppia, sempre manuale. Lo spellcheck è disattivato sui campi con il link |
+| `getLinkUrlAction` non ha limite di frequenza né audit | Solo chi ha `guests/write` può chiamarla; ricalcola il link e lo confronta con l'hash |
+| La derivazione del token è un invariante dell'app, non del database: `rsvp_create_links` e `rsvp_rotate_link` ricevono `link_id` e `token_hash` dal client, quindi un partner può registrare l'hash di un token scelto da lui (solo nel proprio matrimonio; il foglio mostra poi "Nuovo link") (REV-104) | Il rischio resta nel perimetro della coppia. Regola per il codice futuro: derivare il token solo per un link letto tramite RLS (come fa `getLinkUrlAction`), mai per un `link_id` indicato dal chiamante |
+| Finestra fissa dei limiti: al confine di due finestre un IP o un link può fare fino al doppio del limite (per esempio 20 link non validi, 40 invii per link) (REV-106) | Il limite serve a frenare, non a contare con precisione; il token da 256 bit resta la difesa principale. Un IP `null` non ha limite per IP, come da P5 |
+
 ## Segreti
 
 | Dove | Cosa | Regola |
 |---|---|---|
-| Vercel | `SUPABASE_SECRET_KEY`, `R2Y_BOOTSTRAP_*`, `CRON_SECRET`, `EMAIL_LINK_SECRET`, `RESEND_API_KEY` | Marcati *Sensitive*. Non stampati, non nei log |
+| Vercel | `SUPABASE_SECRET_KEY`, `R2Y_BOOTSTRAP_*`, `CRON_SECRET`, `EMAIL_LINK_SECRET`, `RESEND_API_KEY`, `RSVP_LINK_SECRET` | Marcati *Sensitive*. Non stampati, non nei log. `RSVP_LINK_SECRET` ha valori diversi fra Production e Preview |
 | GitHub | Secret di ambiente (`production`, `staging`, `production-keepalive`) | Solo per i job su `main`. Elenco nel runbook |
 | Repository | Nessun segreto. `.env*` è ignorato dal git | gitleaks sull'intera cronologia in CI |
 | Dati | Nessuna email reale, nessun codice reale, nessun dato di invitati | Ogni email di test è `@example.test`: lo verifica `npm run check:test-emails` |
@@ -260,3 +291,4 @@ Il file `.env.example` contiene solo valori finti. Le chiavi locali le genera `n
 | 2026-11-24 | FEAT-2026-001 | Prima stesura con ordine DB-prima, codici, limitatore, R26 e R27, cookie, token di invito (F4, T18) |
 | 2026-11-25 | FEAT-2026-002 | Guida: slug solo da elenco reale, nessun HTML grezzo, regole dei link esterni; "Altro" diventa "Opzioni" |
 | 2026-11-25 | FEAT-2026-003 | Dati personali degli invitati (ADR-0002): permesso `delete`, `DELETE` solo su righe eliminate, audit senza dati personali, nessun valore nei log, residuo REV-8 |
+| 2026-11-28 | FEAT-2026-004 | Pagina pubblica RSVP (ADR-0003): token derivato, quinto ambito della chiave segreta, limiti, intestazioni per tipo di pagina, residui REV-114..126; `RSVP_LINK_SECRET` tra i segreti |

@@ -17,5 +17,6 @@ description = "Fake test secrets and the public access-code alphabet (false posi
 regexTarget = "line"
 regexes = [
   '''const SECRET = "(test-secret|unit-test-link-secret|qa-cron-secret|integration-cron-secret)[-0-9a-z]*";''',
+  '''const TOKEN = "D-nIsgqL5dGbgoSIb9_oamFr3fXgA_dVLTkmc1J0vno";''',
   '''export const ACCESS_CODE_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";''',
 ]

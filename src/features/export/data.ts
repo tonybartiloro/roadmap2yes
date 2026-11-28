@@ -121,6 +121,63 @@ export async function gatherGuests(
   };
 }
 
+const NOT_MIGRATED_CODES: ReadonlySet<string> = new Set(["42P01", "PGRST205", "PGRST202"]);
+
+/**
+ * RSVP answers and link STATES (AC13, QA-16). Columns are listed: `token_hash` has no column grant
+ * and is never selected. A missing table (code deployed before the migration) is an empty list.
+ * Any other failure is an `ExportLoadError` without cause (a diet note could sit in a message).
+ */
+export async function gatherRsvp(
+  db: Db,
+): Promise<Required<Pick<ExportInput, "rsvpResponses" | "rsvpLinks">>> {
+  try {
+    const [responses, links] = await Promise.all([
+      allRows("presenze", (from, to) =>
+        db
+          .from("rsvp_responses")
+          .select("id, status, diet, diet_note, source, answered_at")
+          .order("id")
+          .range(from, to),
+      ),
+      allRows("link delle presenze", (from, to) =>
+        db
+          .from("rsvp_links")
+          .select("id, group_id, guest_id, created_at, revoked_at, shared_at")
+          .order("id")
+          .range(from, to),
+      ),
+    ]);
+    return {
+      rsvpResponses: responses.map((r) => ({
+        guestId: r.id,
+        status: r.status,
+        diet: r.diet,
+        dietNote: r.diet_note,
+        source: r.source,
+        answeredAt: r.answered_at,
+      })),
+      rsvpLinks: links.map((l) => ({
+        id: l.id,
+        groupId: l.group_id,
+        guestId: l.guest_id,
+        createdAt: l.created_at,
+        revokedAt: l.revoked_at,
+        sharedAt: l.shared_at,
+      })),
+    };
+  } catch (error) {
+    const cause = error instanceof ExportLoadError ? error.cause : error;
+    const code = (cause as { code?: string } | null)?.code;
+    if (code && NOT_MIGRATED_CODES.has(code)) return { rsvpResponses: [], rsvpLinks: [] };
+    throw new ExportLoadError(
+      "presenze",
+      undefined,
+      error instanceof ExportLoadError ? error.infra : classifyDbError(error),
+    );
+  }
+}
+
 /** Everything of the wedding, mapped to the plain shapes of `domain/export`. */
 export async function gatherExportInput(db: Db): Promise<ExportInput> {
   const weddingResult = await db.from("weddings").select(WEDDING_COLUMNS).limit(1).maybeSingle();
@@ -342,9 +399,11 @@ export async function gatherExportInput(db: Db): Promise<ExportInput> {
   }));
 
   const guestData = await gatherGuests(db);
+  const rsvpData = await gatherRsvp(db);
 
   return {
     ...guestData,
+    ...rsvpData,
     wedding,
     partners: exportPartners,
     decisions,

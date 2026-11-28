@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ExportLoadError, gatherGuests, prepareExport, type Db } from "./data";
+import { ExportLoadError, gatherGuests, gatherRsvp, prepareExport, type Db } from "./data";
 
 type Reply = { data: unknown; error: { code?: string; message: string } | null };
 
@@ -70,6 +70,79 @@ describe("gatherGuests (T14)", () => {
     expect(failure.message).toBe("Esportazione: invitati");
     expect(failure.cause).toBeUndefined();
     expect(JSON.stringify(failure)).not.toContain(PERSONAL);
+  });
+});
+
+describe("gatherRsvp (AC13, QA-16)", () => {
+  const empty: Reply = { data: [], error: null };
+
+  it("maps answers and link states without ever selecting token_hash", async () => {
+    const selected: string[] = [];
+    const db = fakeDb(empty, {
+      rsvp_responses: {
+        data: [
+          {
+            id: "g1",
+            status: "yes",
+            diet: ["vegan"],
+            diet_note: "no noci",
+            source: "guest",
+            answered_at: "2027-01-01T10:00:00Z",
+          },
+        ],
+        error: null,
+      },
+      rsvp_links: {
+        data: [
+          {
+            id: "l1",
+            group_id: "gr1",
+            guest_id: null,
+            created_at: "2027-01-01T09:00:00Z",
+            revoked_at: null,
+            shared_at: null,
+          },
+        ],
+        error: null,
+      },
+    });
+    const from = db.from.bind(db);
+    db.from = ((table: string) => {
+      const builder = from(table as never) as unknown as Record<string, unknown>;
+      const select = builder["select"] as (cols: string) => unknown;
+      builder["select"] = (cols: string) => {
+        selected.push(cols);
+        return select(cols);
+      };
+      return builder;
+    }) as never;
+    const out = await gatherRsvp(db);
+    expect(out.rsvpResponses).toEqual([
+      {
+        guestId: "g1",
+        status: "yes",
+        diet: ["vegan"],
+        dietNote: "no noci",
+        source: "guest",
+        answeredAt: "2027-01-01T10:00:00Z",
+      },
+    ]);
+    expect(out.rsvpLinks[0]).toMatchObject({ id: "l1", groupId: "gr1", guestId: null });
+    expect(selected.join(" ")).not.toMatch(/token_hash|\*/);
+  });
+
+  it("missing tables give empty lists; another failure is a fixed error without cause", async () => {
+    const missing: Reply = { data: null, error: { code: "42P01", message: "x" } };
+    expect(
+      await gatherRsvp(fakeDb(empty, { rsvp_responses: missing, rsvp_links: missing })),
+    ).toEqual({ rsvpResponses: [], rsvpLinks: [] });
+    const boom: Reply = { data: null, error: { code: "XX000", message: `boom ${PERSONAL}` } };
+    const error = await gatherRsvp(fakeDb(empty, { rsvp_responses: boom })).catch(
+      (e: unknown) => e,
+    );
+    expect(error).toBeInstanceOf(ExportLoadError);
+    expect((error as ExportLoadError).cause).toBeUndefined();
+    expect(JSON.stringify(error)).not.toContain(PERSONAL);
   });
 });
 

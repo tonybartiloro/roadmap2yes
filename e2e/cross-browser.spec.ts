@@ -10,8 +10,15 @@
  * Real Safari / iOS stays a manual check (reviews/qa-a11y-checklist.md).
  */
 import { loginAs } from "./support/auth";
-import { expect, newFounder, test, uniqueIp } from "./support/fixtures";
-import { addTask, romeDate, seedWedding } from "./support/seed";
+import { expect, newFounder, serviceClient, test, uniqueIp } from "./support/fixtures";
+import {
+  addGuest,
+  addGuestGroup,
+  addRsvpLink,
+  addTask,
+  romeDate,
+  seedWedding,
+} from "./support/seed";
 
 test.describe.configure({ timeout: 90_000 });
 
@@ -70,6 +77,76 @@ test("the Percorso at 390 px: phases, filters and a task sheet", async ({ page }
     .click();
   await expect(page.getByTestId("task-sheet")).toBeVisible();
   await expect(page.getByTestId("task-sheet")).toContainText("Prenotare il fotografo");
+});
+
+/**
+ * FEAT-2026-004 T11 (AC1, AC2): the two RSVP flows that decide whether the guest page and the link
+ * sheet work on an iPhone's engine. The clipboard is NOT exercised here: it is proved on a real
+ * device (WebKit in Playwright does not grant it), as the plan says.
+ */
+test("RSVP: the public page opens and a guest sends the answers", async ({ page }) => {
+  const w = await seedWedding({ templateTasks: false, names: { a: "Tony", b: "Jessica" } });
+  const group = await addGuestGroup(w, "Famiglia Rossi");
+  const anna = await addGuest(w, { firstName: "Anna", lastName: "Rossi", groupId: group });
+  const marta = await addGuest(w, {
+    firstName: "Marta",
+    lastName: "Rossi",
+    category: "child",
+    groupId: group,
+  });
+  const link = await addRsvpLink(w, { groupId: group });
+  await page.goto(link.path);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Tony e Jessica si sposano");
+  await expect(page.getByText("Solo se vieni")).toHaveCount(0); // hydrated
+  await page.getByRole("button", { name: "Vengono tutti" }).click();
+  await page.getByTestId(`rsvp-person-${anna}`).getByLabel("Vegetariano").check();
+  await page.getByRole("button", { name: "Invia le risposte" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Grazie! Abbiamo ricevuto le risposte" }),
+  ).toBeVisible();
+  await expect(page.getByTestId("rsvp-summary")).toContainText("Anna Rossi: Sì, vegetariano");
+  await expect(page.getByTestId("rsvp-summary")).toContainText("Marta Rossi: Sì");
+  const saved = await serviceClient()
+    .from("rsvp_responses")
+    .select("id, status")
+    .eq("wedding_id", w.weddingId);
+  expect(saved.data?.map((r) => r.id).sort()).toEqual([anna, marta].sort());
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    ),
+  ).toBeLessThanOrEqual(0);
+});
+
+test("RSVP: the link sheet of Invitati opens and loads the link without errors", async ({
+  page,
+}) => {
+  const w = await seedWedding({ templateTasks: false, names: { a: "Tony", b: "Jessica" } });
+  const mario = await addGuest(w, { firstName: "Mario", lastName: "Verdi" });
+  await addRsvpLink(w, { guestId: mario });
+  await loginAs(page, w.wedding.founder, uniqueIp());
+  await page.goto("/invitati");
+  await expect(page.getByRole("heading", { level: 1, name: "Invitati" })).toBeVisible();
+  // The listeners start here: the goto above cancels the login action that was still in flight, and
+  // WebKit logs that cancel as "TypeError: Load failed" (QA-23). Only the sheet opening is checked.
+  const problems: string[] = [];
+  page.on("pageerror", (error) => problems.push(`pageerror: ${error.message}`));
+  page.on("console", (message) => {
+    if (message.type() === "error") problems.push(`console: ${message.text()}`);
+  });
+  await page.getByRole("button", { name: "Invia il link di Mario Verdi" }).click();
+  const sheet = page.getByRole("dialog");
+  await expect(sheet.getByRole("heading", { name: "Link di Mario Verdi" })).toBeVisible();
+  await expect(sheet.getByLabel("Messaggio")).toHaveValue(
+    /Ciao Mario! .*\/rsvp\/[A-Za-z0-9_-]{43}$/,
+  );
+  await expect(sheet.getByRole("button", { name: "Copia link" })).toBeVisible();
+  await expect(sheet.getByRole("link", { name: "WhatsApp" })).toHaveAttribute(
+    "href",
+    /^https:\/\/wa\.me\/\?text=/,
+  );
+  await expect(sheet.getByRole("button", { name: "Nuovo link" })).toBeVisible();
+  expect(problems).toEqual([]);
 });
 
 test("Home, Scelte and Budget open without horizontal scroll", async ({ page }) => {
