@@ -89,3 +89,12 @@
 - code-9 REV-38..46 (4 should: AC10 OG test, test docs, Guide "8 s", fixed 2027 dates in e2e); code-10 REV-128..133 (2 should: `rsvp.test.ts` skipped in CI, missing residuals REV-104/105/106). QA-A fix verified with curl; QA-B (901 s) accepted, value never shown.
 - Coordinator decisions: REV-41 relative dates in non-time e2e; `ci.yml` and `eslint.config.mjs` (`.claude/**` ignore) added to T10's files; the release-manager puts the `e2e-full` label on the PR so the WebKit smoke runs before merge.
 - Fixes 19091b6 (docs), 73e1a00 (e2e), 34771d5 (acceptance, `ci.yml`, ESLint ignore). code-9 and code-10 approved round 2, all items closed. Leftover note: "Limiti in locale" bullet in `sviluppo-locale-e-test.md` still says tests clean `rsvp_attempts` (F4).
+
+## F3 integration — 2026-11-28
+- `adf verify --with-e2e`: lint, typecheck, unit, build pass; e2e 339 pass / 24 fail. QA qa-1: 16 environment (WebKit missing → installed; degraded/email-off need `E2E_ALL_SERVERS=1`), pgTAP 1785 green, RSVP integration/acceptance 124 green.
+- Findings: QA-20 blocking (R-03 e2e specs stale after T9), QA-21/22 should (test waits), QA-23 should (WebKit `Load failed` opening the link sheet), QA-24 note (verify e2e command → project memory, needs the developer's yes), QA-25 should (full `test:integration` hangs on `jobs.test.ts`).
+- Coordinator: `invitati.mobile/desktop.spec.ts` added to T11's files for QA-20/21; QA-23 to a developer (port 3302); QA-25 after, on a fresh `db:reset`.
+- QA-23: not an app bug — `goto("/invitati")` cancels the pending login action and WebKit logs `Load failed`; listeners now start after login. 05af182 fixes QA-20/21/22/23 in the tests (WebKit 15/15, `rsvp.invitati` 72/72 at 4 workers).
+- QA-20 exposed a real regression of R-03 DES-03: at 768 px the flat list (6 columns with presence) makes a long-name row 113 px high (limit 80) → developer fix in `GuestRow`; test limits unchanged.
+- cb33812: tighter name leading, 0.5 rem gap, narrower Type track, 64 px "Invia" at md+ → row 77 px; 34/34 e2e. design-3 APPROVED (32 combinations, axe 0); notes DES-61 (rule ≤ 80 px without link line, ≤ 100 px with one, in design.md §1.2), DES-62 optional padding, DES-63 long group/table names break mid-word at 768 px (pre-existing R-03, follow-up).
+- QA-25 (full `test:integration` hang) next, on a fresh `db:reset`.
