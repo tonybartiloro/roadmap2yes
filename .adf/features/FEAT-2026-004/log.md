@@ -98,3 +98,4 @@
 - QA-20 exposed a real regression of R-03 DES-03: at 768 px the flat list (6 columns with presence) makes a long-name row 113 px high (limit 80) → developer fix in `GuestRow`; test limits unchanged.
 - cb33812: tighter name leading, 0.5 rem gap, narrower Type track, 64 px "Invia" at md+ → row 77 px; 34/34 e2e. design-3 APPROVED (32 combinations, axe 0); notes DES-61 (rule ≤ 80 px without link line, ≤ 100 px with one, in design.md §1.2), DES-62 optional padding, DES-63 long group/table names break mid-word at 768 px (pre-existing R-03, follow-up).
 - QA-25 (full `test:integration` hang) next, on a fresh `db:reset`.
+- QA-25 not reproduced: full integration 46 files, 952 pass, 2 skip, twice (fresh 116 s, dirty 178 s); no locks or leftover servers. Likely cause: `jobs.test.ts` runs the daily job over every wedding of a dirty local DB; CI starts fresh. Closed as environment; tip in `sviluppo-locale-e-test.md` (F4).
