@@ -68,3 +68,11 @@
 - Fix 048bcbc: `same-origin` on pages that reach `/rsvp/[token]` (header + meta), neutral 404/429 keep `no-referrer`; DES-38/39/43 fixed, DES-40 partly. No-JS submit verified in headless Chromium at 320 px.
 - Reviews closed: code-5 approved (round 2), code-6 approved (round 3, residual 10 = own-origin Referer), design-1 approved on 048bcbc (notes DES-40/41/44 open, no action).
 - Carry-overs: T10 checks the neutral 404 body = `neutralHtml()`, one BR9 failure per dead open, `Referrer-Policy` per page type (dead-link 404 branch has no test yet); T11 submits for real without JS, checks no-JS dead link and revoked-link submit; T12: `sicurezza.md` residuals (10, list in `reviews/code-6.md`), ADR-0003 referrer line, stale comment `next.config.ts:43`, `servizio-in-pausa.md` "dal pannello".
+
+## F3 step S4 checkpoint — 2026-11-28
+- Resumed with `/adf:resume` (new session). plan.md condensed 41 → 37 KB by the architect (671a16b).
+- T8 (a0400e5): `LinkSheet`, `GroupModeDialog`. T9 (aed2ce6): presence, group summary, link state + "Invia", `CreateAllDialog`, "Come rispondono", read-only presence, "K restano" toast. Coordinator approved `GuestList.tsx` + `CreateAllDialog.tsx` for T9; `dateChosen` = date only (no location signal); T8 deviations in plan Change log.
+- Reviews: code-7 REV-24..37 (6 should) → fixed, approved round 2 (+ notes 36/37 fixed in round 3); code-8 security REV-123 should (stale URL after rotate) → fixed, approved; design-2 DES-45 **blocking** (toast Annulla unreachable under the modal sheet, tap fell through to WhatsApp) → inline Annulla in the sheet; DES-59 blocking (lost dialog name) and DES-60 found in round 2 → fixed, approved round 3 (axe 0 at 320/1280). Fixes 069f9fc, f55e76f.
+- Coordinator decisions: REV-124 diet data stays in the list payload (same access as RLS) → residual; REV-29 degrade + fixed-code log, no on-page notice; REV-31 `hasGuestsPermission` refactor out of scope.
+- Carry-overs: T11 keeps the `<script>` note case (REV-127) and the singular "1 link personale" copy; T12 `sicurezza.md` residuals REV-124/125/126 and `getLinkUrlAction` without rate limit/audit; follow-up DES-54 (24 px toast Annulla in shared `ui/sonner.tsx`, also R-03) and R-03 `ConfirmDialog` focus return.
+- Tests: unit 1521/1521, typecheck, lint 0 errors; no DB change in S4.

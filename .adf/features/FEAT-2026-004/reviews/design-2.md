@@ -74,5 +74,16 @@ Stessa prova (:3300, stack locale, 320/768/1280, chiaro/scuro; server fermato, `
 - **DES-59**: corretto. Il bug era mio: avevo dato al titolo un `id` fisso, che sostituiva quello generato da Radix e a cui punta `aria-labelledby`. Ora il titolo tiene l'id di Radix (resta `tabIndex=-1`) e il focus iniziale lo trova per `data-slot` dentro il dialogo. Test: il dialogo ha il nome "Link di Famiglia Rossi" e `aria-labelledby` punta a un elemento che esiste (vitest non ha axe; il controllo axe resta all'e2e/designer).
 - **DES-60**: corretto. Dopo revoca o nuovo link con esito positivo la riga con Annulla sparisce e l'annullamento in sospeso viene scartato (neanche il toast di chiusura può comparire). Test per entrambi i casi: la riga non c'è più e `unmarkSharedAction` non viene chiamata.
 
+## Ricontrollo su f55e76f (2026-11-28, designer)
+Verdetto: **lato coppia (S4) approvato dal punto di vista del design**; nessun bloccante né should aperto. DES-54 resta una nota (follow-up su `ui/sonner.tsx`, a cura del coordinatore).
+
+| ID | Stato | Verifica |
+|---|---|---|
+| DES-59 | Closed | `aria-labelledby` risolve il titolo ("Link di Famiglia Esempio"); axe 0 violazioni a 320 e 1280 in pronto, condiviso con riga inline, revocato, ruotato; a 320 anche scaduto e "va rigenerato". Focus sul titolo all'apertura. |
+| DES-60 | Closed | Dopo Revoca e dopo Nuovo link la riga con Annulla sparisce (0 pulsanti Annulla, nessun toast con Annulla; restano "Link revocato." / "Ho creato un nuovo link."), a 320 e 1280. |
+| DES-54 | Still open (nota) | Invariato, accettato come nota. |
+
+Focus: alla chiusura (Chiudi o Esc) torna a "Invia il link di Famiglia Esempio" a 320 e 1280. `.next` ripristinato com'era; server fermato, `db:reset` fatto.
+
 ## Non verificato
 Skeleton del foglio (locale troppo veloce); errore del server nel foglio (DES-55); "Da rimandare" per spostamento di gruppo (provato solo per revoca); altri 10 temi; lettore di schermo; iPhone reale, browser interno di WhatsApp e Safari/Firefox (Gate C); `row-columns.test.ts`.
