@@ -51,6 +51,18 @@ describe("guards: no session", () => {
     });
   });
 
+  // QA-A: a broken escape on /rsvp/{x} reaches the proxy (neutral 404); other paths stay private.
+  it("lets a broken percent escape on /rsvp through, but not on other prefixes", async () => {
+    expect(await evaluateGuards(ctx("/rsvp/%E0%A4%A"))).toEqual({ action: "next" });
+    expect(await evaluateGuards(ctx("/rsvp/%E0%A4%A", { claims: signedIn() }))).toEqual({
+      action: "next",
+    });
+    expect(await evaluateGuards(ctx("/percorso/%E0%A4%A"))).toEqual({
+      action: "redirect",
+      to: "/accesso",
+    });
+  });
+
   it.each(["/", "/percorso", "/altro/account", "/onboarding"])(
     "redirects the private page %s to the login",
     async (path) => {
