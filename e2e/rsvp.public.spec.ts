@@ -29,6 +29,7 @@ import {
   chooseDate,
   chooseLocation,
   revokeRsvpLink,
+  romeDate,
   seedWedding,
   submitRsvp,
   type SeededLink,
@@ -43,6 +44,14 @@ test.beforeEach(async ({ context, ip }) => {
   await context.setExtraHTTPHeaders({ "x-forwarded-for": ip });
 });
 
+// Relative to the real date: the links expire 30 days after the chosen date (REV-41).
+const WEDDING_DATE = romeDate(200);
+const WEDDING_DATE_TEXT = new Intl.DateTimeFormat("it-IT", {
+  day: "numeric",
+  month: "long",
+  year: "numeric",
+  timeZone: "UTC",
+}).format(new Date(`${WEDDING_DATE}T00:00:00Z`));
 const NEUTRAL = "Questo link non funziona più";
 const BLOCKED = "Troppi tentativi: riprova tra 15 minuti";
 
@@ -60,7 +69,7 @@ async function family(): Promise<Family> {
   const w = await seedWedding({
     templateTasks: false,
     names: { a: "Tony", b: "Jessica" },
-    scenarios: [{ kind: "fixed", date_from: "2027-09-03" }],
+    scenarios: [{ kind: "fixed", date_from: WEDDING_DATE }],
   });
   await chooseDate(w);
   await chooseLocation(w, "Villa Aurora", "Tivoli");
@@ -123,7 +132,7 @@ test("the page shows only what AC3 allows: couple, date, place, the people with 
 
   await expect(page).toHaveTitle("Conferma la tua presenza");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Tony e Jessica si sposano");
-  await expect(page.getByText(/3 settembre 2027/)).toBeVisible();
+  await expect(page.getByText(WEDDING_DATE_TEXT)).toBeVisible();
   await expect(page.getByText("Villa Aurora, Tivoli")).toBeVisible();
   await expect(page.getByText("Dicci chi di voi viene.")).toBeVisible();
   // every person of the group, the infant too, each with their own card (no head of family)

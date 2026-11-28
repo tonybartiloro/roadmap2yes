@@ -39,6 +39,7 @@ const standardIgnore = Object.values(SPECIAL);
 /**
  * RSVP link secret of the e2e servers: the seed derives its tokens with the same value (`seed.ts`).
  * The public fake of `.env.example`/CI; a value already in the environment wins on both sides.
+ * The literal MUST equal `FAKE_RSVP_LINK_SECRET` of `src/lib/app-config.ts` (the seed imports that).
  */
 const RSVP_SECRET = process.env.RSVP_LINK_SECRET ?? "local-fake-rsvp-secret-0123456789abcdef";
 
@@ -47,13 +48,19 @@ const RSVP_SECRET = process.env.RSVP_LINK_SECRET ?? "local-fake-rsvp-secret-0123
  * reaches it (plan T11). Not under `test-results/`: Playwright empties that folder at the start. Only
  * a server started by Playwright writes it (a reused one keeps its own console).
  */
-const SERVER_LOG = path.join(os.tmpdir(), `r2y-e2e-server-${process.env.E2E_PORT ?? 3000}.log`);
+// The name carries an id made once per run (the runner sets it first, the workers inherit it): a
+// server that was reused never wrote this file, so an old log can never give a false green (REV-44).
+process.env.E2E_RUN_ID ??= String(Date.now());
+const SERVER_LOG = path.join(
+  os.tmpdir(),
+  `r2y-e2e-server-${process.env.E2E_PORT ?? 3000}-${process.env.E2E_RUN_ID}.log`,
+);
 process.env.E2E_SERVER_LOG = SERVER_LOG;
 
 function server(port: number, env: Record<string, string>, log?: string) {
   const start = `npx next start -H ${host} -p ${port}`;
   return {
-    command: log ? `${start} 2>&1 | tee ${log}` : start,
+    command: log ? `${start} 2>&1 | tee ${JSON.stringify(log)}` : start,
     url: url(port),
     reuseExistingServer: !CI,
     timeout: 120_000,

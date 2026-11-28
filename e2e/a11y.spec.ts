@@ -191,7 +191,7 @@ test.describe("axe on the public RSVP page (WCAG 2.2 AA)", () => {
         const w = await seedWedding({
           templateTasks: false,
           names: { a: "Tony", b: "Jessica" },
-          scenarios: [{ kind: "fixed", date_from: "2027-09-03" }],
+          scenarios: [{ kind: "fixed", date_from: romeDate(200) }],
         });
         await serviceClient().from("weddings").update({ theme_id: theme }).eq("id", w.weddingId);
         await chooseDate(w);

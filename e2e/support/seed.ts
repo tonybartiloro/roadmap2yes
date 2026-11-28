@@ -3,6 +3,7 @@ import { DEFAULT_BUDGET_CATEGORIES } from "@/content/budget-categories";
 import { getMilestone, type Rite } from "@/content/milestones";
 import { generateTasks } from "@/domain/timeline";
 import { deriveRsvpToken, hashRsvpToken } from "@/features/rsvp/token";
+import { FAKE_RSVP_LINK_SECRET } from "@/lib/app-config";
 import {
   addPartnerB,
   createUser,
@@ -294,8 +295,7 @@ export async function addFamilyMember(w: SeededWedding): Promise<TestFamilyMembe
  * `token.ts` and the RPC `rsvp_create_links`, never with the token of `supabase/seeds/05_rsvp.sql`
  * (QA-6: that one is a public constant). Fake data only.
  */
-export const RSVP_SECRET =
-  process.env["RSVP_LINK_SECRET"] ?? "local-fake-rsvp-secret-0123456789abcdef";
+export const RSVP_SECRET = process.env["RSVP_LINK_SECRET"] ?? FAKE_RSVP_LINK_SECRET;
 
 export type SeededLink = { linkId: string; token: string; path: string };
 export type RsvpTarget = { groupId: string } | { guestId: string };

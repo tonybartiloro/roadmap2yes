@@ -54,9 +54,11 @@ test("the link works until the end of the Rome day of date + 30 and is neutral a
   baseURL,
 }) => {
   const w = await seed();
-  await chooseDate(w, DATE);
   const sara = await addGuest(w, { firstName: "Sara", lastName: "Bianchi" });
+  // the link first, the date after: with the date taken, the DB clock (real today) would refuse to
+  // create a link once 2027-10-03 has passed (REV-41); the injected clock does the rest
   const link = await addRsvpLink(w, { guestId: sara });
+  await chooseDate(w, DATE);
 
   await setNow(context, baseURL!, LAST_DAY_EVENING);
   const open = await page.goto(link.path);
@@ -90,10 +92,10 @@ test("couple side: 'Scade il', then 'Scaduto il' with no creation or rotation; m
   baseURL,
 }) => {
   const w = await seed();
-  await chooseDate(w, DATE);
   const sara = await addGuest(w, { firstName: "Sara", lastName: "Bianchi" });
   await addGuest(w, { firstName: "Mario", lastName: "Verdi" }); // no link yet
-  const link = await addRsvpLink(w, { guestId: sara });
+  const link = await addRsvpLink(w, { guestId: sara }); // before the date: see the first test
+  await chooseDate(w, DATE);
   await loginAs(page, w.wedding.founder, uniqueIp());
 
   await setNow(context, baseURL!, "2027-10-03T10:00:00Z");
