@@ -77,3 +77,4 @@
 - Carry-overs: T11 keeps the `<script>` note case (REV-127) and the singular "1 link personale" copy; T12 `sicurezza.md` residuals REV-124/125/126 and `getLinkUrlAction` without rate limit/audit; follow-up DES-54 (24 px toast Annulla in shared `ui/sonner.tsx`, also R-03) and R-03 `ConfirmDialog` focus return.
 - Tests: unit 1521/1521, typecheck, lint 0 errors; no DB change in S4. `adf verify` pass on 7d7b460 (lint, typecheck, unit, build).
 - Next: S5 (T10 QA acceptance/integration, T11 e2e, T12 docs, T13 release checklist).
+- Developer: "Nuova sessione" → S5 continues in a new session with `/adf:resume FEAT-2026-004`. Follow-up DES-54 + `ConfirmDialog` focus started as a separate session on its own branch.
