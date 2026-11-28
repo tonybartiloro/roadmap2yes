@@ -350,11 +350,18 @@ test("delete a group, restore it, delete it for good; delete a person for good: 
   expect(left.data).toEqual([]);
   expect(await statusOf(page, shared.path)).toBe(404);
   await page.keyboard.press("Escape");
+  await expect(sheet(page)).toHaveCount(0); // the sheet is gone before the next click (QA-22)
+  // The purge changed Anna's group pointer (her version): load the list again, or "Elimina" can
+  // race the refresh and be answered with a version conflict instead of deleting (QA-22).
+  await page.reload();
+  await expect(row(page, "Anna Rossi")).toBeVisible();
 
   // a person: their answer goes with them
   expect((await db().from("rsvp_responses").select("id").eq("id", ids[0]!)).data).toHaveLength(1);
   await row(page, "Anna Rossi").click();
   await sheet(page).getByRole("button", { name: "Elimina", exact: true }).click();
+  await expect(row(page, "Anna Rossi")).toHaveCount(0);
+  await expect(sheet(page)).toHaveCount(0);
   await openMenu(page, /^Eliminati di recente \(1\)/);
   await sheet(page).getByRole("button", { name: "Elimina definitivamente Anna Rossi" }).click();
   await confirmDialog(page).getByRole("button", { name: "Elimina definitivamente" }).click();

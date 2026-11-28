@@ -121,16 +121,19 @@ test("RSVP: the public page opens and a guest sends the answers", async ({ page 
 test("RSVP: the link sheet of Invitati opens and loads the link without errors", async ({
   page,
 }) => {
-  const problems: string[] = [];
-  page.on("pageerror", (error) => problems.push(`pageerror: ${error.message}`));
-  page.on("console", (message) => {
-    if (message.type() === "error") problems.push(`console: ${message.text()}`);
-  });
   const w = await seedWedding({ templateTasks: false, names: { a: "Tony", b: "Jessica" } });
   const mario = await addGuest(w, { firstName: "Mario", lastName: "Verdi" });
   await addRsvpLink(w, { guestId: mario });
   await loginAs(page, w.wedding.founder, uniqueIp());
   await page.goto("/invitati");
+  await expect(page.getByRole("heading", { level: 1, name: "Invitati" })).toBeVisible();
+  // The listeners start here: the goto above cancels the login action that was still in flight, and
+  // WebKit logs that cancel as "TypeError: Load failed" (QA-23). Only the sheet opening is checked.
+  const problems: string[] = [];
+  page.on("pageerror", (error) => problems.push(`pageerror: ${error.message}`));
+  page.on("console", (message) => {
+    if (message.type() === "error") problems.push(`console: ${message.text()}`);
+  });
   await page.getByRole("button", { name: "Invia il link di Mario Verdi" }).click();
   const sheet = page.getByRole("dialog");
   await expect(sheet.getByRole("heading", { name: "Link di Mario Verdi" })).toBeVisible();
