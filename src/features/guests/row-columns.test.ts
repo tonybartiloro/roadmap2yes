@@ -22,7 +22,8 @@ describe("rowColumns", () => {
       );
       expect(widths.length).toBe(2 + Number(g) + Number(t) + Number(p));
       // the 768 px content width is ~37rem: 8rem Nome + the other columns + the gaps (0.75rem each)
-      const others = widths.reduce((a, b) => a + b, 0) + 0.75 * widths.length;
+      // (the presence layout uses 0.5rem gaps, see rowGap; the send slot is 4.75rem there)
+      const others = widths.reduce((a, b) => a + b, 0) + (p ? 0.5 : 0.75) * widths.length;
       expect(others).toBeLessThanOrEqual(p ? 29 : 27);
     },
   );

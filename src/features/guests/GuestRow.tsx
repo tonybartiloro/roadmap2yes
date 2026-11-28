@@ -18,7 +18,8 @@ export function rowColumns(withGroup: boolean, withTable: boolean, withPresence 
   if (withPresence) {
     // The last column (5.5rem) holds "In attesa" with its icon on one line (whitespace-nowrap).
     if (withGroup && withTable) {
-      return "md:grid-cols-[minmax(8rem,1fr)_4.5rem_minmax(0,4.5rem)_minmax(0,5.5rem)_minmax(0,5rem)_5.5rem]";
+      // 6 tracks at 768 px: Type 4rem, so a long name wraps onto two lines, not four (DES-03, QA-20)
+      return "md:grid-cols-[minmax(8rem,1fr)_4rem_minmax(0,4.5rem)_minmax(0,5.5rem)_minmax(0,5rem)_5.5rem]";
     }
     if (withGroup) {
       return "md:grid-cols-[minmax(8rem,1fr)_4.5rem_minmax(0,5rem)_minmax(0,6rem)_5.5rem]";
@@ -38,6 +39,11 @@ export function rowColumns(withGroup: boolean, withTable: boolean, withPresence 
 
 // Cells: wrap long text inside their column instead of cutting it (REV-61).
 const CELL = "md:row-start-1 min-w-0 break-words";
+
+/** Gap between columns from 768 px: tighter with the presence column, to give the name room. */
+export function rowGap(withPresence: boolean): string {
+  return withPresence ? "md:gap-x-2" : "md:gap-x-3";
+}
 
 /** Written out so Tailwind sees every class. */
 const COL_START = [
@@ -144,10 +150,10 @@ export const GuestRow = memo(function GuestRow({
   const link = rsvp?.link ?? null;
   const details = (
     <span
-      className={`relative flex min-w-0 flex-1 flex-col md:grid md:items-center md:gap-x-3 ${rowColumns(withGroup, withTable, Boolean(rsvp))}`}
+      className={`relative flex min-w-0 flex-1 flex-col md:grid md:items-center ${rowGap(Boolean(rsvp))} ${rowColumns(withGroup, withTable, Boolean(rsvp))}`}
     >
       <span
-        className={`min-w-0 [overflow-wrap:anywhere] md:col-start-1 md:row-start-1 ${rsvp && !link ? "pr-24 md:pr-0" : ""}`}
+        className={`min-w-0 [overflow-wrap:anywhere] ${rsvp ? "md:leading-tight" : ""} md:col-start-1 md:row-start-1 ${rsvp && !link ? "pr-24 md:pr-0" : ""}`}
       >
         {name}
       </span>{" "}
@@ -222,14 +228,14 @@ export const GuestRow = memo(function GuestRow({
         <Button
           type="button"
           variant="outline"
-          className="mr-3 min-h-11 w-20 shrink-0"
+          className="mr-3 min-h-11 w-20 shrink-0 md:w-16"
           aria-label={`Invia il link di ${name}`}
           onClick={() => onSend(link.recipient)}
         >
           Invia
         </Button>
       ) : sendSlot ? (
-        <span aria-hidden className="mr-3 hidden w-20 shrink-0 md:block" />
+        <span aria-hidden className="mr-3 hidden w-16 shrink-0 md:block" />
       ) : null}
     </li>
   );

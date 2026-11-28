@@ -6,7 +6,7 @@ import { countGuests } from "@/domain/guests";
 import { groupAccessibleName, type Recipient } from "@/features/rsvp/view";
 import type { GroupView, GuestView } from "./data";
 import { GroupHeader } from "./GroupHeader";
-import { GuestRow, rowColumns } from "./GuestRow";
+import { GuestRow, rowColumns, rowGap } from "./GuestRow";
 import { NO_RSVP, type GroupRsvp, type GuestRsvp } from "./rsvp-model";
 import { ShowMore } from "./ShowMore";
 import { categorySummary, PAGE_SIZE, type PartnerNames, type Section } from "./view";
@@ -53,7 +53,7 @@ function ColumnHeader({ handlers, withGroup }: { handlers: ListHandlers; withGro
   return (
     <div
       aria-hidden
-      className={`text-muted-foreground border-border hidden border-b py-1.5 text-sm font-semibold md:grid md:gap-x-3 ${reserve ? "pr-[6.5rem]" : "pr-3"} ${handlers.selecting ? "md:pl-12" : "md:pl-3"} ${rowColumns(withGroup, withTable, Boolean(handlers.rsvp))}`}
+      className={`text-muted-foreground border-border hidden border-b py-1.5 text-sm font-semibold md:grid ${rowGap(Boolean(handlers.rsvp))} ${reserve ? "pr-[6.5rem] md:pr-[5.5rem]" : "pr-3"} ${handlers.selecting ? "md:pl-12" : "md:pl-3"} ${rowColumns(withGroup, withTable, Boolean(handlers.rsvp))}`}
     >
       <span>Nome</span>
       <span>Tipo</span>
