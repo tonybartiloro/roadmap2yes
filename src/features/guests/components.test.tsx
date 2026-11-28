@@ -376,6 +376,18 @@ describe("delete and Annulla (AC10)", () => {
     );
   });
 
+  it("gives the focus back to the group menu button when the confirmation is cancelled", async () => {
+    renderScreen({ guests: [guest({ groupId: "g1" })], groups: [group("g1", "Famiglia Rossi")] });
+    const menu = screen.getByRole("button", { name: "Azioni del gruppo Famiglia Rossi" });
+    await userEvent.click(menu);
+    // The menu sheet closes as the confirmation opens: the button that opened it is gone.
+    await userEvent.click(screen.getByRole("button", { name: "Elimina gruppo" }));
+    await userEvent.click(
+      within(screen.getByRole("alertdialog")).getByRole("button", { name: "Annulla" }),
+    );
+    await waitFor(() => expect(document.activeElement).toBe(menu));
+  });
+
   it("members of a deleted group are listed under Senza gruppo", () => {
     renderScreen({
       guests: [guest({ groupId: "g1" })],
@@ -604,6 +616,16 @@ describe("Eliminati di recente (AC10, AC11)", () => {
       }),
     );
     expect(actions.purgeEntityAction).toHaveBeenCalledWith({ kind: "guest", id: gone.id });
+  });
+
+  it("gives the focus back to the button that opened the confirmation (no Radix Trigger)", async () => {
+    await openDeleted({ guests: [guest(), guest({ firstName: "Gone", deletedAt: deleted })] });
+    const purge = screen.getByRole("button", { name: "Elimina definitivamente Gone Rossi" });
+    await userEvent.click(purge);
+    await userEvent.click(
+      within(screen.getByRole("alertdialog")).getByRole("button", { name: "Annulla" }),
+    );
+    await waitFor(() => expect(document.activeElement).toBe(purge));
   });
 
   it("says so when nothing was deleted", async () => {

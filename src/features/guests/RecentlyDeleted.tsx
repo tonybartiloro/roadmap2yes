@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Sheet, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { plural } from "@/components/format";
+import { useFocusReturn } from "@/lib/hooks/use-focus-return";
 import { PanelContent } from "@/features/timeline/PanelContent";
 import type { EmptyScope, EntityKind, GroupView, GuestView, TableView } from "./data";
 import { fullName } from "./view";
@@ -23,9 +24,17 @@ export interface ConfirmRequest {
   description: string;
   confirmLabel: string;
   onConfirm: () => void;
+  /**
+   * `aria-label`s of buttons that take the focus back when the control that opened the dialog is
+   * gone by the time it closes (e.g. the group menu sheet closed: its "Azioni del gruppo …").
+   */
+  returnFocusTo?: readonly string[];
 }
 
-/** Destructive confirmation: the focus starts on "Annulla" (Radix AlertDialog), never on the danger. */
+/**
+ * Destructive confirmation: the focus starts on "Annulla" (Radix AlertDialog), never on the danger,
+ * and goes back to the control that opened it when it closes (there is no Radix Trigger).
+ */
 export function ConfirmDialog({
   request,
   onClose,
@@ -33,9 +42,10 @@ export function ConfirmDialog({
   request: ConfirmRequest | null;
   onClose: () => void;
 }) {
+  const returnFocus = useFocusReturn(request !== null, request?.returnFocusTo);
   return (
     <AlertDialog open={request !== null} onOpenChange={(next) => (next ? undefined : onClose())}>
-      <AlertDialogContent>
+      <AlertDialogContent onCloseAutoFocus={returnFocus}>
         <AlertDialogHeader>
           <AlertDialogTitle>{request?.title}</AlertDialogTitle>
           <AlertDialogDescription>{request?.description}</AlertDialogDescription>
