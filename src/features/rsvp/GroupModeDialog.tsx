@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { useConflict } from "@/features/budget/use-conflict";
 import { RSVP_STALE_CODES } from "./constants";
 import { setGroupModeAction } from "./actions";
-import { useFocusReturn } from "./use-focus-return";
+import { useFocusReturn } from "@/lib/hooks/use-focus-return";
 
 export type GroupMode = "together" | "separate";
 
@@ -76,7 +76,7 @@ export function GroupModeDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const router = useRouter();
-  const returnFocus = useFocusReturn(`Azioni del gruppo ${groupName}`);
+  const returnFocus = useFocusReturn(true, [`Azioni del gruppo ${groupName}`]);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
