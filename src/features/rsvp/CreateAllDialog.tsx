@@ -16,7 +16,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { createLinksAction } from "./actions";
 import { RSVP_STALE_CODES } from "./constants";
-import { useFocusReturn } from "./LinkSheet";
+import { useFocusReturn } from "./use-focus-return";
 import type { Recipient } from "./view";
 
 const FAILURE = "Non sono riuscito a crearli tutti.";

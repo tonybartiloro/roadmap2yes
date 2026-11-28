@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { formatLongDate } from "@/components/format";
@@ -42,6 +42,7 @@ import {
   type Recipient,
   type RsvpLink,
 } from "./view";
+import { useFocusReturn } from "./use-focus-return";
 
 type UrlResult = {
   linkId: string;
@@ -52,31 +53,12 @@ type UrlResult = {
 type Confirm = "rotate" | "revoke";
 type Undo = { linkId: string; previous: SharedPrevious; how: string; day: string; until: number };
 
-const TITLE_ID = "link-sheet-title";
-
 /**
- * Focus goes back to what opened the dialog (WCAG 2.4.3). Radix cannot do it for a dialog that has
- * no Trigger (an AlertDialog then sends it to `body`). `fallbackLabel` = the `aria-label` of a
- * button that survives when the opener is gone (a menu sheet that closed).
+ * The title keeps the id Radix gave it (the dialog's `aria-labelledby` points to it, DES-59), so
+ * it is found by its slot, inside the open dialog.
  */
-export function useFocusReturn(fallbackLabel?: string) {
-  const [opener] = useState<Element | null>(() =>
-    typeof document === "undefined" ? null : document.activeElement,
-  );
-  return useCallback(
-    (event: Event) => {
-      event.preventDefault();
-      const alive = opener instanceof HTMLElement && opener.isConnected && opener !== document.body;
-      const fallback = fallbackLabel
-        ? [...document.querySelectorAll<HTMLElement>("button")].find(
-            (b) => b.getAttribute("aria-label") === fallbackLabel,
-          )
-        : undefined;
-      (alive ? opener : fallback)?.focus();
-    },
-    [opener, fallbackLabel],
-  );
-}
+const focusTitle = () =>
+  document.querySelector<HTMLElement>('[role="dialog"] [data-slot="sheet-title"]')?.focus();
 
 /**
  * "Link di {destinatario}" (design §1.2). The URL loads when the sheet opens, so Copia, Condividi
@@ -118,7 +100,7 @@ export function LinkSheet({
   onOpenChange: (open: boolean) => void;
 }) {
   const router = useRouter();
-  const returnFocus = useFocusReturn("Altro");
+  const returnFocus = useFocusReturn(`Invia il link di ${recipient.name}`, "Altro");
   const confirmOpener = useRef<Element | null>(null);
   const [fetched, setFetched] = useState<UrlResult | null>(null);
   const [busy, setBusy] = useState(false);
@@ -300,6 +282,9 @@ export function LinkSheet({
     );
     setConfirmOpen(false);
     if (!ok) return;
+    // The pending "Annulla" belongs to a link that no longer works: drop it (DES-60).
+    undoRef.current = null;
+    setUndo(null);
     if (confirm === "revoke") setRevokedId(linkId);
     else setRetiredId(linkId);
     setEdited(null);
@@ -319,12 +304,12 @@ export function LinkSheet({
           onOpenAutoFocus={(event) => {
             // Not on "Nuovo link" (first control before the URL loads): start at the title.
             event.preventDefault();
-            document.getElementById(TITLE_ID)?.focus();
+            focusTitle();
           }}
           onCloseAutoFocus={returnFocus}
         >
           <SheetHeader>
-            <SheetTitle id={TITLE_ID} tabIndex={-1} className="outline-none">
+            <SheetTitle tabIndex={-1} className="outline-none">
               {`Link di ${recipient.name}`}
             </SheetTitle>
             <SheetDescription id="link-hint">
@@ -503,11 +488,8 @@ export function LinkSheet({
           onCloseAutoFocus={(event) => {
             event.preventDefault();
             const opener = confirmOpener.current;
-            const target =
-              opener instanceof HTMLElement && opener.isConnected
-                ? opener
-                : document.getElementById(TITLE_ID);
-            target?.focus();
+            if (opener instanceof HTMLElement && opener.isConnected) opener.focus();
+            else focusTitle();
           }}
         >
           <AlertDialogHeader>

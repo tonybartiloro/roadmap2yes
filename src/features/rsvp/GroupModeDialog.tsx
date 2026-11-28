@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { useConflict } from "@/features/budget/use-conflict";
 import { RSVP_STALE_CODES } from "./constants";
 import { setGroupModeAction } from "./actions";
-import { useFocusReturn } from "./LinkSheet";
+import { useFocusReturn } from "./use-focus-return";
 
 export type GroupMode = "together" | "separate";
 

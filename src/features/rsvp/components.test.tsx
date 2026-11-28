@@ -196,6 +196,34 @@ describe("LinkSheet", () => {
     ).not.toContain(URL_);
   });
 
+  it("the dialog has an accessible name, from its own title (DES-59)", async () => {
+    sheet();
+    const dialog = await screen.findByRole("dialog", { name: "Link di Famiglia Rossi" });
+    const labelledBy = dialog.getAttribute("aria-labelledby");
+    expect(labelledBy && document.getElementById(labelledBy)?.textContent).toBe(
+      "Link di Famiglia Rossi",
+    );
+  });
+
+  it.each([
+    ["Revoca link", "Revoca", "revokeLinkAction"],
+    ["Nuovo link", "Crea nuovo link", "rotateLinkAction"],
+  ] as const)(
+    "%s drops the pending Annulla so it cannot act on a dead link (DES-60)",
+    async (open, confirmName, action) => {
+      actions[action].mockResolvedValue(ok({ linkId: LINK_ID }));
+      sheet();
+      await userEvent.click(await screen.findByRole("button", { name: "Copia link" }));
+      await screen.findByText(/Link copiato · Condiviso il/);
+      await userEvent.click(screen.getByRole("button", { name: open }));
+      await userEvent.click(screen.getByRole("button", { name: confirmName }));
+      await waitFor(() => expect(actions[action]).toHaveBeenCalled());
+      await waitFor(() => expect(screen.queryByText(/Link copiato · Condiviso/)).toBeNull());
+      expect(screen.queryByRole("button", { name: "Annulla" })).toBeNull();
+      expect(actions.unmarkSharedAction).not.toHaveBeenCalled();
+    },
+  );
+
   it("starts with the focus on the title, not on 'Nuovo link' (DES-46)", async () => {
     sheet();
     await waitFor(() =>
