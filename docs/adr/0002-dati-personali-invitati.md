@@ -78,7 +78,7 @@
   - i backup del fornitore conservano i dati fino alla loro rotazione;
   - residuo noto (REV-8): se una scrittura diretta sulla tabella viola un vincolo, Postgres scrive nei propri log il dettaglio "Failing row contains (...)" con i valori della riga. L'app non lo restituisce né lo registra (le server action mappano solo il codice), ma i log del database del fornitore lo conservano fino alla loro rotazione.
 - **Follow-up**:
-  - R-04: tabella `rsvp_links` (hash del token, invitato o gruppo, scadenza, revoca), rate limit e `noindex`;
+  - R-04: vedi ADR-0003 (token derivato, accesso pubblico);
   - eventuale informativa privacy per la pagina pubblica.
 
 ## Compliance

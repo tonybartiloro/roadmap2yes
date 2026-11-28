@@ -105,9 +105,31 @@ Permessi: area `guests` in `private.role_permissions`, solo per `partner`, con `
 | `guests_bulk(p_ids uuid[], p_op, p_target) → {previous, changed}` | `SECURITY INVOKER` | `assign_group`, `assign_table`, `delete`, `restore`. Vale RLS e grant di colonna. Restituisce i valori precedenti letti sotto lock, solo per le righe cambiate. Al massimo 1000 id per chiamata |
 | `guests_bulk_undo(p_previous jsonb) → {restored}` | `SECURITY INVOKER` | Rimette i valori salvati. Salta gli id spariti, le persone eliminate nel frattempo e le assegnazioni a gruppi o tavoli eliminati. L'ultimo salvataggio vince |
 | `import_guests(p_rows jsonb) → {batch_id, guests, groups}` | `SECURITY DEFINER` | Importazione atomica: gruppi nuovi e persone con lo stesso `import_batch_id`. Il gruppo esistente si riusa per chiave normalizzata calcolata in SQL (`private.guest_group_key`, come `groupKey` del TypeScript). Limiti ricontrollati: 500 righe, payload sopra ~940 KB rifiutato |
-| `undo_guest_import(p_batch_id uuid) → {guests, groups}` | `SECURITY DEFINER` | Cancella **fisicamente** le persone del lotto ancora intatte (vive, `version = 1`, senza tavolo; le altre restano) e i gruppi creati dal lotto rimasti senza membri. Richiede `guests/delete`. Un lotto di un altro matrimonio non fa nulla |
+| `undo_guest_import(p_batch_id uuid) → {guests, groups, skipped}` | `SECURITY DEFINER` | Cancella **fisicamente** le persone del lotto ancora intatte (vive, `version = 1`, senza tavolo). Salta chi ha una risposta, un link personale non revocato o è nella fotografia di un link condiviso; `skipped` le conta per il messaggio. Cancella i gruppi creati dal lotto rimasti senza membri. Richiede `guests/delete`. Un lotto di un altro matrimonio non fa nulla |
 
 Nelle `SECURITY DEFINER` il matrimonio viene dall'appartenenza di chi chiama, mai da un parametro, e il permesso si controlla per primo. Gli errori sono `P0001` con codice stabile (`invalid_row`, `too_many_rows`, `payload_too_large`, `group_deleted`, `table_deleted`) e `42501` per i dinieghi. Il messaggio non contiene mai valori.
+
+### Conferme di presenza (ADR-0003)
+
+Risposte e link sono dati di terzi, anche sanitari (preferenze alimentari). Valgono le regole degli invitati (ADR-0002) e, per la pagina pubblica, quelle dell'[ADR-0003](../adr/0003-link-rsvp-token-derivato-accesso-pubblico.md). Le tabelle hanno `wedding_id`, `created_*`/`updated_*` e FK composte `(…, wedding_id)`.
+
+| Tabella | Scopo | Note |
+|---|---|---|
+| `guest_groups.rsvp_mode` | Modalità del gruppo | `text not null default 'together'`, `check` su `together` (insieme) e `separate` (ognuno per sé). Versionata; grant di colonna dal menu del gruppo |
+| `rsvp_links` | Un link per gruppo o per persona | Esattamente uno tra `group_id` e `guest_id`. `token_hash bytea` unico, 32 byte. `revoked_*`, `shared_*`, `version`. Un solo link non revocato per bersaglio (indice unico parziale). Cascata con il bersaglio. Nessun grant di lettura su `token_hash` |
+| `rsvp_link_people` | Persone coperte al momento del "Condiviso il" | `(link_id, guest_id)`, cascata su entrambi. Serve a "Da rimandare". Nessun dato personale, senza audit |
+| `rsvp_responses` | Presenza, preferenze, origine, data | Una riga per persona, con `id` uguale a quello dell'invitato. `status` `yes`/`no`; `diet` ⊆ quattro valori; `diet_note` fino a 200; `source` `guest`/`couple` (da `auth.uid()`); `answered_at`; `version`. Senza "Sì" niente preferenze. Nessuna riga = "In attesa". Nessuna scrittura diretta |
+| `private.rsvp_attempts` | Limiti del BR9 | Stessa forma di `login_attempts`, con pulizia propria |
+
+Audit: `rsvp_links` esclude `token_hash`; `rsvp_responses` esclude `status`, `diet` e `diet_note`; `rsvp_link_people` non ha audit.
+
+| Funzione | Sicurezza | Cosa fa |
+|---|---|---|
+| `private.rsvp_expires_on(wedding)` | Privata | Data scelta + 30 giorni, `null` se la data non è scelta |
+| `private.rsvp_link_people(link, now)` | Privata | Le persone vive che il link copre ora. Vuoto se è revocato, scaduto o il bersaglio non è un destinatario. Un link funziona se l'insieme non è vuoto |
+| `rsvp_status(p_now)` | `SECURITY DEFINER`, `guests/read` | Stato per la lista: scadenza, link, persone "Da rimandare" |
+| `rsvp_create_links`, `rsvp_rotate_link`, `rsvp_revoke_link`, `rsvp_mark_shared`, `rsvp_unmark_shared`, `rsvp_link_matches` | `SECURITY DEFINER`, `guests/write` | Scritture dei link. Create e rotate rifiutano dopo la scadenza. `rsvp_link_matches` confronta l'hash senza leggerlo. `rsvp_mark_shared` restituisce il valore precedente per Annulla |
+| `rsvp_gate`, `rsvp_page`, `rsvp_submit` | `SECURITY DEFINER`, solo `service_role` | Pagina pubblica. Insiemi di chiavi chiusi; `p_now` solo dal server. `rsvp_submit` salva una riga per persona (vince l'ultimo), ignora gli id fuori dal destinatario e rispetta i limiti del BR9 |
 
 ## Matrice delle scritture
 
@@ -127,6 +149,8 @@ Sintesi di ciò che `authenticated` può fare direttamente con una `UPDATE` o `I
 | `budget_versions` | Nessuna | Append-only |
 | `budget_categories`, `budget_items`, `payments` | Colonne di business e `deleted_at` | `move_budget_items` per spostare le voci |
 | `guests`, `guest_groups`, `guest_tables` | Colonne di business, `deleted_at` (eliminazione e ripristino). `DELETE` fisico solo su righe già eliminate e con `guests/delete` | `create_guest_family`, `guests_bulk`, `guests_bulk_undo`, `import_guests`, `undo_guest_import` |
+| `guest_groups.rsvp_mode` | Solo questa colonna, dal menu del gruppo, con versione e grant di colonna | — |
+| `rsvp_links`, `rsvp_link_people`, `rsvp_responses` | Nessuna (`rsvp_links` senza `token_hash`). Cancellazione solo a cascata | `rsvp_create_links`, `rsvp_rotate_link`, `rsvp_revoke_link`, `rsvp_mark_shared`, `rsvp_unmark_shared`, `rsvp_submit` (solo `service_role`) |
 | `audit_log`, `heartbeats`, `notification_log`, `private.*` | Nessuna | Trigger e job |
 
 Le funzioni eseguibili da `authenticated` includono, tra le altre: `create_wedding`, `complete_onboarding`, `accept_pending_invitation`, `create_invitation`, `rotate_invitation`, `revoke_invitation`, `upsert_partner_b`, `update_partner_email`, `sync_my_email`, `authorize_account_op`, `choose_option`, `reopen_decision`, `set_reference_scenario`, `insert_template_tasks`, `record_seen`, `record_export`, `dismiss_welcome`, `last_heartbeat`. Solo con la chiave segreta: `record_heartbeat`, `login_gate`, `login_record`, `auth_user_id_by_email` (solo bootstrap), `invitation_by_token`, e le funzioni `job_*`.
@@ -136,7 +160,7 @@ Le funzioni eseguibili da `authenticated` includono, tra le altre: `create_weddi
 - Una migrazione è **additiva**. Una modifica distruttiva richiede un piano separato e revisionato (vedi [runbook](ambienti-e-rilascio.md#migrazioni)).
 - Un trigger o una funzione `SECURITY DEFINER` non deve mai essere più permissiva di quanto dichiarato nel nome e nel commento della funzione.
 - Le viste SQL devono avere `security_invoker = true`, altrimenti bypassano la RLS.
-- Il `DELETE` fisico è ammesso solo per le tabelle degli invitati, e solo su righe già eliminate logicamente (ADR-0002). Le altre tabelle di dominio non hanno `DELETE`; l'unica eccezione precedente è `option_reactions`, con le proprie righe.
+- Il `DELETE` fisico è ammesso solo per le tabelle degli invitati, e solo su righe già eliminate logicamente (ADR-0002). Le tabelle `rsvp_*` non si cancellano direttamente: vanno a cascata quando la persona o il gruppo sono eliminati definitivamente. Le altre tabelle di dominio non hanno `DELETE`; l'unica eccezione precedente è `option_reactions`, con le proprie righe.
 
 ## Storico delle modifiche
 
@@ -144,3 +168,4 @@ Le funzioni eseguibili da `authenticated` includono, tra le altre: `create_weddi
 |---|---|---|
 | 2026-11-24 | FEAT-2026-001 | Prima stesura (F4, T18) |
 | 2026-11-25 | FEAT-2026-003 | Tabelle `guests`, `guest_groups`, `guest_tables`; permesso `guests` con `delete`; RPC di famiglia, di massa e di importazione |
+| 2026-11-28 | FEAT-2026-004 | Tabelle `rsvp_links`, `rsvp_link_people`, `rsvp_responses`, `rsvp_mode` su `guest_groups`; RPC dei link e pubbliche; `undo_guest_import` salta chi ha risposto o un link |

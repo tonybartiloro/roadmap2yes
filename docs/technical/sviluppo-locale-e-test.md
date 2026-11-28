@@ -136,6 +136,15 @@ Dove stanno i test del modulo, per livello:
 - **E2E**: `e2e/invitati.mobile.spec.ts` (persone e azioni di massa), `invitati.desktop.spec.ts` (conflitto e scala), `invitati.tavoli.mobile.spec.ts` (tavoli) e `invitati.nav.spec.ts` (barra e Aiuto). I dati si preparano con gli helper `seedGuests`, `addFamilyMember` e quelli dei tavoli in `e2e/support/seed.ts`, mai dalla UI.
 - Gli e2e girano sulla build: dopo ogni modifica lanciate `npm run build`, poi `E2E_PORT=3300 npm run e2e` come nel resto del documento.
 
+## Conferme di presenza (FEAT-2026-004)
+
+- **Seed**: `supabase/seeds/05_rsvp.sql` (applicato da `npm run db:reset`) riusa il matrimonio di prova: un gruppo "insieme", un gruppo "separato", una persona senza gruppo e un link di prova. Il segreto e il token del seed sono **finti e valgono solo in locale**: i valori stanno nel file, non in questo documento. Il seed non gira mai su staging o produzione (vedi [Ambienti e rilascio](ambienti-e-rilascio.md#link-rsvp-segreto-e-revoca-totale)).
+- **pgTAP**: `rsvp_model.test.sql` (vincoli, audit senza `status`/`diet`/`token_hash`), `rsvp_rls.test.sql` (dinieghi per `anon`, altro matrimonio, family/planner), `rsvp_lifecycle.test.sql` (matrice del ciclo di vita dei link) e `rsvp_public.test.sql` (insieme esatto delle chiavi, neutre, scadenza, limiti, invii). Richiedono `npm run db:reset`.
+- **Unit** (`npm test`): `token.ts` con vettori fissi e forme scartate senza database; `limiter.ts` (IPv6 /64, IP assente); `view.ts` (stati dei link, riepilogo, saluto WhatsApp); configurazione del segreto; orologio; pagine neutra e 429 (byte identici); componenti della pagina pubblica e del foglio link.
+- **Integration** (`npm run test:integration`): `tests/integration/rsvp.actions.test.ts` (azioni della coppia ed esportazione) e l'helper `tests/acceptance/support/rsvp.ts`.
+- **E2E** (`npm run e2e`): pagina pubblica a 320 px e senza JavaScript, lato coppia, scadenza con l'orologio di test (progetto `time`, seriale). Nei test e2e il token del seed non si usa: i link si creano con gli helper.
+- **Limiti in locale**: `x-forwarded-for` non è affidabile fuori da Vercel, quindi i test che provano i limiti usano un IP sintetico e puliscono `rsvp_attempts`. Un link aperto da WhatsApp su iPhone e Android, e Condividi da iPhone, si provano solo su dispositivo vero (Gate C); WebKit in locale non lo sostituisce.
+
 ## Stato al termine di F3
 
 Riferimento dal log della feature, non un contratto: unit circa 850, integration circa 740, pgTAP circa 950, e2e 209 su 210 con un test di avvio a freddo poi reso deterministico. I numeri cambiano con il codice.
@@ -150,6 +159,7 @@ Riferimento dal log della feature, non un contratto: unit circa 850, integration
 
 | Data | Feature | Modifica |
 |---|---|---|
+| 2026-11-28 | FEAT-2026-004 | Conferme di presenza: seed `05_rsvp.sql`, pgTAP, unit, integration ed e2e del modulo, limiti locali (IP sintetico) |
 | 2026-11-24 | FEAT-2026-001 | Prima stesura: suite, progetti e2e, matrice dei temi, limiti noti (F4, T18) |
 | 2026-11-25 | FEAT-2026-002 | Test dei documenti della Guida; porta e2e locale (`E2E_PORT=3300`) |
 | 2026-11-25 | FEAT-2026-003 | Test del modulo invitati per livello, seed finto e helper e2e |

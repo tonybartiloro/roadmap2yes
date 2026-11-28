@@ -40,8 +40,9 @@ function contentSecurityPolicy(): string {
   ].join("; ");
 }
 
-// `Referrer-Policy` is set in src/proxy.ts (no-referrer on /invito/*, /auth/*, /email/*,
-// strict-origin-when-cross-origin elsewhere) so the value is never duplicated here.
+// `Referrer-Policy` is set in src/proxy.ts (no-referrer on /invito/*, /auth/*, /email/* and on the
+// RSVP neutral 404 and 429; same-origin on the RSVP form page /rsvp/*; strict-origin-when-cross-origin
+// elsewhere) so the value is never duplicated here.
 const securityHeaders = [
   { key: "X-Robots-Tag", value: "noindex, nofollow" },
   { key: "Content-Security-Policy", value: contentSecurityPolicy() },

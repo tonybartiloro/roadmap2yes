@@ -19,3 +19,5 @@ Decisioni di architettura: [`docs/adr`](../adr/0001-stack-auth-ambienti.md).
 |---|---|---|
 | 2026-11-24 | FEAT-2026-001 | Prima stesura (F4, T18) |
 | 2026-11-25 | FEAT-2026-002 | Guida d'uso in app: route, lettura e tracciamento, sicurezza, test dei documenti; "Altro" diventa "Opzioni" |
+| 2026-11-25 | FEAT-2026-003 | Modulo invitati: modello, sicurezza dei dati personali, runbook, test |
+| 2026-11-28 | FEAT-2026-004 | Conferme di presenza: modello, pagina pubblica nella sicurezza, proxy, segreto `RSVP_LINK_SECRET`, test |

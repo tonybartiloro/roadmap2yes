@@ -31,7 +31,7 @@ Nessuno storage di file: R1 non carica file. Lo storage, quando servirà (R6), s
 
 ## Come arriva una richiesta
 
-1. **`src/proxy.ts`** verifica la sessione con `getClaims()`, applica le intestazioni di sicurezza, rimanda al login o alla pagina "Questo spazio è su invito", e con errori di rete o con il servizio in pausa riscrive su `/servizio` senza leggere il database.
+1. **`src/proxy.ts`** verifica la sessione con `getClaims()`, applica le intestazioni di sicurezza, rimanda al login o alla pagina "Questo spazio è su invito", e con errori di rete o con il servizio in pausa riscrive su `/servizio` senza leggere il database. Su `/rsvp/{token}` controlla anche la forma del token, chiama il gate delle conferme di presenza e risponde da sé con la pagina neutra 404 o con il 429 (vedi [Conferme di presenza](#conferme-di-presenza-rsvp)).
 2. **Le pagine autenticate sono dinamiche.** Nessun dato utente viene messo in cache: una regola di lint vieta `use cache` nelle aree autenticate.
 3. **Le scritture passano da server actions** con validazione zod. La server action chiama l'RPC o la tabella con il **JWT dell'utente**. Lo stato delle transizioni (per esempio scegliere una data) lo cambia una funzione SQL atomica.
 4. **La decisione è del database.** Il codice non ricontrolla i permessi: se la RLS o la funzione dicono no, la richiesta fallisce.
@@ -49,7 +49,7 @@ Nessuno storage di file: R1 non carica file. Lo storage, quando servirà (R6), s
 `SUPABASE_SECRET_KEY` bypassa la RLS. Per questo:
 
 - è letta solo in `src/lib/supabase/admin.ts`, marcato `server-only`;
-- una regola ESLint permette di importare `admin.ts` solo da quattro ambiti: login e bootstrap (`features/auth/{login,bootstrap}.ts`), operazioni sugli account (`features/accounts/admin-ops.ts`), job (`features/jobs/**`), disattivazione email (`app/(public)/email/**`);
+- una regola ESLint permette di importare `admin.ts` solo da cinque ambiti: login e bootstrap (`features/auth/{login,bootstrap}.ts`), operazioni sugli account (`features/accounts/admin-ops.ts`), job (`features/jobs/**`), disattivazione email (`app/(public)/email/**`), pagina pubblica RSVP (`features/rsvp/public-rpc.ts`, solo le tre RPC pubbliche);
 - la stessa chiave è anche la chiave HMAC del limitatore di login (vedi [Sicurezza](sicurezza.md#r27--residui-del-limitatore-e-del-bootstrap)).
 
 ## Configurazione
@@ -95,6 +95,20 @@ Limiti per non rompere il rendering e il body delle server action:
 
 Gli errori mostrano codici e messaggi fissi. Né il database né il server restituiscono `message` o `details` di Postgres, perché possono contenere la riga.
 
+## Conferme di presenza (RSVP)
+
+Il link personale è l'unica area pubblica con dati di terzi. Le regole di accesso sono nell'[ADR-0003](../adr/0003-link-rsvp-token-derivato-accesso-pubblico.md), la sicurezza in [Sicurezza](sicurezza.md#pagina-pubblica-rsvp-adr-0003).
+
+| Parte | Dove | Cosa fa |
+|---|---|---|
+| Token | `src/features/rsvp/token.ts` | Token derivato da `RSVP_LINK_SECRET` e dall'id del link; forma, hash e URL. Il segreto si legge con `readRsvpLinkSecret()` in `app-config.ts` |
+| Bordo pubblico | `src/proxy.ts`, `public-rpc.ts`, `limiter.ts` | Il proxy chiama `rsvp_gate` con timeout di 3 secondi, fail-open. Un blocco dà 429 con `Retry-After`; un link che non funziona dà la 404 neutra scritta a mano (`neutral-html.ts`). Il proxy imposta `x-r2y-theme` con il tema del matrimonio e toglie quella del client |
+| Pagina pubblica | `src/app/(public)/rsvp/[token]/`, `src/features/rsvp/public/` | Pagina senza JavaScript obbligatorio, con `RsvpShell` e il modulo con `submitRsvp`. `not-found` non esiste: la neutra è del proxy, e la pagina mostra `LinkUnavailable` in 200 solo se il gate scade |
+| Lato coppia | `src/features/rsvp/actions.ts`, `data.ts`, `view.ts`, `LinkSheet.tsx` | Azioni sui link (crea, copia, rigenera, revoca, "Condiviso il"), stati calcolati in `view.ts`, lettura di `rsvp_status` |
+| Esportazione | `src/features/export/data.ts` | `rsvpResponses` e `rsvpLinks` nel JSON, mai il token né l'hash |
+
+Regole di invariante: `p_now` arriva solo dal server (`resolveNow()`), mai dalla richiesta; le RPC pubbliche sono solo per `service_role`; la pagina pubblica non ha un `loading.tsx`, perché uno streaming darebbe 200 a un link morto.
+
 ## Guida d'uso (`/guida`)
 
 La **Guida** sta in cima alla pagina Opzioni (non più nella barra) e mostra le pagine di `docs/functional`. Il contenuto arriva dagli stessi file Markdown, senza copie nel codice: un file modificato appare alla build successiva.
@@ -116,3 +130,4 @@ La **Guida** sta in cima alla pagina Opzioni (non più nella barra) e mostra le 
 | 2026-11-24 | FEAT-2026-001 | Prima stesura (F4, T18) |
 | 2026-11-25 | FEAT-2026-002 | Guida d'uso in app: route, lettura dei file, tracciamento Vercel, renderer e regole dei link |
 | 2026-11-25 | FEAT-2026-003 | Modulo invitati: dominio, letture, scritture, importazione ed esportazione; Guida in Opzioni; link Aiuto |
+| 2026-11-28 | FEAT-2026-004 | Conferme di presenza: bordo pubblico nel proxy, quinto ambito della chiave segreta, lato coppia ed esportazione |

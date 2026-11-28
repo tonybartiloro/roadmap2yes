@@ -51,7 +51,8 @@
    - Il blocco per IP in apertura dà **429 + `Retry-After`** dal proxy, che chiama `rsvp_gate` prima della pagina. Se la chiamata scade, il proxy lascia passare (fail-open).
    - Un invio su un link che non funziona più dà lo stesso contenuto neutro per ogni causa, ma con stato 200: una server action non può cambiare lo stato HTTP.
    - Il blocco sugli invii compare come messaggio nel modulo, per la stessa ragione.
-   - Sempre: `no-store`, `noindex`, `Referrer-Policy: no-referrer`; anteprima statica senza nomi.
+   - Sempre: `Cache-Control: private, no-store` e `noindex`; anteprima statica senza nomi.
+   - `Referrer-Policy`: `no-referrer` sulla pagina neutra 404 e sul 429, che non hanno moduli. `same-origin` sulla pagina con il modulo (D15, 2026-11-27): con `no-referrer` il modulo senza JavaScript invia `Origin: null` e Next rifiuta l'invio (DES-37). Con `same-origin` il referrer non esce mai dal sito: il percorso con il token può comparire nei log delle richieste dello stesso sito, con la stessa durata e lo stesso pubblico del punto 8.
 7. **Tema senza sessione.** Il proxy passa il tema del matrimonio, letto da `rsvp_gate`, in un'intestazione di richiesta propria (`x-r2y-theme`), che rimuove da ogni richiesta del client. Il layout radice la legge per prima. Per i link non validi usa il tema predefinito.
 8. **Residuo accettato (D5).** Il token sta nel percorso. Il codice dell'app non lo scrive mai nei log, ma il percorso finisce nei log delle richieste di Vercel (breve conservazione su Hobby, visibili solo al proprietario del progetto) e nella cronologia del browser.
 
