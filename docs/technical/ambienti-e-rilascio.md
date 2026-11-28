@@ -281,6 +281,48 @@ Controlli specifici di FEAT-2026-003 (Invitati), dopo il job `migrate` verde:
 18. Nel pannello Supabase, l'ultima riga di `audit_log` per `guests` non contiene nome, telefono, email o note.
 19. Se `/invitati` mostra "Non riesco a caricare gli invitati" per qualche minuto dopo il merge, è la finestra in cui il codice nuovo gira sullo schema vecchio: "Riprova" dopo il job `migrate`. Se persiste, il rollback è l'Instant Rollback di Vercel, non lo schema.
 
+### Rilascio R-04 (conferme di presenza)
+
+Checklist di FEAT-2026-004. Nessun feature flag: finché la coppia non crea un link, la superficie pubblica non dà nulla.
+
+**Prima del merge**
+
+- [ ] Lo sviluppatore crea `RSVP_LINK_SECRET` in Vercel, **Sensitive**, per Production e per Preview, con **due valori diversi** generati in locale (`openssl rand -base64 48`). Mai in chat, nei file o nei log.
+- [ ] Il release manager controlla **solo che il nome esista** nei due ambienti (mai il valore) prima di proporre il Gate C.
+- [ ] CI verde e preview provata. La preview non ha le migrazioni di R-04 (decisione D-A, vedi [Punti da confermare](#punti-da-confermare)): il foglio dei link si prova in locale.
+
+**Al merge** (Vercel e `migrate.yml` partono in parallelo)
+
+1. Parte il deploy di produzione di Vercel.
+2. `migrate.yml` applica le due migrazioni di R-04 nell'environment `production`, con l'approvazione del reviewer.
+3. Per qualche minuto la lista Invitati è senza stati RSVP e la pagina pubblica dà la risposta neutra (nessun link esiste ancora). È atteso.
+
+**Controlli post-deploy**, con un invitato finto (nome ed email `@example.test`) da cancellare alla fine:
+
+20. Il job `migrate` è verde sulle due migrazioni di R-04.
+21. Creare il link per l'invitato finto, aprirlo in una finestra in incognito e da WhatsApp sul telefono, rispondere: la lista mostra lo stato.
+22. **Revoca link**: il link apre la pagina neutra (404).
+23. `curl -I` sul link: presenti `X-Robots-Tag`, `Referrer-Policy` e `Cache-Control`.
+24. Nel pannello Supabase, l'ultima riga di `audit_log` per `rsvp_responses` non contiene `status` né `diet`.
+25. Opzioni > Esporta: il JSON non contiene `token_hash`.
+26. **Elimina definitivamente** l'invitato finto: risposta e link spariti. Poi nessun dato di prova resta in produzione.
+
+**Il seed non gira mai in remoto (QA-17).** `supabase/seeds/05_rsvp.sql` (account e invitati finti) è raggiunto solo da `supabase db reset` locale. Verifica del 2026-11-28:
+
+- `supabase/config.toml:28-31`: i seed (`./seeds/*.sql`) sono attivi, ma `config.toml` vale solo per locale e CI.
+- `package.json:72`: `db:reset` è `supabase db reset` senza `--linked`, quindi locale.
+- `.github/workflows/migrate.yml:59` e `:65`: l'unico comando verso il remoto è `db push --remote` (dry-run e applicazione), senza `--include-seed`. I commenti a `:6-10` e `:63` vietano seed e `reset --linked`.
+- Nessun altro workflow in `.github/workflows/` contiene `seed`, `db reset` o `--linked`.
+- `supabase/seeds/05_rsvp.sql:2-3` dichiara che è solo locale e CI.
+
+Resta fuori dal codice: un comando manuale `supabase db reset --linked` dal portatile. Il runbook lo vieta (regole in cima).
+
+### Rollback di R-04
+
+- **Codice**: Instant Rollback di Vercel. Lo schema additivo resta compatibile con il codice precedente.
+- **Schema**: si corregge con una migrazione nuova, mai cancellando quella applicata.
+- **Fuga del segreto**: runbook in [Link RSVP](#link-rsvp-segreto-e-revoca-totale), poi **Crea link per tutti**.
+
 ## Rollback
 
 - **Codice**: Instant Rollback di Vercel alla deploy precedente. Le migrazioni sono additive, quindi il codice precedente gira sullo schema nuovo.
@@ -331,3 +373,4 @@ Il segreto `RSVP_LINK_SECRET` firma i token dei link personali (ADR-0003). Il da
 | 2026-11-25 | FEAT-2026-002 | "Altro" diventa "Opzioni" nei percorsi del runbook; controllo della Guida in Preview e post-deploy |
 | 2026-11-25 | FEAT-2026-003 | Controlli post-deploy di Invitati (13-19); decisione D-A sulla preview |
 | 2026-11-28 | FEAT-2026-004 | `RSVP_LINK_SECRET` tra le variabili e i segreti da ruotare; ruotare non revoca; runbook di revoca totale |
+| 2026-11-28 | FEAT-2026-004 | Checklist di rilascio R-04 (controlli 20-26), prova QA-17 che il seed non gira in remoto, rollback |
