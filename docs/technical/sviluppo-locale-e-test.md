@@ -148,7 +148,13 @@ Dove stanno i test del modulo, per livello:
 - **Server e output**: `playwright.config.ts` copia l'output del server principale in un file temporaneo (`E2E_SERVER_LOG`, con `tee`). `rsvp.public.spec.ts` verifica che il token di prova non compaia in quel file. Lo scrive solo un server avviato da Playwright, non uno riusato.
 - **Link morti e IP**: i test dei link morti mandano un proprio `x-forwarded-for`. `next start` dà a tutte le richieste locali lo stesso indirizzo se nessuno lo indica, e il limite per IP si accumulerebbe tra un test e l'altro. Gli e2e non puliscono `rsvp_attempts`: le righe restano alla pulizia del limitatore.
 - **WebKit smoke**: i due test RSVP di `cross-browser.spec.ts` girano in CI solo nel job `e2e-full` (push su main, notturno o PR con l'etichetta `e2e-full`).
-- **Limiti in locale**: `x-forwarded-for` non è affidabile fuori da Vercel, quindi i test che provano i limiti usano un IP sintetico e puliscono `rsvp_attempts`. Un link aperto da WhatsApp su iPhone e Android, e Condividi da iPhone, si provano solo su dispositivo vero (Gate C); WebKit in locale non lo sostituisce.
+- **Limiti in locale**: `x-forwarded-for` non è affidabile fuori da Vercel, quindi i test che provano i limiti usano un IP sintetico. Solo i test di acceptance puliscono `rsvp_attempts`. Un link aperto da WhatsApp su iPhone e Android, e Condividi da iPhone, si provano solo su dispositivo vero (Gate C); WebKit in locale non lo sostituisce.
+
+## Prima di una prova completa
+
+- Prima di un `npm run test:integration` completo lanciate `npm run db:reset`. Su un database locale sporco, `jobs.test.ts` esegue il job giornaliero su tutti i matrimoni rimasti e rallenta. La CI parte sempre da zero.
+- La prova e2e locale completa richiede `E2E_PORT=3300 E2E_ALL_SERVERS=1 npm run e2e`. Senza `E2E_ALL_SERVERS=1` i progetti `degraded` ed `email-off` non hanno il loro server.
+- WebKit richiede `npm run e2e:install` una volta sola.
 
 ## Stato al termine di F3
 
