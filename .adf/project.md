@@ -17,7 +17,7 @@ commands:
   typecheck: "npm run typecheck"
   test: "npm run test"
   build: "npm run build"
-  e2e: "npm run e2e"
+  e2e: "E2E_ALL_SERVERS=1 npm run e2e"
 deploy:
   staging: "Vercel preview deployment per ogni PR"
   production: "automatico al merge su main (Vercel Hobby); per ora la produzione fa anche da staging"
@@ -61,3 +61,4 @@ Repo pubblico GitHub tonybartiloro/roadmap2yes (CI GitHub Actions, minuti illimi
 - Codice d'accesso: minimo 10 caratteri con lettere e cifre, imposto da Supabase Auth; nessun CAPTCHA in R1.
 - Utenti: Tony e Jessica (pari permessi); previsti ruoli futuri famiglia e wedding planner (opzionale).
 - e2e in locale: la porta 3000 della macchina di sviluppo è occupata da un'altra app Docker e Playwright la riusa (test falliti in massa). Usare `E2E_PORT=3300 npm run e2e` (con `npm run db:start` attivo); WebKit (`webkit-smoke`) richiede `npm run e2e:install`, altrimenti resta alla CI. Approvato dallo sviluppatore il 2026-11-25 (FEAT-2026-002).
+- e2e completi in locale: il comando e2e usa `E2E_ALL_SERVERS=1`, altrimenti i progetti `degraded` ed `email-off` restano senza server e falliscono. Prima di una prova completa conviene `npm run db:reset`. Approvato dallo sviluppatore il 2026-11-28 (FEAT-2026-004, QA-24).
