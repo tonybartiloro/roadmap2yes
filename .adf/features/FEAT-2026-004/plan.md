@@ -225,3 +225,19 @@ Tutte accolte (QA 17, designer 13, PO 7; riepilogo in `log.md`), integrate nelle
 | 2026-11-28 | T8: "Copia link" copia solo l'URL (il messaggio va con Condividi/WhatsApp); modalità del gruppo = conferma del passaggio all'altra modalità, non scelta a due opzioni; il tocco su WhatsApp segna "Condiviso il". T9: + `src/features/guests/GuestList.tsx` (costruisce le props di `GuestRow`/`GroupHeader`) e `src/features/rsvp/CreateAllDialog.tsx`; avviso "data non scelta" solo sulla data (nessun segnale della location nello snapshot) | Etichetta "link"; testo delle conseguenze copre i due sensi; unico punto in cui nascono le props della lista | coordinatore |
 
 ## Outcome
+Stato prima del merge (F5, in attesa di Gate C).
+
+**Costruito, per step**
+- S1 Dati: migrazioni `20261203100000_rsvp.sql` e `20261203200000_rsvp_public.sql` (tabelle `rsvp_*`, `rsvp_mode`, RPC coppia e pubbliche, `undo_guest_import` più stretta), seed locale.
+- S2 Server: token derivato (`token.ts`), `public-rpc.ts` (quinto ambito della chiave segreta), limitatore, proxy (gate, 429, tema), esportazione JSON con le chiavi RSVP.
+- S3 Pagina pubblica `/rsvp/[token]`: modulo con e senza JS, neutra 404 dal proxy (Arbitrato S3), `same-origin` sul modulo (D15).
+- S4 Lato coppia: stati in Invitati, foglio link (crea, copia, condividi, WhatsApp, nuovo, revoca, Annulla), modalità del gruppo, "Crea link per tutti", "Da rimandare".
+- S5 Prove, documenti, rilascio: acceptance, e2e, docs, checklist di rilascio.
+
+**Test (ultimo `adf verify --with-e2e`, contenuto 63170e5888b7)**: unit 1523, e2e 364 pass / 1 skip (WebKit smoke compreso), pgTAP 1785, integrazione 952 pass / 2 skip, lint, typecheck e build verdi. Revisioni code-1..10, security e design-1..3 chiuse.
+
+**Documenti**: `docs/functional/conferme-di-presenza.md`, `docs/technical/sicurezza.md`, `ambienti-e-rilascio.md`, ADR-0002 e ADR-0003.
+
+**Follow-up**: cancellazione massiva dei link (R-07); DES-63 nomi lunghi di gruppo/tavolo a 768 px (R-03); ordine del saluto WhatsApp a parità di cognome; DES-62 padding; DES-54 (Annulla del toast a 24 px) e focus di `ConfirmDialog` in sessione separata; QA-24 (comando e2e in `.adf/project.md`, serve il sì dello sviluppatore).
+
+**In sospeso**: Gate C; prove su dispositivi veri (link da WhatsApp su iOS e Android, Safari, Condividi da iPhone); `RSVP_LINK_SECRET` in Vercel (Production e Preview, valori diversi) prima del merge; controlli post-deploy 1-7.
