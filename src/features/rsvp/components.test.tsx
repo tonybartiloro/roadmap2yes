@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -51,7 +51,7 @@ const link: RsvpLink = {
 };
 const PREVIOUS = { shared_at: null, shared_by: null, people: [] };
 
-function sheet(extra: Partial<React.ComponentProps<typeof LinkSheet>> = {}) {
+function sheetProps(extra: Partial<React.ComponentProps<typeof LinkSheet>> = {}) {
   const props: React.ComponentProps<typeof LinkSheet> = {
     recipient,
     link,
@@ -64,7 +64,10 @@ function sheet(extra: Partial<React.ComponentProps<typeof LinkSheet>> = {}) {
     onOpenChange: vi.fn(),
     ...extra,
   };
-  return render(<LinkSheet {...props} />);
+  return props;
+}
+function sheet(extra: Partial<React.ComponentProps<typeof LinkSheet>> = {}) {
+  return render(<LinkSheet {...sheetProps(extra)} />);
 }
 
 beforeEach(() => {
@@ -106,30 +109,98 @@ describe("LinkSheet", () => {
     await waitFor(() => expect(nav.refresh).toHaveBeenCalled());
   });
 
-  it("after the expiry there is no Crea link and no Nuovo link (AC12)", () => {
+  it("after the expiry there is no Crea link and no Nuovo link, and one wording only (AC12)", () => {
     sheet({ link: null, state: { kind: "expired", on: "2027-10-03" } });
-    expect(screen.getByText(/Se sposti la data, i link tornano a funzionare da soli/)).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Scaduto il 3 ottobre 2027. Se sposti la data, i link tornano a funzionare da soli.",
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText(/Scade il/)).toBeNull();
     expect(screen.queryByRole("button", { name: /Crea/ })).toBeNull();
     expect(screen.queryByRole("button", { name: "Nuovo link" })).toBeNull();
     expect(actions.getLinkUrlAction).not.toHaveBeenCalled();
   });
 
-  it("copy marks as shared with an Annulla toast that undoes it", async () => {
+  it("copy marks as shared with an Annulla INSIDE the sheet, not a toast (DES-45)", async () => {
     sheet();
     await userEvent.click(await screen.findByRole("button", { name: "Copia link" }));
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith(URL_);
     await waitFor(() => expect(actions.markSharedAction).toHaveBeenCalledWith({ linkId: LINK_ID }));
-    const opts = vi.mocked(toast).mock.calls[0]![1] as unknown as {
-      duration: number;
-      action: { onClick: () => void };
-    };
-    expect(opts.duration).toBeGreaterThanOrEqual(8000);
+    const status = await screen.findByText(/Link copiato · Condiviso il \d+ \w+/);
+    expect(vi.mocked(toast)).not.toHaveBeenCalled();
     actions.unmarkSharedAction.mockResolvedValue(ok({ linkId: LINK_ID }));
-    opts.action.onClick();
+    nav.refresh.mockClear();
+    const undo = within(status.parentElement!).getByRole("button", { name: "Annulla" });
+    expect(undo.className).toContain("min-h-11");
+    await userEvent.click(undo);
     expect(actions.unmarkSharedAction).toHaveBeenCalledWith({
       linkId: LINK_ID,
       previous: PREVIOUS,
     });
+    await waitFor(() => expect(nav.refresh).toHaveBeenCalled());
+    expect(screen.queryByText(/Link copiato · Condiviso/)).toBeNull();
+  });
+
+  it("closing the sheet inside the window hands Annulla to a toast for the time left", async () => {
+    const view = sheet();
+    await userEvent.click(await screen.findByRole("button", { name: "Copia link" }));
+    await screen.findByText(/Link copiato · Condiviso il/);
+    view.unmount();
+    const [message, options] = vi.mocked(toast).mock.calls.at(-1) as unknown as [
+      string,
+      { duration: number; action: { label: string; onClick: () => void } },
+    ];
+    expect(message).toMatch(/Link copiato · Condiviso il/);
+    expect(options.action.label).toBe("Annulla");
+    expect(options.duration).toBeGreaterThan(8000);
+  });
+
+  it("a failed 'Condiviso' write says so in the sheet (no toast under the overlay)", async () => {
+    actions.markSharedAction.mockResolvedValue({ ok: false, code: "x", message: "no" });
+    sheet();
+    await userEvent.click(await screen.findByRole("button", { name: "Copia link" }));
+    expect(await screen.findByText(/segnare il link come condiviso/)).toBeTruthy();
+    expect(screen.queryByText(/Condiviso il/)).toBeNull();
+  });
+
+  it("the edited message is what WhatsApp and Condividi carry", async () => {
+    const share = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "share", { value: share, configurable: true });
+    sheet();
+    const box = await screen.findByLabelText("Messaggio");
+    await userEvent.clear(box);
+    await userEvent.type(box, "Ciao! {Enter}Eccoci");
+    const a = screen.getByRole("link", { name: "WhatsApp" }) as HTMLAnchorElement;
+    expect(decodeURIComponent(a.href)).toContain("Eccoci");
+    await userEvent.click(screen.getByRole("button", { name: "Condividi" }));
+    expect(share).toHaveBeenCalledWith({ text: expect.stringContaining("Eccoci") });
+  });
+
+  it("an answer for a link that is no longer the current one is ignored (race)", async () => {
+    let resolveOld: (v: unknown) => void = () => {};
+    actions.getLinkUrlAction.mockImplementation(({ linkId }: { linkId: string }) =>
+      linkId === LINK_ID
+        ? new Promise((resolve) => (resolveOld = resolve))
+        : Promise.resolve(ok({ url: "https://example.test/rsvp/new" })),
+    );
+    const view = sheet();
+    view.rerender(<LinkSheet {...sheetProps({ link: { ...link, id: "other-link" } })} />);
+    expect(((await screen.findByLabelText("Messaggio")) as HTMLTextAreaElement).value).toContain(
+      "rsvp/new",
+    );
+    resolveOld(ok({ url: URL_ }));
+    await Promise.resolve();
+    expect(
+      ((await screen.findByLabelText("Messaggio")) as HTMLTextAreaElement).value,
+    ).not.toContain(URL_);
+  });
+
+  it("starts with the focus on the title, not on 'Nuovo link' (DES-46)", async () => {
+    sheet();
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByRole("heading", { name: /Link di/ })),
+    );
   });
 
   it("a refused clipboard shows the URL and never marks as shared", async () => {
@@ -170,15 +241,52 @@ describe("LinkSheet", () => {
     await waitFor(() => expect(actions.markSharedAction).toHaveBeenCalled());
   });
 
-  it("a stale link says it must be regenerated and keeps Nuovo link", async () => {
-    actions.getLinkUrlAction.mockResolvedValue({
-      ok: false,
-      code: "link_not_working",
-      message: "x",
-    });
+  it("a hash mismatch says it must be regenerated, keeps Nuovo link and has no Riprova (REV-24)", async () => {
+    actions.getLinkUrlAction.mockResolvedValue({ ok: false, code: "stale", message: "x" });
     sheet();
-    expect(await screen.findByText("Questo link va rigenerato.")).toBeTruthy();
+    expect(await screen.findByText(/Questo link va rigenerato\./)).toBeTruthy();
     expect(screen.getByRole("button", { name: "Nuovo link" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Riprova" })).toBeNull();
+    expect(nav.refresh).not.toHaveBeenCalled();
+  });
+
+  it.each(["link_not_found", "link_not_working"])(
+    "%s means the screen is out of date: its own message, a refresh, no Riprova",
+    async (code) => {
+      actions.getLinkUrlAction.mockResolvedValue({
+        ok: false,
+        code,
+        message: "Nel frattempo qualcosa è cambiato.",
+      });
+      sheet();
+      expect(await screen.findByText("Nel frattempo qualcosa è cambiato.")).toBeTruthy();
+      expect(screen.queryByText(/va rigenerato/)).toBeNull();
+      expect(screen.queryByRole("button", { name: "Riprova" })).toBeNull();
+      expect(nav.refresh).toHaveBeenCalled();
+    },
+  );
+
+  it("an offline read of the URL is a readable error with Riprova", async () => {
+    actions.getLinkUrlAction.mockRejectedValueOnce(new Error("network"));
+    sheet();
+    expect(await screen.findByText(/Non sono riuscito a creare il link/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Riprova" })).toBeTruthy();
+  });
+
+  it("'Da rimandare' uses one cause-neutral line and 'Crea un nuovo link' also on reopen (D8)", () => {
+    sheet({
+      link: null,
+      hadLink: true,
+      state: { kind: "resend", guestIds: ["a"] },
+      resendNames: ["Mario Rossi"],
+    });
+    expect(
+      screen.getByText(
+        "Il link che avevi mandato non funziona più: mandane uno nuovo. Riguarda Mario Rossi.",
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText(/cambiato di gruppo/)).toBeNull();
+    expect(screen.getByRole("button", { name: "Crea un nuovo link" })).toBeTruthy();
   });
 
   it("a failure to read the URL offers Riprova", async () => {
@@ -201,6 +309,33 @@ describe("LinkSheet", () => {
     expect(actions.rotateLinkAction).not.toHaveBeenCalled();
     await userEvent.click(screen.getByRole("button", { name: "Crea nuovo link" }));
     expect(actions.rotateLinkAction).toHaveBeenCalledWith({ linkId: LINK_ID });
+  });
+
+  it("after Nuovo link the dead URL is not offered until the new link arrives (REV-123)", async () => {
+    actions.rotateLinkAction.mockResolvedValue(ok({ linkId: "n" }));
+    const view = sheet();
+    await userEvent.click(await screen.findByRole("button", { name: "Nuovo link" }));
+    await userEvent.click(screen.getByRole("button", { name: "Crea nuovo link" }));
+    await waitFor(() => expect(actions.rotateLinkAction).toHaveBeenCalled());
+    // The refresh has not returned: the old link prop is still there.
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Copia link" })).toBeNull());
+    expect(screen.queryByRole("link", { name: "WhatsApp" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Crea/ })).toBeNull();
+    expect(screen.getByRole("status", { name: "Carico il link" })).toBeTruthy();
+    actions.getLinkUrlAction.mockResolvedValue(ok({ url: "https://example.test/rsvp/new" }));
+    view.rerender(<LinkSheet {...sheetProps({ link: { ...link, id: "new-link" } })} />);
+    expect(await screen.findByRole("button", { name: "Copia link" })).toBeTruthy();
+    expect(((await screen.findByLabelText("Messaggio")) as HTMLTextAreaElement).value).toContain(
+      "rsvp/new",
+    );
+  });
+
+  it("gives the focus back to the opener when the confirmation closes (DES-51)", async () => {
+    sheet();
+    const opener = await screen.findByRole("button", { name: "Nuovo link" });
+    await userEvent.click(opener);
+    await userEvent.click(screen.getByRole("button", { name: "Annulla" }));
+    await waitFor(() => expect(document.activeElement).toBe(opener));
   });
 
   it("Revoca asks first, then Crea un nuovo link takes its place (AC7)", async () => {
@@ -233,6 +368,7 @@ describe("GroupModeDialog", () => {
         mode={mode}
         people={4}
         personalLinks={4}
+        groupLink
         onOpenChange={onOpenChange}
       />,
     );
@@ -245,10 +381,26 @@ describe("GroupModeDialog", () => {
     await waitFor(() => expect(document.activeElement).toBe(screen.getByText("Annulla")));
   });
 
-  it("the way back says the personal links stop working", () => {
-    expect(modeConsequence("together", { people: 4, personalLinks: 4 })).toContain(
-      "i 4 link personali smettono di funzionare",
+  it("names only the consequences that exist (DES-52, REV-28)", () => {
+    const c = (to: "together" | "separate", personalLinks: number, groupLink: boolean) =>
+      modeConsequence(to, { people: 4, personalLinks, groupLink });
+    expect(c("together", 4, false)).toContain("i 4 link personali smettono di funzionare");
+    expect(c("together", 1, false)).toContain("il link personale smette di funzionare");
+    expect(c("together", 0, false)).toBe(
+      'Passando a "insieme" basta un solo link per il gruppo. Nessun link da disattivare.',
     );
+    expect(c("together", 0, false)).not.toMatch(/\b0\b/);
+    expect(c("separate", 0, true)).toContain("il link del gruppo smette di funzionare");
+    expect(c("separate", 0, false)).not.toContain("link del gruppo");
+    expect(c("separate", 0, false)).toContain("Nessun link da disattivare");
+  });
+
+  it("a network failure is said in words and nothing changes", async () => {
+    actions.setGroupModeAction.mockRejectedValue(new Error("offline"));
+    const onOpenChange = dialog();
+    await userEvent.click(screen.getByRole("button", { name: /Passa a ognuno per sé/ }));
+    expect(await screen.findByText(/Controlla la connessione/)).toBeTruthy();
+    expect(onOpenChange).not.toHaveBeenCalledWith(false);
   });
 
   it("confirms with the version the person saw", async () => {

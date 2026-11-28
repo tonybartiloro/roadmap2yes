@@ -1056,13 +1056,20 @@ describe("RSVP in the list (AC1, AC8, AC9)", () => {
 
   it("a 'ognuno per sé' group has no link on its title, and 'Come rispondono' opens its dialog", async () => {
     const f = fixture();
-    renderRsvp(f, {});
+    renderRsvp(f, { snapshot: snap({ links: [link({ groupId: "g1" })] }) });
     expect(screen.getByText("Risponde ognuno per sé")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Invia il link di Amici" })).toBeNull();
     expect(screen.getByRole("button", { name: "Invia il link di Anna Rossi" })).toBeTruthy();
     await userEvent.click(screen.getByRole("button", { name: "Azioni del gruppo Famiglia Rossi" }));
     await userEvent.click(screen.getByRole("button", { name: "Come rispondono" }));
     expect(await screen.findByText(/servono 2 link nuovi/)).toBeTruthy();
+    // Closing it puts the focus back on the group menu button (DES-51).
+    await userEvent.click(screen.getByRole("button", { name: "Annulla" }));
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByRole("button", { name: "Azioni del gruppo Famiglia Rossi" }),
+      ),
+    );
   });
 
   it("'Crea link per tutti (N)' counts the recipients without a link, confirms and says so", async () => {

@@ -8,6 +8,14 @@ export const STALE_MESSAGE = "Questo link va rigenerato.";
 export const LINK_ERROR = "Non sono riuscito a creare il link. Riprova.";
 export const SHARE_ERROR = "Non sono riuscito a segnare il link come condiviso. Riprova.";
 
+/** Diet choices of the public page; the couple side reads the same labels (R-07 adds answers by them). */
+export const DIET_OPTIONS = [
+  { value: "vegetarian", label: "Vegetariano" },
+  { value: "vegan", label: "Vegano" },
+  { value: "gluten_free", label: "Senza glutine" },
+  { value: "lactose_free", label: "Senza lattosio" },
+] as const;
+
 /** Codes after which the screen is stale and must reload. */
 export const RSVP_STALE_CODES: ReadonlySet<string> = new Set([
   "link_not_found",

@@ -47,8 +47,8 @@ import type { GroupView, GuestView, GuestsSnapshot, TableView } from "./data";
 import { FamilySheet } from "./FamilySheet";
 import { FilterChips, FiltersSheet } from "./FiltersSheet";
 import { ActionMenu, type MenuAction } from "./GroupHeader";
+import { buildRsvpModel } from "./rsvp-model";
 import {
-  buildRsvpModel,
   FlatList,
   GroupedList,
   type ListHandlers,
@@ -210,6 +210,12 @@ export function GuestsScreen({
     [],
   );
 
+  const onSend = useCallback((recipient: Recipient) => setSheet({ kind: "link", recipient }), []);
+  const onMode = useCallback(
+    (group: GroupView) => setSheet({ kind: "mode", groupId: group.id }),
+    [],
+  );
+
   async function run<T>(work: () => Promise<T>): Promise<T> {
     setBusy(true);
     try {
@@ -221,13 +227,7 @@ export function GuestsScreen({
 
   const rsvpView: RsvpListView | undefined =
     rsvp && model
-      ? {
-          canWrite: rsvp.canWrite,
-          guests: model.guests,
-          groups: model.groups,
-          onSend: (recipient) => setSheet({ kind: "link", recipient }),
-          onMode: (group) => setSheet({ kind: "mode", groupId: group.id }),
-        }
+      ? { canWrite: rsvp.canWrite, guests: model.guests, groups: model.groups, onSend, onMode }
       : undefined;
 
   const handlers: ListHandlers = {
@@ -335,6 +335,54 @@ export function GuestsScreen({
     ? model?.recipients.find((r) => r.kind === linkTarget.kind && r.id === linkTarget.id)
     : undefined;
   const modeGroup = sheet?.kind === "mode" ? groups.find((g) => g.id === sheet.groupId) : undefined;
+
+  // Props of the link sheet and of the mode dialog (the state is computed once, here).
+  const linkSheet =
+    rsvp && rsvpNow && linkRecipient
+      ? (() => {
+          const { snapshot } = rsvp;
+          const state = linkState(linkRecipient, snapshot, rsvpNow);
+          return {
+            recipient: linkRecipient,
+            link: linkOf(linkRecipient, snapshot.links),
+            hadLink: snapshot.links.some(
+              (l) =>
+                l.revokedAt !== null &&
+                (linkRecipient.kind === "group"
+                  ? l.groupId === linkRecipient.id
+                  : l.guestId === linkRecipient.id),
+            ),
+            state,
+            expiresOn: snapshot.expiresOn,
+            dateChosen: snapshot.expiresOn !== null,
+            firstNames: live
+              .filter((g) => linkRecipient.memberIds.includes(g.id))
+              .map((g) => g.firstName),
+            couple: rsvp.couple,
+            resendNames: state.kind === "resend" ? resendNames(state.guestIds, live) : [],
+            canWrite: rsvp.canWrite,
+          };
+        })()
+      : null;
+  const modeDialog =
+    rsvp && modeGroup
+      ? {
+          groupId: modeGroup.id,
+          groupName: modeGroup.name,
+          version: modeGroup.version,
+          mode: modeGroup.rsvpMode ?? ("together" as const),
+          people: live.filter((g) => g.groupId === modeGroup.id).length,
+          personalLinks: rsvp.snapshot.links.filter(
+            (l) =>
+              l.revokedAt === null &&
+              l.guestId !== null &&
+              live.some((g) => g.id === l.guestId && g.groupId === modeGroup.id),
+          ).length,
+          groupLink: rsvp.snapshot.links.some(
+            (l) => l.revokedAt === null && l.groupId === modeGroup.id,
+          ),
+        }
+      : null;
 
   const closeSheet = (open: boolean) => {
     if (!open) setSheet(null);
@@ -655,44 +703,11 @@ export function GuestsScreen({
           onStale={stale}
         />
       ) : null}
-      {rsvp && rsvpNow && linkRecipient ? (
-        <LinkSheet
-          key={linkRecipient.id}
-          recipient={linkRecipient}
-          link={linkOf(linkRecipient, rsvp.snapshot.links)}
-          state={linkState(linkRecipient, rsvp.snapshot, rsvpNow)}
-          expiresOn={rsvp.snapshot.expiresOn}
-          dateChosen={rsvp.snapshot.expiresOn !== null}
-          firstNames={live
-            .filter((g) => linkRecipient.memberIds.includes(g.id))
-            .map((g) => g.firstName)}
-          couple={rsvp.couple}
-          resendNames={(() => {
-            const state = linkState(linkRecipient, rsvp.snapshot, rsvpNow);
-            return state.kind === "resend" ? resendNames(state.guestIds, live) : [];
-          })()}
-          canWrite={rsvp.canWrite}
-          onOpenChange={closeSheet}
-        />
+      {linkSheet ? (
+        <LinkSheet key={linkSheet.recipient.id} {...linkSheet} onOpenChange={closeSheet} />
       ) : null}
-      {rsvp && modeGroup && model ? (
-        <GroupModeDialog
-          key={modeGroup.id}
-          groupId={modeGroup.id}
-          groupName={modeGroup.name}
-          version={modeGroup.version}
-          mode={modeGroup.rsvpMode ?? "together"}
-          people={live.filter((g) => g.groupId === modeGroup.id).length}
-          personalLinks={
-            rsvp.snapshot.links.filter(
-              (l) =>
-                l.revokedAt === null &&
-                l.guestId !== null &&
-                live.some((g) => g.id === l.guestId && g.groupId === modeGroup.id),
-            ).length
-          }
-          onOpenChange={closeSheet}
-        />
+      {modeDialog && modeGroup ? (
+        <GroupModeDialog key={modeGroup.id} {...modeDialog} onOpenChange={closeSheet} />
       ) : null}
       {rsvp && createAll && sheet?.kind === "createAll" ? (
         <CreateAllDialog

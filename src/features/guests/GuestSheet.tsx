@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { toast } from "sonner";
-import { ChevronDown, ChevronRight, Trash2 } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, Clock, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -37,8 +37,12 @@ import {
   resolveGroup,
   type GroupChoice,
 } from "./GroupPicker";
-import { DIET_OPTIONS } from "@/features/rsvp/public/state";
-import { formatSharedDay, type Presence, type RsvpResponse } from "@/features/rsvp/view";
+import { DIET_OPTIONS } from "@/features/rsvp/constants";
+import {
+  formatSharedDay as formatDay,
+  type Presence,
+  type RsvpResponse,
+} from "@/features/rsvp/view";
 import { fullName, liveGroupId, type PartnerNames } from "./view";
 
 /** Read-only "Presenza" of the person sheet (design §1.2). */
@@ -49,11 +53,16 @@ export interface GuestSheetRsvp {
   invite: { text: string; onOpen: () => void } | null;
 }
 
-const PRESENCE_TEXT = { yes: "Sì", no: "No", pending: "In attesa" } as const;
+const PRESENCE_VIEW = {
+  yes: { Icon: Check, text: "Sì" },
+  no: { Icon: X, text: "No" },
+  pending: { Icon: Clock, text: "In attesa" },
+} as const;
 const DIET_LABELS = new Map<string, string>(DIET_OPTIONS.map((o) => [o.value, o.label]));
 
 function PresenceSection({ rsvp }: { rsvp: GuestSheetRsvp }) {
   const { response } = rsvp;
+  const { Icon, text } = PRESENCE_VIEW[rsvp.presence];
   const prefs =
     rsvp.presence === "yes" && response
       ? [...response.diet.map((d) => DIET_LABELS.get(d) ?? d), response.dietNote ?? ""].filter(
@@ -65,11 +74,15 @@ function PresenceSection({ rsvp }: { rsvp: GuestSheetRsvp }) {
       <h3 id="presence-title" className="text-base font-semibold">
         Presenza
       </h3>
-      <p className="text-base">{PRESENCE_TEXT[rsvp.presence]}</p>
+      <p className="flex items-center gap-1 text-base">
+        <Icon aria-hidden className="size-4 shrink-0" />
+        {text}
+      </p>
       {prefs.length > 0 ? <p className="text-base">Preferenze: {prefs.join(", ")}</p> : null}
       {response ? (
         <p className="text-muted-foreground text-sm">
-          Ultima risposta: {formatSharedDay(response.answeredAt)}, dall&apos;invitato
+          {/* Every answer is the guest's own until R-07 lets the couple answer: then read `source`. */}
+          Ultima risposta: {formatDay(response.answeredAt)}, dall&apos;invitato
         </p>
       ) : null}
       {rsvp.invite ? (

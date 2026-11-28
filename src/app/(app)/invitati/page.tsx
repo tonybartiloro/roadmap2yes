@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { displayName } from "@/lib/display-name";
 import { canReadGuests, GuestsLoadError, loadGuests, type Db } from "@/features/guests/data";
 import { GuestsScreen, type RsvpProps } from "@/features/guests/GuestsScreen";
-import { loadRsvp } from "@/features/rsvp/data";
+import { loadRsvp, RsvpLoadError } from "@/features/rsvp/data";
 import { getNow } from "@/lib/clock";
 import { pageContext } from "@/features/guests/server";
 import { LoadError } from "./LoadError";
@@ -84,15 +84,23 @@ async function canWriteGuests(db: Db): Promise<boolean> {
 async function rsvpProps(db: Db, couple: (string | null)[]): Promise<RsvpProps | null> {
   try {
     const now = await getNow();
-    const snapshot = await loadRsvp(db, now);
-    if (!snapshot) return null;
+    // In parallel: the permission check does not depend on the snapshot.
+    const [snapshot, canWrite] = await Promise.all([loadRsvp(db, now), canWriteGuests(db)]);
+    if (!snapshot) return null; // schema not migrated: the old list, silently
     return {
       snapshot,
       now: now.toISOString(),
       couple: couple.filter((n): n is string => Boolean(n)),
-      canWrite: await canWriteGuests(db),
+      canWrite,
     };
-  } catch {
+  } catch (error) {
+    // The list opens anyway, but the failure is not silent: a fixed code only (no error object,
+    // no names, no token or hash).
+    console.error(
+      error instanceof RsvpLoadError
+        ? `invitati: rsvp load failed (${error.infra ?? "read"})`
+        : "invitati: rsvp load failed (unexpected)",
+    );
     return null;
   }
 }

@@ -1,22 +1,13 @@
 "use client";
 
 import { useId } from "react";
-import { Pencil, Plus, Reply, Trash2 } from "lucide-react";
+import { Pencil, Plus, Trash2, UsersRound } from "lucide-react";
 import { countGuests } from "@/domain/guests";
-import {
-  groupAccessibleName,
-  linkState,
-  linkStateText,
-  presenceSummary,
-  recipientsOf,
-  type LinkState,
-  type Presence,
-  type Recipient,
-  type RsvpSnapshot,
-} from "@/features/rsvp/view";
+import { groupAccessibleName, type Recipient } from "@/features/rsvp/view";
 import type { GroupView, GuestView } from "./data";
 import { GroupHeader } from "./GroupHeader";
-import { GuestRow, rowColumns, type GuestRsvp } from "./GuestRow";
+import { GuestRow, rowColumns } from "./GuestRow";
+import { NO_RSVP, type GroupRsvp, type GuestRsvp } from "./rsvp-model";
 import { ShowMore } from "./ShowMore";
 import { categorySummary, PAGE_SIZE, type PartnerNames, type Section } from "./view";
 
@@ -27,75 +18,14 @@ export interface ListState {
   open: Record<string, boolean>;
 }
 
-/** RSVP of a group title (built by `GuestsScreen`). */
-export interface GroupRsvp {
-  /** "2 sì · 1 in attesa". */
-  summary: string;
-  /** Who the group's link is for (a "together" group with live people), else `null`. */
-  recipient: Recipient | null;
-  state: LinkState | null;
-  /** Second line of the title; `null` = none (an empty group). */
-  line: string | null;
-}
-
 /** The couple-side RSVP data of the list; absent while the schema is not migrated. */
 export interface RsvpListView {
   canWrite: boolean;
   guests: ReadonlyMap<string, GuestRsvp>;
   groups: ReadonlyMap<string, GroupRsvp>;
+  /** Stable callbacks: the memoised rows must not re-render for them (REV-26). */
   onSend: (recipient: Recipient) => void;
   onMode: (group: GroupView) => void;
-}
-
-/** The per-person and per-group RSVP of the list, from the snapshot (pure; `now` is a parameter). */
-export function buildRsvpModel(
-  live: readonly GuestView[],
-  groups: readonly GroupView[],
-  snapshot: RsvpSnapshot,
-  now: Date,
-): {
-  guests: Map<string, GuestRsvp>;
-  groups: Map<string, GroupRsvp>;
-  recipients: Recipient[];
-} {
-  const status = new Map(snapshot.responses.map((r) => [r.guestId, r.status]));
-  const presence = (id: string): Presence => status.get(id) ?? "pending";
-  const recipients = recipientsOf(live, groups);
-  const guestMap = new Map<string, GuestRsvp>();
-  const groupRecipient = new Map<string, Recipient>();
-  for (const r of recipients) {
-    if (r.kind === "group") groupRecipient.set(r.id, r);
-    else {
-      const state = linkState(r, snapshot, now);
-      guestMap.set(r.id, { presence: presence(r.id), link: { recipient: r, state } });
-    }
-  }
-  for (const g of live) {
-    if (!guestMap.has(g.id)) guestMap.set(g.id, { presence: presence(g.id), link: null });
-  }
-  const groupMap = new Map<string, GroupRsvp>();
-  for (const group of groups.filter((g) => !g.deletedAt)) {
-    const memberIds = live.filter((g) => g.groupId === group.id).map((g) => g.id);
-    const summary = presenceSummary(memberIds, snapshot.responses);
-    const recipient = groupRecipient.get(group.id) ?? null;
-    if ((group.rsvpMode ?? "together") === "separate") {
-      groupMap.set(group.id, {
-        summary,
-        recipient: null,
-        state: null,
-        line: "Risponde ognuno per sé",
-      });
-    } else {
-      const state = recipient ? linkState(recipient, snapshot, now) : null;
-      groupMap.set(group.id, {
-        summary,
-        recipient,
-        state,
-        line: state ? linkStateText(state) : null,
-      });
-    }
-  }
-  return { guests: guestMap, groups: groupMap, recipients };
 }
 
 export interface ListHandlers {
@@ -118,10 +48,12 @@ const keyOf = (id: string | null) => id ?? "none";
 /** Column titles from 768 px: decoration (`aria-hidden`), shown ONCE per list, not per group. */
 function ColumnHeader({ handlers, withGroup }: { handlers: ListHandlers; withGroup: boolean }) {
   const withTable = handlers.tableLabels !== null;
+  // Rows keep the room of "Invia" on the right so the columns line up (DES-50).
+  const reserve = handlers.rsvp?.canWrite && !handlers.selecting;
   return (
     <div
       aria-hidden
-      className={`text-muted-foreground border-border hidden border-b py-1.5 pr-3 text-sm font-semibold md:grid md:gap-x-3 ${handlers.selecting ? "md:pl-12" : "md:pl-3"} ${rowColumns(withGroup, withTable, Boolean(handlers.rsvp))}`}
+      className={`text-muted-foreground border-border hidden border-b py-1.5 text-sm font-semibold md:grid md:gap-x-3 ${reserve ? "pr-[6.5rem]" : "pr-3"} ${handlers.selecting ? "md:pl-12" : "md:pl-3"} ${rowColumns(withGroup, withTable, Boolean(handlers.rsvp))}`}
     >
       <span>Nome</span>
       <span>Tipo</span>
@@ -152,30 +84,31 @@ function Rows({
   const count = state.shown[id] ?? PAGE_SIZE;
   const withGroup = groupNames !== null;
   const withTable = handlers.tableLabels !== null;
+  const rsvp = handlers.rsvp;
   return (
     <>
       <ul id={`list-${id}`} className="flex flex-col">
-        {guests.slice(0, count).map((guest) => (
-          <GuestRow
-            key={guest.id}
-            guest={guest}
-            partners={partners}
-            groupLabel={groupNames?.get(guest.id) ?? null}
-            withGroup={withGroup}
-            withTable={withTable}
-            tableLabel={guest.tableId ? (handlers.tableLabels?.get(guest.tableId) ?? null) : null}
-            selecting={handlers.selecting}
-            selected={handlers.selected.has(guest.id)}
-            onSelect={handlers.onSelect}
-            onOpen={handlers.onOpen}
-            {...(handlers.rsvp
-              ? {
-                  rsvp: handlers.rsvp.guests.get(guest.id) ?? { presence: "pending", link: null },
-                  ...(handlers.rsvp.canWrite ? { onSend: handlers.rsvp.onSend } : {}),
-                }
-              : {})}
-          />
-        ))}
+        {guests.slice(0, count).map((guest) => {
+          const entry = rsvp ? (rsvp.guests.get(guest.id) ?? NO_RSVP) : null;
+          return (
+            <GuestRow
+              key={guest.id}
+              guest={guest}
+              partners={partners}
+              groupLabel={groupNames?.get(guest.id) ?? null}
+              withGroup={withGroup}
+              withTable={withTable}
+              tableLabel={guest.tableId ? (handlers.tableLabels?.get(guest.tableId) ?? null) : null}
+              selecting={handlers.selecting}
+              selected={handlers.selected.has(guest.id)}
+              onSelect={handlers.onSelect}
+              onOpen={handlers.onOpen}
+              {...(entry ? { rsvp: entry } : {})}
+              {...(rsvp?.canWrite ? { reserveSend: true } : {})}
+              {...(rsvp?.canWrite && entry?.link ? { onSend: rsvp.onSend } : {})}
+            />
+          );
+        })}
       </ul>
       <div className="p-2">
         <ShowMore remaining={guests.length - count} onClick={() => handlers.onShowMore(id)} />
@@ -249,7 +182,7 @@ function SectionBlock({
           ? [
               {
                 label: "Come rispondono",
-                icon: <Reply aria-hidden />,
+                icon: <UsersRound aria-hidden />,
                 onSelect: () => handlers.rsvp?.onMode(group),
               },
             ]

@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { useConflict } from "@/features/budget/use-conflict";
 import { RSVP_STALE_CODES } from "./constants";
 import { setGroupModeAction } from "./actions";
+import { useFocusReturn } from "./LinkSheet";
 
 export type GroupMode = "together" | "separate";
 
@@ -25,15 +26,27 @@ const MODE_WORDS: Record<GroupMode, string> = {
   separate: "ognuno per sé",
 };
 
-/** Consequence of the switch, written with the real number (design §1.2). */
+/**
+ * Consequence of the switch: only what really exists (design §1.2, BR3). `groupLink` = the group
+ * has a link now; `personalLinks` = non-revoked personal links of its people.
+ */
 export function modeConsequence(
   to: GroupMode,
-  counts: { people: number; personalLinks: number },
+  counts: { people: number; personalLinks: number; groupLink: boolean },
 ): string {
   if (to === "separate") {
-    return `Passando a "ognuno per sé" il link del gruppo smette di funzionare: servono ${plural(counts.people, "link nuovo", "link nuovi")}.`;
+    return counts.groupLink
+      ? `Passando a "ognuno per sé" il link del gruppo smette di funzionare: servono ${plural(counts.people, "link nuovo", "link nuovi")}.`
+      : `Passando a "ognuno per sé" ogni persona avrà il suo link. Nessun link da disattivare.`;
   }
-  return `Passando a "insieme" ${counts.personalLinks === 1 ? "il link personale smette" : `i ${counts.personalLinks} link personali smettono`} di funzionare: serve un solo link per il gruppo.`;
+  if (counts.personalLinks === 0) {
+    return `Passando a "insieme" basta un solo link per il gruppo. Nessun link da disattivare.`;
+  }
+  const stop =
+    counts.personalLinks === 1
+      ? "il link personale smette"
+      : `i ${counts.personalLinks} link personali smettono`;
+  return `Passando a "insieme" ${stop} di funzionare: basta un solo link per il gruppo.`;
 }
 
 /**
@@ -49,6 +62,7 @@ export function GroupModeDialog({
   mode,
   people,
   personalLinks,
+  groupLink,
   onOpenChange,
 }: {
   groupId: string;
@@ -57,9 +71,12 @@ export function GroupModeDialog({
   mode: GroupMode;
   people: number;
   personalLinks: number;
+  /** The group has a non-revoked link now. */
+  groupLink: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
   const router = useRouter();
+  const returnFocus = useFocusReturn(`Azioni del gruppo ${groupName}`);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
@@ -93,7 +110,15 @@ export function GroupModeDialog({
     setError(null);
     const send = (v: number) => setGroupModeAction({ groupId, version: v, mode: target });
     setPending(true);
-    const result = await send(version);
+    let result: Awaited<ReturnType<typeof send>>;
+    try {
+      result = await send(version);
+    } catch {
+      // Offline or the server did not answer: say so, nothing was changed.
+      setPending(false);
+      setError("Non sono riuscito a cambiarlo. Controlla la connessione e riprova.");
+      return;
+    }
     setPending(false);
     if (conflict.handle(result, { mode: target }, send)) return;
     done(result);
@@ -107,12 +132,13 @@ export function GroupModeDialog({
             event.preventDefault();
             cancelRef.current?.focus();
           }}
+          onCloseAutoFocus={returnFocus}
         >
           <AlertDialogHeader>
             <AlertDialogTitle>Come rispondono</AlertDialogTitle>
             <AlertDialogDescription>
               {`${groupName}: ora risponde ${MODE_WORDS[mode]}. `}
-              {modeConsequence(target, { people, personalLinks })}
+              {modeConsequence(target, { people, personalLinks, groupLink })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           {error ? (

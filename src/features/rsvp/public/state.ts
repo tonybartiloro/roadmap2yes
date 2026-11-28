@@ -1,3 +1,4 @@
+import { DIET_OPTIONS } from "../constants";
 import type { RsvpPerson } from "../public-rpc";
 
 /**
@@ -7,12 +8,7 @@ import type { RsvpPerson } from "../public-rpc";
 
 export const NOTE_MAX = 200;
 
-export const DIET_OPTIONS = [
-  { value: "vegetarian", label: "Vegetariano" },
-  { value: "vegan", label: "Vegano" },
-  { value: "gluten_free", label: "Senza glutine" },
-  { value: "lactose_free", label: "Senza lattosio" },
-] as const;
+export { DIET_OPTIONS };
 
 export const DIET_VALUES: readonly string[] = DIET_OPTIONS.map((option) => option.value);
 
